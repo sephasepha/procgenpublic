@@ -101,7 +101,7 @@
       ctx.fillRect(x + cp * 0.2, y + cp * 0.2, cp * 0.6, cp * 0.6);
     }
     if (anim.i < tr.length) requestAnimationFrame(stepAnim);
-    else { anim = null; draw(cur.mz); $('animBtn').textContent = 'Replay carving'; }
+    else { anim = null; draw(cur.mz); $('animBtn').textContent = 'Replay'; }
   }
 
   // ---------- panel ----------
@@ -165,6 +165,28 @@
   $('reseed').onclick = () => { S.seed = 1 + Math.floor(Math.random() * 999999); build(); startAnim(); };
   $('animBtn').onclick = () => { if (!anim) startAnim(); };
   $('cmpBtn').onclick = compare;
+
+  // ---------- explore: walk the current maze ----------
+  // Cells become a block grid: cell (x, y) sits at block (2x+1, 2y+1); passages fill the blocks between.
+  function exploreOpts() {
+    const { W, H: Hh, mz } = cur, bw = 2 * W + 1, bh = 2 * Hh + 1, pass = new Uint8Array(bw * bh);
+    for (let c = 0; c < W * Hh; c++) {
+      const x = 2 * (c % W) + 1, y = 2 * ((c / W) | 0) + 1;
+      pass[y * bw + x] = 1;
+      if (mz[c] & 2) pass[y * bw + x + 1] = 1;
+      if (mz[c] & 4) pass[(y + 1) * bw + x] = 1;
+    }
+    return {
+      w: bw, h: bh, pass, step: 2, light: 9,
+      start: bw + 1, goal: (bh - 2) * bw + (bw - 2),
+      colorOf: () => COL.floor,
+      title: `${MAZE_ALGOS[S.algo].short} · ${W}×${Hh} · seed ${S.seed}`,
+      optimal: cur.path.length - 1,
+      nextLabel: 'Next maze',
+      onNext: () => { S.seed = 1 + Math.floor(Math.random() * 999999); build(); return exploreOpts(); },
+    };
+  }
+  $('exploreBtn').onclick = () => { anim = null; draw(cur.mz); Explore.open(exploreOpts()); };
   window.addEventListener('resize', () => { if (cur) { sizeCanvas(); draw(cur.mz); } });
   build();
 })();

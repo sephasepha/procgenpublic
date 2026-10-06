@@ -48,10 +48,11 @@ td.hi { color: var(--s1); } td.lo { color: var(--s2); }
       <div class="algos" id="algos" role="group" aria-label="Algorithm"></div>
       <div class="plate"><canvas id="cv" aria-label="Maze preview"></canvas></div>
       <div class="nav">
-        <button class="btn" id="animBtn" type="button">Replay carving</button>
+        <button class="btn primary" id="exploreBtn" type="button">Explore ▸</button>
+        <button class="btn" id="animBtn" type="button">Replay</button>
         <span class="grow"></span>
         <span class="seed">seed <b id="seedOut">1</b></span>
-        <button class="btn primary" id="reseed" type="button">New maze</button>
+        <button class="btn" id="reseed" type="button">New maze</button>
       </div>
     </div>
 
@@ -92,6 +93,7 @@ td.hi { color: var(--s1); } td.lo { color: var(--s2); }
   </div>
 </div>
 <script src="gen/mazes.js"></script>
+<script src="explore/explore.js"></script>
 <script src="lab/lab.js"></script>
 <script src="assets/sw-register.js"></script>
 </body>

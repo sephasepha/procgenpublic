@@ -120,3 +120,33 @@ header .preset { grid-template-columns: repeat(2, minmax(0, 1fr)); min-width: 11
 .algos button { appearance: none; font: inherit; font-size: 0.82rem; padding: 7px 11px; border-radius: 999px; border: 1px solid var(--rule); background: var(--slab); color: var(--dim); cursor: pointer; }
 .algos button.on { background: var(--brass); border-color: var(--brass); color: var(--ink); font-weight: 700; }
 .note a, .blurb a { color: var(--brass); }
+
+/* ---------- explore mode ---------- */
+html.xp-open, html.xp-open body { overflow: hidden; }
+.xp { position: fixed; inset: 0; z-index: 50; background: var(--ink); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); }
+.xp-top { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; align-items: center; padding: 10px 14px 8px; border-bottom: 1px solid var(--rule); }
+.xp-title { font-family: var(--f-display); font-size: 1.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.xp-stats { grid-column: 1 / -1; display: flex; gap: 14px; font-family: var(--f-mono); font-size: 0.78rem; color: var(--dim); font-variant-numeric: tabular-nums; }
+.xp-stats b { color: var(--text); font-weight: 500; }
+.xp-btn { appearance: none; border: 1px solid var(--rule); background: var(--slab); color: var(--text); border-radius: 8px; width: 38px; height: 38px; font-size: 1rem; cursor: pointer; }
+.xp-stage { position: relative; min-height: 0; }
+.xp-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; image-rendering: auto; }
+.xp-bump { animation: xpbump 0.16s; }
+@keyframes xpbump { 30% { transform: translateX(3px); } 70% { transform: translateX(-3px); } }
+@media (prefers-reduced-motion: reduce) { .xp-bump { animation: none; } }
+.xp-done { position: absolute; left: 16px; right: 16px; top: 50%; transform: translateY(-50%); max-width: 420px; margin: 0 auto; background: var(--slab); border: 1px solid var(--brass-dim); border-radius: 10px; padding: 16px; display: grid; gap: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.6); }
+.xp-done h3 { margin: 0; font-family: var(--f-display); font-weight: 400; font-size: 1.5rem; color: var(--gate); }
+.xp-score { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.xp-score div { display: grid; gap: 1px; }
+.xp-score span { font-size: 0.72rem; color: var(--dim); }
+.xp-score b { font-family: var(--f-mono); font-weight: 500; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.xp-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.xp-row .btn { flex: 1; }
+.xp-bottom { display: grid; gap: 10px; padding: 10px 16px 14px; border-top: 1px solid var(--rule); justify-items: center; }
+.xp-toggles { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.xp-chip { appearance: none; font: inherit; font-size: 0.78rem; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--rule); background: transparent; color: var(--dim); cursor: pointer; }
+.xp-pad { display: grid; grid-template-columns: repeat(3, 64px); grid-template-rows: repeat(2, 56px); gap: 6px; grid-template-areas: ". up ." "left down right"; }
+.xp-key { appearance: none; border: 1px solid var(--rule); background: var(--slab); color: var(--text); border-radius: 12px; font-size: 1.2rem; cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.xp-key:active { background: var(--brass); color: var(--ink); border-color: var(--brass); }
+.xp-key.up { grid-area: up; } .xp-key.left { grid-area: left; } .xp-key.right { grid-area: right; } .xp-key.down { grid-area: down; }
+.xp button:focus-visible { outline: 2px solid var(--gate); outline-offset: 2px; }

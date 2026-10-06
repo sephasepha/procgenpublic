@@ -412,7 +412,7 @@ function prodsHTML() {
 function stageCtlHTML() {
   if (stage === S_PINS) return `<div class="eyebrow">Maze algorithm</div><div class="algos" role="group" aria-label="Maze algorithm">${['backtracker', 'growing', 'huntkill', 'prim', 'kruskal', 'wilson', 'aldous', 'binary', 'sidewinder'].map(k => `<button type="button" data-algo="${k}" class="${k === P.algo ? 'on' : ''}">${MAZE_ALGOS[k].short}</button>`).join('')}</div><p class="note">${MAZE_ALGOS[P.algo].blurb} Each biome still applies its own straightness and braid. Compare the raw algorithms in the <a href="lab.html#a=${P.algo}">Maze Lab</a>.</p>`;
   if (stage === S_WFC) return `<div class="eyebrow">Collapse</div><div class="row"><button class="btn" id="stepBtn" type="button">Step one cell</button><button class="btn" id="restartBtn" type="button">Re-run collapse</button><button class="btn" id="finishBtn" type="button">Finish now</button></div><p class="note">Same pins, new random choices: the progression stays, the architecture changes.</p>`;
-  if (stage === S_CHECK) return `<div class="eyebrow">Leftover pockets</div><div class="seg" role="group" aria-label="Pocket handling"><button type="button" data-fix="show">Show</button><button type="button" data-fix="prune">Prune</button><button type="button" data-fix="connect">Connect</button></div><div class="row"><label class="check"><input type="checkbox" id="tintChk"> Tint floor by tier</label><label class="check"><input type="checkbox" id="heatChk"> Flood-fill heat map</label></div><button class="btn" id="rerollBtn" type="button">Re-roll architecture</button>`;
+  if (stage === S_CHECK) return `<div class="eyebrow">Leftover pockets</div><div class="seg" role="group" aria-label="Pocket handling"><button type="button" data-fix="show">Show</button><button type="button" data-fix="prune">Prune</button><button type="button" data-fix="connect">Connect</button></div><div class="row"><label class="check"><input type="checkbox" id="tintChk"> Tint floor by tier</label><label class="check"><input type="checkbox" id="heatChk"> Flood-fill heat map</label></div><div class="row"><button class="btn primary" id="exploreBtn" type="button">Explore this dungeon ▸</button><button class="btn" id="rerollBtn" type="button">Re-roll architecture</button></div>`;
   const hint = [
     'Change the hub count or seed below to see a new layout.',
     'Borders shorter than three cells are ignored, so every link has room for a doorway.',
@@ -452,6 +452,7 @@ function updatePanel(full) {
     $('heatChk').checked = S.heat; $('tintChk').checked = S.tint;
     $('heatChk').onchange = e => { S.heat = e.target.checked; resetHeat(); updatePanel(true); };
     $('tintChk').onchange = e => { S.tint = e.target.checked; finalDirty = true; updatePanel(true); };
+    $('exploreBtn').onclick = () => Explore.open(exploreOpts());
     $('rerollBtn').onclick = () => { P.salt++; S.wfc = null; S.val = null; finishAndValidate(); updatePanel(true); };
   }
 }
@@ -472,6 +473,28 @@ function writeHash() {
   const parts = [`preset=${PRESET}`, `algo=${P.algo}`, `stage=${stage}`];
   Object.entries(HASH_KEYS).forEach(([k, [o, f]]) => parts.push(`${k}=${typeof o[f] === 'boolean' ? (o[f] ? 1 : 0) : o[f]}`));
   try { history.replaceState(null, '', '#' + parts.join('&')); } catch (e) { /* ignore */ }
+}
+// ---------- explore: walk the finished dungeon on its 3x3 sub-grid ----------
+function exploreOpts() {
+  finishAndValidate();
+  const sub = S.sub, v = S.fix === 'connect' ? S.val2 : S.val;
+  const pocket = new Uint8Array(SW * SH); S.val.pockets.forEach(cells => cells.forEach(i => pocket[i] = 1));
+  const pass = new Uint8Array(SW * SH);
+  for (let i = 0; i < SW * SH; i++) pass[i] = (sub.floor[i] && !(S.fix === 'prune' && pocket[i])) || (S.fix === 'connect' && S.carved[i]) ? 1 : 0;
+  const hubSub = p => (p.cy * 3 + 1) * SW + p.cx * 3 + 1;
+  // goal: the Vault in the Arsenal, otherwise the reachable hub farthest from the entrance
+  let goalP = S.reg.pts.find(p => p.fn === 'VA' && v.dist[hubSub(p)] >= 0);
+  if (!goalP) goalP = S.reg.pts.reduce((a, p) => (v.dist[hubSub(p)] > v.dist[hubSub(a)] ? p : a), S.reg.pts[S.reg.entrance]);
+  const goal = hubSub(goalP);
+  const colorOf = i => { if (S.fix === 'connect' && S.carved[i] && !sub.floor[i]) return '#6b5a33'; const st = subStyle(sub.tileOf, i); return st >= 0 ? STYLE_FLOOR[st] : '#6b5a33'; };
+  const landmarks = S.reg.pts.filter(p => p !== goalP).map(p => ({ i: hubSub(p), label: p.fn || TIERS[p.tier].short, color: TIER_COL[p.tier] }));
+  const goalName = goalP.fn ? FUNCS[goalP.fn].name : 'deepest hub';
+  return {
+    w: SW, h: SH, pass, step: 1, light: 11, start: v.start, goal, colorOf, landmarks,
+    title: `Find the ${goalName} · seed ${P.seed}`, optimal: v.dist[goal],
+    nextLabel: 'Next dungeon',
+    onNext: () => { P.seed = 1 + Math.floor(Math.random() * 99999); P.salt = 0; $('seedOut').textContent = P.seed; compute(1); go(S_CHECK); return exploreOpts(); },
+  };
 }
 function go(n) {
   stage = Math.max(1, Math.min(NST, n));

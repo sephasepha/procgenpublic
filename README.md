@@ -13,6 +13,8 @@ Open it on your phone and use **Add to Home Screen** to install it as an app. It
   - *Arsenal*: a dead empire's arsenal with clearance rings, function nodes assigned by doctrine, and a ruin pass that opens breaches.
 - **Maze Lab** (`lab.html`): nine classic maze algorithms on a plain grid, with carving replay, solution and distance overlays, and a comparison table across many seeds.
 
+Both pages have an **Explore** mode: you start at the entrance and walk the generated space with an on-screen arrow pad, swipes or the keyboard. A light radius spreads along corridors (never through walls), explored areas stay dimly mapped, **Run** follows a corridor to the next junction, and reaching the goal (the maze exit, or the Vault / deepest hub in a dungeon) shows your steps against the shortest route.
+
 Every setting lives in the page URL, so any generation can be bookmarked, shared or replayed exactly.
 
 ## Layout
@@ -22,6 +24,7 @@ gen/mazes.js      maze algorithms + metrics (no DOM, works in Node)
 gen/core.js       pipeline: regions, grammar, field, corridors, WFC, validation (no DOM)
 workbench/app.js  workbench UI
 lab/lab.js        Maze Lab UI
+explore/explore.js  walkable explore mode shared by both pages
 assets/           shared styles, icons, service worker registration
 tests/run.js      generator test suite
 ```
