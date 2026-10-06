@@ -478,7 +478,8 @@ function genMaze(field, cor, seed, algo) {
 }
 
 class WFC {
-  constructor(field, cor, seed, reg, maze, strength) {
+  // opts.lazy: build domains and weights only; solve() does the first restart (so a faster kernel can)
+  constructor(field, cor, seed, reg, maze, strength, opts) {
     this.field = field; this.cor = cor; this.maze = maze; this.strength = strength || 0;
     this.styleOfRegion = reg.pts.map(p => p.style);
     this.rng = mulberry32(seed * 7 + 99);
@@ -488,9 +489,17 @@ class WFC {
     this.ent = new Float32Array(NC);
     this.dirty = new Uint8Array(NC);
     this.resets = 0; this.restarts = 0; this.done = false; this.collapsedSteps = 0;
-    this.buildInit();
-    this.buildWeights();
-    this.restart();
+    this.seed = seed;
+    this.lazy = !!(opts && opts.lazy);
+    if (!this.lazy) { this.buildInit(); this.buildWeights(); this.restart(); }
+  }
+  // run to completion, as the infinite world does; the WebAssembly kernel (gen/wasm.js) replaces this
+  // with a bit-identical, much faster solver when it is loaded
+  solve(maxSteps) {
+    const K = typeof WFC_WASM !== 'undefined' && WFC_WASM && !this.noWasm ? WFC_WASM : null;
+    if (K && this.lazy) { K.solve(this, maxSteps); this.lazy = false; return; }
+    if (this.lazy) { this.buildInit(); this.buildWeights(); this.restart(); this.lazy = false; }
+    let guard = 0; while (this.step() && guard++ < maxSteps) {}
   }
   styleSet(c) {
     // a cell may use its own style and its band partner; a pinned corridor cell may also take the style of the
@@ -506,10 +515,10 @@ class WFC {
     }
     return m;
   }
-  allowed(t, c) {
+  allowed(t, c, setIn) {
     const ex = this.field.excluded;
     if (ex && ex[c]) return t === 0;
-    const f = this.field, tt = tiles[t], x = c % COLS, y = (c / COLS) | 0, rq = this.cor.req[c], set = this.styleSet(c);
+    const f = this.field, tt = tiles[t], x = c % COLS, y = (c / COLS) | 0, rq = this.cor.req[c], set = setIn !== undefined ? setIn : this.styleSet(c);
     if (tt.style === -1) { if (rq || this.cor.stamp[c]) return false; }
     else if (tt.gate) {
       const a = tt.gate[0], b = tt.gate[1];
@@ -528,7 +537,7 @@ class WFC {
     }
     return true;
   }
-  buildInit() { for (let c = 0; c < NC; c++) for (let t = 0; t < T; t++) this.init[c * T + t] = this.allowed(t, c) ? 1 : 0; }
+  buildInit() { for (let c = 0; c < NC; c++) { const set = this.styleSet(c); for (let t = 0; t < T; t++) this.init[c * T + t] = this.allowed(t, c, set) ? 1 : 0; } }
   buildWeights() {
     // per-cell tile weights: the biome's table, scaled by how well each tile's openings follow the maze
     const W = this.W = new Float32Array(NC * T), mz = this.maze, S0 = this.strength;
@@ -740,4 +749,4 @@ function validateGrammar(floor, tileOf, val, reg, field, rules, cor) {
   return { links: links.size, linkList: [...links], cross, illegal, capViol, skip, breaches };
 }
 
-if (typeof module !== 'undefined') module.exports = { subStyle, assignFunctions, mulberry32, makeNoise, tierPairOK, OPP, DX, DY, setPreset, PRESETS, FUNCS, DOCTRINE, genMaze, COLS, ROWS, NC, T, tiles, STYLES, TIERS, genRegions, genCandidates, genGrammar, validateGrammar, genField, genCorridors, WFC, buildSub, validate, connectPockets, SW, SH };
+if (typeof module !== 'undefined') module.exports = { tSock, tW, subStyle, assignFunctions, mulberry32, makeNoise, tierPairOK, OPP, DX, DY, setPreset, PRESETS, FUNCS, DOCTRINE, genMaze, COLS, ROWS, NC, T, tiles, STYLES, TIERS, genRegions, genCandidates, genGrammar, validateGrammar, genField, genCorridors, WFC, buildSub, validate, connectPockets, SW, SH };

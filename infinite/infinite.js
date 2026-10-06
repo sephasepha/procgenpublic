@@ -48,6 +48,8 @@
   }
   function deliver(r) {
     const k = K(r.sx, r.sy);
+    if (r.timing) { st.perf.gens.push({ ...r.timing, at: performance.now() }); if (st.perf.gens.length > 200) st.perf.gens.shift(); }
+    if (r.ok && r.sx === 0 && r.sy === 0 && !st.perf.firstSector) st.perf.firstSector = performance.now() - st.perf.opened;
     st.pending.delete(k);
     if (!r.ok) { st.sectors.set(k, { ...r, failed: true }); st.failures++; return; }
     if (!st.seen.has(k)) st.seen.set(k, new Uint8Array(SW * SH));
@@ -92,6 +94,7 @@
         <canvas class="mini" aria-label="Sector map"></canvas>
         <div class="toast" role="status" aria-live="polite" hidden></div>
         <div class="rules" hidden></div>
+        <div class="perf" hidden aria-live="off"></div>
       </div>
       <div class="xp-bottom">
         <div class="xp-toggles">
@@ -99,6 +102,7 @@
           <button class="xp-chip" data-x="zoom" type="button">View: close</button>
           <button class="xp-chip" data-x="tiles" type="button">Tiles: on</button>
           <button class="xp-chip" data-x="rules" type="button">Rules</button>
+          <button class="xp-chip" data-x="perf" type="button">Perf</button>
         </div>
         <div class="xp-pad" role="group" aria-label="Move">
           <button class="xp-key up" data-d="0" type="button" aria-label="Up">▲</button>
@@ -108,12 +112,13 @@
         </div>
       </div>`;
     document.body.appendChild(el);
-    let hold = null;
-    const press = d => { move(d); clearInterval(hold); hold = setInterval(() => move(d), 110); };
-    const release = () => { clearInterval(hold); hold = null; };
+    // input is state, read by the game loop: directions held down (latest first) and one buffered tap,
+    // so a turn pressed just before reaching a junction is taken there
+    const press = d => { if (!st) return; st.held = [d, ...st.held.filter(x => x !== d)]; st.buffer = { d, until: performance.now() + 250 }; };
+    const release = d => { if (st) st.held = st.held.filter(x => x !== d); };
     el.querySelectorAll('.xp-key').forEach(b => {
       b.addEventListener('pointerdown', e => { e.preventDefault(); b.setPointerCapture?.(e.pointerId); press(+b.dataset.d); });
-      ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => b.addEventListener(t, release));
+      ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => b.addEventListener(t, () => release(+b.dataset.d)));
     });
     el.addEventListener('click', e => {
       const x = e.target.closest('[data-x]'); if (!x) return;
@@ -123,6 +128,7 @@
       if (k === 'zoom') { st.map = !st.map; x.textContent = 'View: ' + (st.map ? 'map' : 'close'); }
       if (k === 'tiles') { st.tiles = !st.tiles; x.textContent = 'Tiles: ' + (st.tiles ? 'on' : 'off'); st.sectors.forEach(s => s.dirty = true); }
       if (k === 'rules') { const r = el.querySelector('.rules'); r.hidden = !r.hidden; if (!r.hidden) rules(); }
+      if (k === 'perf') { const r = el.querySelector('.perf'); r.hidden = !r.hidden; }
       st.redraw = true; st.layerDirty = true;
     });
     const cv = el.querySelector('canvas.main');
@@ -131,21 +137,25 @@
     cv.addEventListener('pointerup', e => {
       if (!sw) return; sw = false;
       const dx = e.clientX - sx, dy = e.clientY - sy;
-      if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
-      move(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0));
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 24 || !st) return;
+      st.buffer = { d: Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0), until: performance.now() + 400 };
     });
+    const KEYS = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3, w: 0, d: 1, s: 2, a: 3 };
     window.addEventListener('keydown', e => {
       if (el.hidden) return;
-      const k = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3, w: 0, d: 1, s: 2, a: 3 }[e.key];
-      if (k !== undefined) { e.preventDefault(); move(k); }
+      const k = KEYS[e.key];
+      if (k !== undefined) { e.preventDefault(); if (!e.repeat) press(k); }
       if (e.key === 'Escape') close();
     });
+    window.addEventListener('keyup', e => { const k = KEYS[e.key]; if (k !== undefined) release(k); });
+    window.addEventListener('blur', () => { if (st) st.held = []; });
     window.addEventListener('resize', () => { if (!el.hidden) { size(); st.redraw = true; } });
     return el;
   }
 
   function open(settings) {
     ui(); makePool(); buildAtlas();
+    if (root.GenWasm && !GenWasm.ready && !GenWasm.loading) GenWasm.loading = GenWasm.load('wasm/gen.wasm'); // for the main-thread fallback
     TIER_COL = PRESETS[settings.preset || WORLD_DEFAULTS.preset].colors || BASE_COL;
     const gen = (st ? st.gen : 0) + 1;
     st = {
@@ -153,6 +163,8 @@
       sectors: new Map(), pending: new Set(), seen: new Map(), charted: new Set(), visited: new Set(['0,0']),
       cs: [0, 0], gx: 0, gy: 0, from: [0, 0], t: 1, placed: false, litList: [],
       fog: true, map: false, tiles: true, steps: 0, started: 0, failures: 0, deepest: 0, redraw: true,
+      held: [], buffer: null, mv: null, speed: 8, // tiles per second
+      perf: { frames: [], layer: [], gens: [], firstSector: 0, opened: performance.now(), drops: 0 },
     };
     queue = [];
     el.querySelector('[data-x="fog"]').textContent = 'Light: on';
@@ -182,16 +194,34 @@
     const cs = ownerSub(st.gx, st.gy);
     if (cs[0] !== st.cs[0] || cs[1] !== st.cs[1]) crossed(st.cs, cs);
   }
-  function move(d) {
-    if (!st || !st.placed || el.hidden) return;
+  // the game loop's movement: one tile per step at st.speed tiles a second, chained while a direction is held
+  function tryStep(d, t) {
     const p = canStep(st.gx, st.gy, d);
-    if (p === -1) { toast('Charting the next sector…', true); const o = ownerSub(st.gx + DX[d], st.gy + DY[d]); request(o[0], o[1]); return; }
-    if (p !== 1) { bump(); return; }
-    if (!st.started) st.started = performance.now();
-    st.from = [st.gx, st.gy]; st.t = 0;
-    stepTo(d); // always exactly one tile per move
+    if (p === -1) { toast('Charting the next sector…', true); const o = ownerSub(st.gx + DX[d], st.gy + DY[d]); request(o[0], o[1]); return false; }
+    if (p !== 1) return false;
+    if (!st.started) st.started = t;
+    st.from = [st.gx, st.gy];
+    stepTo(d);
+    st.mv = { t0: t, dur: 1000 / st.speed };
     light(); hud();
+    return true;
   }
+  function update(t) {
+    if (!st.placed) return;
+    if (st.mv && t - st.mv.t0 < st.mv.dur) return; // still walking to the next tile
+    const carry = st.mv ? Math.min(st.mv.dur, t - st.mv.t0 - st.mv.dur) : 0; // keep chained steps evenly spaced
+    st.mv = null;
+    const want = [];
+    if (st.buffer && st.buffer.until > t) want.push(st.buffer.d);
+    st.held.forEach(d => { if (!want.includes(d)) want.push(d); });
+    for (const d of want) {
+      if (tryStep(d, t - carry)) { if (st.buffer && st.buffer.d === d) st.buffer = null; return; }
+    }
+    if (st.buffer && st.buffer.until <= t) st.buffer = null;
+    if (want.length && !st.bumped) { bump(); st.bumped = true; } else if (!want.length) st.bumped = false;
+  }
+  // kept for scripted use (tests, tools): one immediate step
+  function move(d) { if (!st || !st.placed || el.hidden) return; st.mv = null; tryStep(d, performance.now()); }
   function bump() { const c = el.querySelector('canvas.main'); c.classList.remove('xp-bump'); void c.offsetWidth; c.classList.add('xp-bump'); }
   function crossed(a, b) {
     const A = sectorInfo(st.S, a[0], a[1]), B = sectorInfo(st.S, b[0], b[1]);
@@ -408,17 +438,22 @@
     return (stars = out);
   }
 
-  function loop() {
+  function loop(t) {
     st.raf = requestAnimationFrame(loop);
-    if (st.t < 1) { st.t = Math.min(1, st.t + 0.34); }
+    t = t || performance.now();
+    const P = st.perf, f0 = performance.now();
+    update(t);
+    st.t = st.mv ? Math.min(1, (t - st.mv.t0) / st.mv.dur) : 1;
     st.sectors.forEach(s => { if (!s.failed && (s.dirty || s.cells.length)) paint(s); });
-    if (st.started && (performance.now() | 0) % 1000 < 17) hud();
-    const now = performance.now();
-    if (now - (st.lastFrame || 0) < 30) return; // about 30 frames a second is plenty for drifting fog and spores
-    st.lastFrame = now;
-    ambience(); draw(now / 1000); drawMini();
+    ambience(); draw(t / 1000);
+    if (!st.miniAt || t - st.miniAt > 100) { drawMini(); st.miniAt = t; }
+    if (st.started && (!st.hudAt || t - st.hudAt > 1000)) { hud(); st.hudAt = t; }
+    // performance: frame interval and the work done in this frame
+    if (P.last) { const dt = t - P.last; P.frames.push([dt, performance.now() - f0]); if (P.frames.length > 240) P.frames.shift(); if (dt > 50) P.drops++; }
+    P.last = t;
+    if (!el.querySelector('.perf').hidden && (!P.shownAt || t - P.shownAt > 500)) { perfPanel(); P.shownAt = t; }
   }
-  const ease = t => 1 - (1 - t) * (1 - t);
+  const ease = t => t; // constant speed: chained steps glide instead of pulsing
   function draw(time) {
     const W = cv.width, H = cv.height, a = st.amb;
     g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
@@ -445,7 +480,7 @@
         g.drawImage(s.cv, Math.floor(x), Math.floor(y), Math.ceil(w), Math.ceil(h));
       });
     } else {
-      if (st.layerDirty || !layer.cv) buildLayer();
+      if (st.layerDirty || !layer.cv) { const t0 = performance.now(); buildLayer(); st.perf.layer.push(performance.now() - t0); if (st.perf.layer.length > 120) st.perf.layer.shift(); }
       g.drawImage(layer.cv, Math.round(ox + layer.x0 * bs), Math.round(oy + layer.y0 * bs), Math.round(layer.w * bs), Math.round(layer.h * bs));
       // glowing tiles: candles, eyes, the bloom heart, unsealed pits
       g.globalCompositeOperation = 'lighter';
@@ -618,5 +653,35 @@
       `<div class="rules-n">Deepest reached: ${st.deepest ? tierName(st.S, st.deepest % 3, Math.floor(st.deepest / 3) + 1) : sectorInfo(st.S, 0, 0).name}</div>`;
   }
 
-  root.Infinite = { open, close, state: () => st };
+  // ---------- performance: tracked live, shown on the Perf panel, readable by tools/bench-browser.py ----------
+  const q = (a, p) => { if (!a.length) return 0; const b = a.slice().sort((x, y) => x - y); return b[Math.min(b.length - 1, Math.floor(b.length * p))]; };
+  function perfSummary() {
+    const P = st.perf, dts = P.frames.map(f => f[0]), work = P.frames.map(f => f[1]), g = P.gens;
+    const field = k => g.map(x => x[k]).filter(v => v !== undefined);
+    return {
+      fps: dts.length ? 1000 / (dts.reduce((a, b) => a + b, 0) / dts.length) : 0,
+      frameP95: q(dts, 0.95), workMedian: q(work, 0.5), workP95: q(work, 0.95), drops: P.drops,
+      layerMedian: q(P.layer, 0.5), layerP95: q(P.layer, 0.95),
+      genCount: g.length, genMedian: q(field('total'), 0.5), genP95: q(field('total'), 0.95), genMax: q(field('total'), 1),
+      dressMedian: q(field('dress'), 0.5), wfcMedian: q(field('wfc'), 0.5),
+      wasm: g.length ? g.every(x => x.wasm) : null, wasmError: g.length ? g[g.length - 1].wasmError : null,
+      firstSector: P.firstSector, workers: pool.filter(w => !w.dead).length, pending: st.pending.size, loaded: st.sectors.size,
+    };
+  }
+  function perfPanel() {
+    const p = perfSummary(), f = (v, d = 1) => (+v).toFixed(d);
+    const row = (k, v, ok) => `<div class="${ok === undefined ? '' : ok ? 'ok' : 'bad'}"><span>${k}</span><b>${v}</b></div>`;
+    el.querySelector('.perf').innerHTML = `<div class="rules-h">Performance</div>` +
+      row('frame rate', `${f(p.fps, 0)} fps · p95 ${f(p.frameP95)} ms`, p.frameP95 < 25) +
+      row('work per frame', `${f(p.workMedian)} ms · p95 ${f(p.workP95)} ms`, p.workP95 < 8) +
+      row('view rebuild', `${f(p.layerMedian)} ms · p95 ${f(p.layerP95)} ms`) +
+      row('sector generation', `${f(p.genMedian, 0)} ms · p95 ${f(p.genP95, 0)} ms (${p.genCount})`, p.genP95 < 150) +
+      row('  layout WFC / dressing', `${f(p.wfcMedian)} / ${f(p.dressMedian)} ms`) +
+      row('generator', p.wasm === null ? '…' : p.wasm ? 'WebAssembly' : 'JavaScript' + (p.wasmError ? ' (' + p.wasmError + ')' : ''), p.wasm !== false) +
+      row('first sector ready', `${f(p.firstSector, 0)} ms`, p.firstSector < 1500) +
+      row('workers · queue · loaded', `${p.workers} · ${p.pending} · ${p.loaded}`) +
+      row('long frames (> 50 ms)', p.drops, p.drops < 5);
+  }
+
+  root.Infinite = { open, close, state: () => st, perf: () => st && perfSummary(), move };
 })(window);

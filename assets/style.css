@@ -163,6 +163,9 @@ html.xp-open, html.xp-open body { overflow: hidden; }
 .inf .rules .ok span { color: var(--s1); } .inf .rules .bad span { color: var(--t2); }
 .inf .rules-h { font-family: var(--f-mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--brass); margin-bottom: 2px; }
 .inf .rules-n { color: var(--dim); font-size: 0.78rem; margin-top: 4px; }
+.inf .perf { position: absolute; left: 10px; right: 10px; top: 10px; background: rgba(25,28,35,0.94); border: 1px solid var(--rule); border-radius: 10px; padding: 10px 12px; display: grid; gap: 3px; font-size: 0.78rem; z-index: 3; }
+.inf .perf > div:not(.rules-h) { display: flex; justify-content: space-between; gap: 10px; font-family: var(--f-mono); }
+.inf .perf .ok b { color: var(--s1); } .inf .perf .bad b { color: var(--t2); }
 .preview-wrap { border: 1px solid var(--rule); border-radius: 4px; background: #0b0c10; overflow: hidden; }
 .preview-wrap canvas { display: block; width: 100%; height: auto; }
 .descend { font-size: 1rem; padding: 12px 18px; }

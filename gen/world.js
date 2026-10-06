@@ -21,6 +21,7 @@
   const MARGIN = 5, CW = COLS - 2 * MARGIN, CH = ROWS - 2 * MARGIN;
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 
+  const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
   function h32(a, b, c, d) {
     let h = Math.imul(a | 0, 0x9E3779B1) ^ Math.imul(b | 0, 0x85EBCA77) ^ Math.imul(c | 0, 0xC2B2AE3D) ^ Math.imul(d | 0, 0x27D4EB2F);
     h ^= h >>> 15; h = Math.imul(h, 0x2C1B3C6D); h ^= h >>> 12; h = Math.imul(h, 0x297A2D39); h ^= h >>> 15;
@@ -128,7 +129,7 @@
     const S = { ...WORLD_DEFAULTS, ...Sin };
     setPreset(S.preset);
     const arsenal = S.preset === 'arsenal';
-    const t0 = Date.now();
+    const t0 = now(), timing = {};
     const info = sectorInfo(S, sx, sy), portals = sectorPortals(S, sx, sy);
     const origin = sx === 0 && sy === 0;
     let last = null;
@@ -169,8 +170,13 @@
         cor.onPath[b] = 1; cor.ownA[b] = hubIdx; cor.ownB[b] = hubIdx;
       });
       const maze = genMaze(field, cor, seed, S.algo);
-      const wfc = new WFC(field, cor, seed, reg, maze, S.maze / 100);
-      let guard = 0; while (wfc.step() && guard++ < 50000) {}
+      const tw = now();
+      const wfc = new WFC(field, cor, seed, reg, maze, S.maze / 100, { lazy: true });
+      if (S.wasm === false) wfc.noWasm = true;
+      wfc.solve(50000);
+      if (wfc.kernelMs) { timing.wfcPrepare = wfc.kernelMs.prepare; timing.wfcSolve = wfc.kernelMs.solve; }
+      timing.collapses = wfc.collapsedSteps; timing.resets = wfc.resets;
+      timing.wfc = now() - tw;
       let unsolved = 0; for (let c = 0; c < NC; c++) if (wfc.cnt[c] !== 1) unsolved++;
       if (unsolved) { last = 'WFC unsolved'; continue; }
       const sub = buildSub(wfc), val = validate(sub, reg);
@@ -206,14 +212,19 @@
         // landmarks show their stratum's centrepiece (star chart, bloom heart, unsealed pit)
         const pins = [];
         if (P.tilesets) pts.forEach(p => { if (!p.fn || p.fn === 'SE') return; const c = centrepieceAt(pass, setOf, SW, SH, p.cx * 3, p.cy * 3, 5); if (c) pins.push(...c); });
-        const d = dress(pass, setOf, SW, SH, seed * 31 + 7, pins);
+        // the WebAssembly kernel when it is loaded (bit-identical to the JS, about 15x faster)
+        const useWasm = S.wasm !== false && typeof DRESS_WASM !== 'undefined' && DRESS_WASM;
+        const td = now();
+        const d = (useWasm ? DRESS_WASM.dress : dress)(pass, setOf, SW, SH, seed * 31 + 7, pins);
+        timing.dress = now() - td; timing.wasm = !!useWasm;
         deco = d.tiles; dressStats = { fallbacks: d.fallbacks, violations: d.violations };
       }
       const hubs = pts.map((p, i) => ({ i: (p.cy * 3 + 1) * SW + p.cx * 3 + 1, label: p.label, type: info.type, fn: p.fn || null, portal: !!p.portal }));
       const [ox, oy] = originOf(sx, sy);
-      return { sx, sy, ox, oy, own, info, portals, doors, pass, col, deco, dressStats, hubs, doctrine, attempts: attempt + 1, ms: Date.now() - t0, entranceSub: val.start, ok: true };
+      timing.total = now() - t0; timing.layout = timing.total - (timing.dress || 0);
+      return { sx, sy, ox, oy, own, info, portals, doors, pass, col, deco, dressStats, hubs, doctrine, attempts: attempt + 1, ms: Math.round(timing.total), timing, entranceSub: val.start, ok: true };
     }
-    return { sx, sy, info, portals, ok: false, error: last, ms: Date.now() - t0 };
+    return { sx, sy, info, portals, ok: false, error: last, ms: Math.round(now() - t0) };
   }
   // the subcell on the sector's edge where a doorway opens
   function doorSub(p) {

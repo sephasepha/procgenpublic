@@ -63,6 +63,34 @@ The grammar holds globally even though no sector ever sees the whole world:
 
 The **Rules** panel in the explorer re-checks these live against every loaded sector. `tests/world.js` checks them over every sector within a few steps of the start: doorways meet edge to edge, every cell belongs to exactly one sector, floors of two sectors only ever touch at a doorway, and sectors come out identical in any generation order.
 
+## Real time and WebAssembly
+
+The explorer is a real-time game loop: input is state (held directions plus one buffered tap, so a turn pressed
+just before a junction is taken there), movement is one tile per step at a constant speed, chained smoothly
+while a direction is held, and the view renders at the display's full rate. Sectors stream in from background
+workers that run the generator in **WebAssembly**:
+
+- `wasm/*.c` holds C ports of the two hot kernels, the layout WFC (domains, weights and solve) and the dressing
+  WFC. `npm run build` compiles them with clang straight to `wasm/gen.wasm` (no libc, about 20 KB, under a second).
+  The .wasm is committed, so the site still needs no build step.
+- The ports are **bit-identical** to the JavaScript: same RNG calls in the same order, float32 where the JS uses
+  Float32Arrays, and fdlibm's `log` (the algorithm behind V8's `Math.log`). `tests/wasm.js` checks every tile of
+  whole sectors in all three presets on every test run, so the JS stays as a reference and a fallback.
+
+### Performance tracking
+
+| Metric | Budget | Where |
+| --- | --- | --- |
+| Sector generation p95 (WebAssembly) | < 150 ms | `npm run bench` (Node), Perf panel, browser bench |
+| Frame interval p95 | < 25 ms (60 fps target) | Perf panel, `npm run bench:browser` |
+| Main-thread work per frame p95 | < 8 ms | Perf panel, browser bench |
+| First sector ready after opening | < 1.5 s | Perf panel, browser bench |
+| Any single sector (tests) | < 3 s | `tests/world.js` |
+
+`npm run bench` and `npm run bench:browser` (headless Chromium at phone size, walking for 15 s) append a record
+with the commit to `perf/history.jsonl`, so every build's numbers stay comparable. In the app, the **Perf** chip
+shows the same numbers live, red when over budget.
+
 ## Layout
 
 ```
@@ -74,6 +102,9 @@ explore/explore.js  walkable explore mode shared by both pages
 gen/world.js        infinite world: sector tree, tiers, border contracts, sector generation
 infinite/           streaming explorer, generation worker, home page
 gen/dressing.js     tilesets, example rooms, learning, dressing WFC
+gen/wasm.js         loads wasm/gen.wasm and swaps in the WebAssembly kernels
+wasm/               C sources of the WebAssembly kernels and build.sh
+tools/bench.js, tools/bench-browser.py, tools/profile.js   performance tracking
 tiles/              Tiles page
 tools/autotile.js   authoring helper for example rooms
 assets/           shared styles, icons, service worker registration
