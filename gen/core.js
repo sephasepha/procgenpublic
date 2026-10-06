@@ -265,7 +265,8 @@ function warpRegions(reg, seed) {
 }
 // Candidate links: hubs whose regions share a real border (at least 3 cell edges), so a corridor
 // between them never has to cross a third region.
-function genCandidates(reg, seed) {
+function genCandidates(reg, seed, minBorder) {
+  const minB = minBorder || 3;
   const { region } = warpRegions(reg, seed), border = new Map();
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
     const c = y * COLS + x;
@@ -276,7 +277,7 @@ function genCandidates(reg, seed) {
     }
   }
   const del = [];
-  border.forEach((cnt, k) => { if (cnt < 3) return; const [a, b] = k.split(',').map(Number); del.push({ a, b, len: Math.hypot(reg.pts[a].x - reg.pts[b].x, reg.pts[a].y - reg.pts[b].y), border: cnt }); });
+  border.forEach((cnt, k) => { if (cnt < minB) return; const [a, b] = k.split(',').map(Number); del.push({ a, b, len: Math.hypot(reg.pts[a].x - reg.pts[b].x, reg.pts[a].y - reg.pts[b].y), border: cnt }); });
   return { del: del.sort((x, y) => x.len - y.len), region };
 }
 
@@ -487,7 +488,7 @@ class WFC {
     if (cor.onPath[c] && cor.ownA[c] >= 0) {
       const sa = this.styleOfRegion[cor.ownA[c]], sb = this.styleOfRegion[cor.ownB[c]];
       m |= (1 << sa) | (1 << sb);
-      if (rq) for (let d = 0; d < 4; d++) if (rq >> d & 1) { const p = f.prim[(y + DY[d]) * COLS + x + DX[d]]; if (p === sa || p === sb) m |= 1 << p; }
+      if (rq) for (let d = 0; d < 4; d++) if (rq >> d & 1) { const nx = x + DX[d], ny = y + DY[d]; if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) continue; const p = f.prim[ny * COLS + nx]; if (p === sa || p === sb) m |= 1 << p; }
     }
     return m;
   }
@@ -502,7 +503,8 @@ class WFC {
     } else if (!(set >> tt.style & 1)) return false;
     for (let d = 0; d < 4; d++) {
       const nx = x + DX[d], ny = y + DY[d], so = tSock[t * 4 + d];
-      if ((nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) && so !== 0) return false;
+      // the map edge is solid, except where a portal (a doorway into the next sector) is declared
+      if ((nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) && so !== 0 && !(this.cor.portalOut && (this.cor.portalOut[c] >> d & 1))) return false;
       if ((rq >> d & 1) && so === 0) return false;
       if ((this.cor.wide[c] >> d & 1) && !(so > 0 && so % 2 === 0)) return false;
     }
@@ -718,4 +720,4 @@ function validateGrammar(floor, tileOf, val, reg, field, rules, cor) {
   return { links: links.size, linkList: [...links], cross, illegal, capViol, skip, breaches };
 }
 
-if (typeof module !== 'undefined') module.exports = { setPreset, PRESETS, FUNCS, DOCTRINE, genMaze, COLS, ROWS, NC, T, tiles, STYLES, TIERS, genRegions, genCandidates, genGrammar, validateGrammar, genField, genCorridors, WFC, buildSub, validate, connectPockets, SW, SH };
+if (typeof module !== 'undefined') module.exports = { subStyle, assignFunctions, mulberry32, makeNoise, tierPairOK, OPP, DX, DY, setPreset, PRESETS, FUNCS, DOCTRINE, genMaze, COLS, ROWS, NC, T, tiles, STYLES, TIERS, genRegions, genCandidates, genGrammar, validateGrammar, genField, genCorridors, WFC, buildSub, validate, connectPockets, SW, SH };

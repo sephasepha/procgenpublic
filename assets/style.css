@@ -152,3 +152,17 @@ html.xp-open, html.xp-open body { overflow: hidden; }
 .xp button:focus-visible { outline: 2px solid var(--gate); outline-offset: 2px; }
 
 .explore-top { font-size: 0.95rem; padding: 9px 16px; }
+
+/* ---------- infinite explore ---------- */
+.inf .xp-stats { flex-wrap: wrap; gap: 4px 12px; }
+.inf canvas.mini { position: absolute; top: 10px; right: 10px; left: auto; bottom: auto; border: 1px solid var(--rule); border-radius: 6px; pointer-events: none; }
+.inf .toast { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); max-width: calc(100% - 170px); background: rgba(25,28,35,0.94); border: 1px solid var(--brass-dim); color: var(--text); font-size: 0.84rem; padding: 7px 12px; border-radius: 8px; pointer-events: none; text-align: center; }
+@media (max-width: 420px) { .inf .toast { left: 12px; transform: none; max-width: calc(100% - 160px); } }
+.inf .rules { position: absolute; left: 10px; right: 10px; bottom: 10px; background: rgba(25,28,35,0.96); border: 1px solid var(--rule); border-radius: 10px; padding: 12px 14px; display: grid; gap: 5px; font-size: 0.82rem; max-height: 60%; overflow: auto; }
+.inf .rules > div:not(.rules-h):not(.rules-n) { display: grid; grid-template-columns: 1.2em minmax(0, 1fr); gap: 4px; }
+.inf .rules .ok span { color: var(--s1); } .inf .rules .bad span { color: var(--t2); }
+.inf .rules-h { font-family: var(--f-mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--brass); margin-bottom: 2px; }
+.inf .rules-n { color: var(--dim); font-size: 0.78rem; margin-top: 4px; }
+.preview-wrap { border: 1px solid var(--rule); border-radius: 4px; background: #0b0c10; overflow: hidden; }
+.preview-wrap canvas { display: block; width: 100%; height: auto; }
+.descend { font-size: 1rem; padding: 12px 18px; }
