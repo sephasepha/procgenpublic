@@ -37,7 +37,6 @@
         <div class="xp-toggles">
           <button class="xp-chip" data-x="fog" type="button">Light: on</button>
           <button class="xp-chip" data-x="zoom" type="button">View: close</button>
-          <button class="xp-chip" data-x="run" type="button">Run: off</button>
         </div>
         <div class="xp-pad" role="group" aria-label="Move">
           <button class="xp-key up" data-d="0" type="button" aria-label="Up">▲</button>
@@ -61,7 +60,6 @@
       if (k === 'close') close();
       if (k === 'fog') { st.fog = !st.fog; x.textContent = 'Light: ' + (st.fog ? 'on' : 'off'); st.dirty = true; }
       if (k === 'zoom') { st.map = !st.map; x.textContent = 'View: ' + (st.map ? 'map' : 'close'); st.dirty = true; }
-      if (k === 'run') { st.run = !st.run; x.textContent = 'Run: ' + (st.run ? 'on' : 'off'); }
       if (k === 'again') restart();
       if (k === 'next' && st.onNext) { const o = st.onNext(); if (o) open(o); }
     });
@@ -91,7 +89,7 @@
       ...o, step: o.step || 1, light: o.light || 7,
       pos: o.start, from: o.start, t: 1, steps: 0, revisits: 0, started: 0, finished: 0,
       seen: new Uint8Array(o.w * o.h), lit: new Uint8Array(o.w * o.h), trail: new Uint8Array(o.w * o.h),
-      fog: st ? st.fog : true, map: false, run: st ? st.run : false, dirty: true,
+      fog: st ? st.fog : true, map: false, dirty: true,
     };
     let floor = 0; for (let i = 0; i < o.w * o.h; i++) if (o.pass[i]) floor++;
     st.floor = floor;
@@ -100,7 +98,6 @@
     el.querySelector('[data-x="next"]').textContent = o.nextLabel || 'Close';
     el.querySelector('[data-x="fog"]').textContent = 'Light: ' + (st.fog ? 'on' : 'off');
     el.querySelector('[data-x="zoom"]').textContent = 'View: close';
-    el.querySelector('[data-x="run"]').textContent = 'Run: ' + (st.run ? 'on' : 'off');
     el.querySelector('.xp-done').hidden = true;
     el.hidden = false;
     document.documentElement.classList.add('xp-open');
@@ -121,22 +118,10 @@
     if (st.trail[i]) st.revisits++; st.trail[i] = 1;
     return true;
   }
-  const exits = i => { let n = 0; for (let d = 0; d < 4; d++) { let j = i, ok = true; for (let k = 0; k < st.step; k++) { if (!passable(j, d)) { ok = false; break; } j += DX[d] + DY[d] * st.w; } if (ok) n++; } return n; };
   function move(d) {
     if (!st || st.finished || el.hidden) return;
     if (!st.started) st.started = performance.now();
     if (!stepOnce(d)) { bump(); return; }
-    // run: keep going along a corridor until a junction, a room or a dead end
-    if (st.run) {
-      let dir = d, guard = 0;
-      while (guard++ < 400 && st.pos !== st.goal && exits(st.pos) === 2) {
-        const back = (dir + 2) & 3; let nd = -1;
-        for (let k = 0; k < 4; k++) if (k !== back) { let j = st.pos, ok = true; for (let s = 0; s < st.step; s++) { if (!passable(j, k)) { ok = false; break; } j += DX[k] + DY[k] * st.w; } if (ok) { nd = k; break; } }
-        if (nd < 0) break;
-        stepOnce(nd); dir = nd; light();
-      }
-      st.t = 1; // runs jump straight to the end rather than tweening through corners
-    }
     light(); stats();
     if (st.pos === st.goal) finish();
   }

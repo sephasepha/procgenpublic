@@ -84,7 +84,6 @@
         <div class="xp-toggles">
           <button class="xp-chip" data-x="fog" type="button">Light: on</button>
           <button class="xp-chip" data-x="zoom" type="button">View: close</button>
-          <button class="xp-chip" data-x="run" type="button">Run: on</button>
           <button class="xp-chip" data-x="tiles" type="button">Tiles: on</button>
           <button class="xp-chip" data-x="rules" type="button">Rules</button>
         </div>
@@ -110,7 +109,6 @@
       if (k === 'fog') { st.fog = !st.fog; x.textContent = 'Light: ' + (st.fog ? 'on' : 'off'); st.sectors.forEach(s => s.dirty = true); }
       if (k === 'zoom') { st.map = !st.map; x.textContent = 'View: ' + (st.map ? 'map' : 'close'); }
       if (k === 'tiles') { st.tiles = !st.tiles; x.textContent = 'Tiles: ' + (st.tiles ? 'on' : 'off'); st.sectors.forEach(s => s.dirty = true); }
-      if (k === 'run') { st.run = !st.run; x.textContent = 'Run: ' + (st.run ? 'on' : 'off'); }
       if (k === 'rules') { const r = el.querySelector('.rules'); r.hidden = !r.hidden; if (!r.hidden) rules(); }
       st.redraw = true;
     });
@@ -140,12 +138,11 @@
       S: { ...WORLD_DEFAULTS, ...settings }, gen,
       sectors: new Map(), pending: new Set(), seen: new Map(), charted: new Set(), visited: new Set(['0,0']),
       cs: [0, 0], gx: 0, gy: 0, from: [0, 0], t: 1, placed: false, litList: [],
-      fog: true, map: false, run: true, tiles: true, steps: 0, started: 0, failures: 0, deepest: 0, redraw: true,
+      fog: true, map: false, tiles: true, steps: 0, started: 0, failures: 0, deepest: 0, redraw: true,
     };
     queue = [];
     el.querySelector('[data-x="fog"]').textContent = 'Light: on';
     el.querySelector('[data-x="zoom"]').textContent = 'View: close';
-    el.querySelector('[data-x="run"]').textContent = 'Run: on';
     el.querySelector('[data-x="tiles"]').textContent = 'Tiles: on';
     el.querySelector('.rules').hidden = true;
     el.hidden = false;
@@ -166,7 +163,6 @@
 
   // ---------- movement ----------
   function canStep(gx, gy, d) { return passAt(gx + DX[d], gy + DY[d]); }
-  function exits(gx, gy) { let n = 0; for (let d = 0; d < 4; d++) if (passAt(gx + DX[d], gy + DY[d]) === 1) n++; return n; }
   function stepTo(d) {
     st.gx += DX[d]; st.gy += DY[d]; st.steps++;
     const cs = [Math.floor(st.gx / SW), Math.floor(st.gy / SH)];
@@ -179,17 +175,7 @@
     if (p !== 1) { bump(); return; }
     if (!st.started) st.started = performance.now();
     st.from = [st.gx, st.gy]; st.t = 0;
-    stepTo(d);
-    if (st.run) {
-      let dir = d, guard = 0;
-      while (guard++ < 300 && exits(st.gx, st.gy) === 2) {
-        const back = (dir + 2) & 3; let nd = -1;
-        for (let k = 0; k < 4; k++) if (k !== back && passAt(st.gx + DX[k], st.gy + DY[k]) === 1) { nd = k; break; }
-        if (nd < 0) break;
-        stepTo(nd); dir = nd;
-      }
-      if (guard > 1) st.t = 1;
-    }
+    stepTo(d); // always exactly one tile per move
     light(); hud();
   }
   function bump() { const c = el.querySelector('canvas.main'); c.classList.remove('xp-bump'); void c.offsetWidth; c.classList.add('xp-bump'); }
