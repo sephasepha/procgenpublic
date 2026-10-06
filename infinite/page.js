@@ -10,7 +10,7 @@
     generic: { name: 'Generic', desc: 'Easy, medium and hard tiers in rings around the start. Sectors are built around you as you walk: progression rules, a maze layer, then wave function collapse for the architecture and the dressing.' },
   };
   const ALGOS = ['backtracker', 'growing', 'huntkill', 'prim', 'kruskal', 'wilson', 'aldous', 'binary', 'sidewinder'];
-  const NUM = { seed: [1, 1e9], band: [3, 6], loops: [0, 100], doors: [0, 4], hubs: [5, 14], maze: [0, 100], ruin: [0, 40] };
+  const NUM = { seed: [1, 1e9], band: [2, 6], loops: [0, 100], doors: [0, 4], hubs: [5, 14], maze: [0, 100], ruin: [0, 40] };
 
   function readHash() {
     const p = new URLSearchParams(location.hash.slice(1));

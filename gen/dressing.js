@@ -506,9 +506,67 @@
       v.rgb = v.px.join('').split('').map(c => pal[c] || [255, 0, 255]);
       if (v.spin) { v.spins = [v.rgb]; let p = v.px; for (let r = 1; r < 4; r++) { p = rotPx(p); v.spins.push(p.join('').split('').map(c => pal[c] || [255, 0, 255])); } }
     });
+    // per-spin character grids and materials, for the renderer's material pass
+    variants.forEach(v => { let px = v.px; v.pxs = [px]; for (let r = 1; r < 4; r++) { px = rotPx(px); v.pxs.push(px); } });
+    const M = MATERIALS[ts.key], rgbOf = c => pal[c] || [255, 0, 255];
+    const materials = M ? {
+      floor: M.floor.map(([name, f]) => ({ name, rgb: grid(f).join('').split('').map(rgbOf) })),
+      wall: M.wall.map(([name, face, top]) => ({ name, face: grid(face).join('').split('').map(rgbOf), top: top ? grid(top).join('').split('').map(rgbOf) : null })),
+    } : null;
     const fallback = { floor: index.F0, wall: index.E0, rock: index.R0 };
-    return { ...ts, size, tiles, variants, n, K, allow, weight, classMask, fallback, index, exampleIds, unplaced, learned, classesOf };
+    return { ...ts, size, tiles, variants, n, K, allow, weight, classMask, fallback, index, exampleIds, unplaced, learned, classesOf, materials, pal };
   }
+
+  // Threshold: the processional halls where one sector opens into the next, the same in every stratum so a
+  // crossing is unmistakable. It learns from the Constellation of Mazes example rooms (same letters, its own art).
+  TILESETS.push({ key: 'threshold', name: 'Threshold', size: 8, examplesFrom: 'mazes',
+    palette: { '.': '#4a3a5c', ',': '#433452', ':': '#57466b', ';': '#2e2440', 'k': '#3a2d4a', 'K': '#2a2036', 'x': '#6a5a7e', 'w': '#5a4b6e', 'W': '#3b2f4d', 'h': '#8f7fa6', 'H': '#1e1828', 'd': '#2a2036', '#': '#100c18', '+': '#2a2040', '*': '#b9b2d8', 'o': '#e0b84a', 'O': '#fff0a0', 'q': '#8a2a3a', 'Q': '#b8434f', 'v': '#b9b2d8', 'f': '#ffb040', 'F': '#fff0a0', 'n': '#6e5a8c' },
+    tiles: {
+      r: { px: ['xwxxxwxx', 'xxwxxxwx', 'wxQQQQxw', 'hhQoQQhh', 'WWQQQQWW', 'WWQoQQWW', 'WWQQQQWW', 'HHHQQHHH'], walk: 0, anchor: 4, w: 2, name: 'Processional banner' },
+      e: { px: ['xwxxxwxx', 'xxWWWWxx', 'xWHfFHWx', 'hWHffHWh', 'WWHooHWW', 'WWWWWWWW', 'WdWWWWWW', 'HHHHHHHH'], walk: 0, anchor: 4, w: 0.8, glow: '#ffb040', name: 'Brazier niche' },
+      u: { px: ['Kk.qq.kK', 'Kk.qQ.kK', 'Kk.qq.kK', 'Kk.qo.kK', 'Kk.qq.kK', 'Kk.Qq.kK', 'Kk.qq.kK', 'Kk.oq.kK'], walk: 1, anchor: FLOOR | 10, strict: 1, w: 0.3, name: 'Runner, corridor' },
+      l: { px: ['........', '...o....', '..ovo...', '.ovOvo..', '..ovo...', '...o....', '.,......', '......:.'], walk: 1, spin: 1, name: 'Inlaid star' },
+      c: { px: ['..vvvv..', '.v....v.', 'v..oo..v', 'v.o..o.v', 'v.o..o.v', 'v..oo..v', '.v....v.', '..vvvv..'], walk: 1, name: 'Sigil' },
+      ...quad(['.......vv.......', '....vvvvvvvv....', '...vv..oo..vv...', '..v..o.qq.o..v..', '.vv.o..qq..o.vv.', '.v.o.v.qq.v.o.v.', '.v.....qq.....v.', 'vvoqqqqqqqqqqovv', 'vvoqqqqqqqqqqovv', '.v.....qq.....v.', '.v.o.v.qq.v.o.v.', '.vv.o..qq..o.vv.', '..v..o.qq.o..v..', '...vv..oo..vv...', '....vvvvvvvv....', '.......vv.......'], 'Great sigil', { glow: '#b9b2d8' }),
+      V: { px: ['.oqqqqo.', '.oqQqqo.', '.oqqqqo.', '.oqqQqo.', '.oqqqqo.', '.oQqqqo.', '.oqqqqo.', '.oqqqQo.'], walk: 1, like: 'F', share: 0.0001, name: 'Runner (north-south)' },
+      N: { px: ['........', 'oooooooo', 'qqqqQqqq', 'qQqqqqqq', 'qqqqqqQq', 'qqQqqqqq', 'oooooooo', '........'], walk: 1, like: 'F', share: 0.0001, name: 'Runner (east-west)' },
+      T: { px: ['..fFf...', '.fFFFf..', '.ofofo..', 'ooooooo.', '.oOOOo..', '..ooo...', '.o...o..', 'KKKKKKK.'], walk: 1, like: 'F', share: 0.0001, glow: '#ffb040', name: 'Brazier' },
+      M: { px: ['xwxxxwxx', 'xxwxxxwx', 'wxxwxxxw', 'hhhhhhhh', 'WnWnWnWn', 'nWnWnWnW', 'WnWnWnWn', 'HHHHHHHH'], walk: 0, like: 'A', share: 0.5, name: 'Chequered face' },
+    },
+  });
+
+  TILESETS.forEach(ts => { if (ts.examplesFrom) ts.examples = TILESETS.find(t => t.key === ts.examplesFrom).examples; });
+
+  // ---------- materials: structured floor and wall surfaces laid per room and district ----------
+  // A material is a 16x16 pattern (2x2 tiles, aligned to the world) in palette characters. At render time it
+  // replaces the floor tones (. , :) of walkable tiles, or the faces (W) and tops (x w) of walls, so shadows,
+  // props and details stay on top. Patterns are structure (slabs, courses, herringbone), never noise.
+  const PAT = {
+    slabs: (n, grout, a, b) => (x, y) => (x % n === 0 || y % n === 0) ? grout : (((x / n | 0) + (y / n | 0)) % 2 ? a : b),
+    offsetSlabs: (w, h, grout, a, b) => (x, y) => { const row = y / h | 0, xx = x + (row % 2) * (w >> 1); return (y % h === 0 || xx % w === 0) ? grout : ((xx / w | 0) + row) % 3 ? a : b; },
+    herringbone: (grout, a, b) => (x, y) => { const k = ((x >> 1) + (y >> 1)) & 3, v = ((x >> 1) - (y >> 1)) & 3; return (k === 0 && (x & 1) === 0) || (v === 0 && (y & 1) === 0) ? grout : ((x >> 2) + (y >> 2)) & 1 ? a : b; },
+    squares: (a, b, c) => (x, y) => { const m = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5)) | 0; return m === 7 ? c : m % 3 === 0 ? b : a; },
+    checker: (n, a, b) => (x, y) => (((x / n | 0) + (y / n | 0)) & 1) ? a : b,
+    rings: (a, b, c) => (x, y) => { const d = Math.hypot(x - 7.5, y - 7.5) | 0; return d > 7 ? c : d % 3 === 0 ? b : a; },
+    bricks: (w, h, mortar, a, b) => (x, y) => { const row = y / h | 0, xx = x + (row % 2) * (w >> 1); return (y % h === h - 1 || xx % w === w - 1) ? mortar : ((xx / w | 0) * 7 + row * 3) % 5 ? a : b; },
+    bands: (n, a, b) => (x, y) => ((y / n | 0) % 2) ? a : b,
+    blocks: (mortar, a) => (x, y) => (y % 8 === 7 || ((x + (y / 8 | 0) * 4) % 8) === 7) ? mortar : a,
+  };
+  const grid = f => Array.from({ length: 16 }, (_, y) => Array.from({ length: 16 }, (_, x) => f(x, y)).join(''));
+  const MATERIALS = {
+    mazes: {
+      floor: [['Star paving', PAT.slabs(8, ';', '.', ':')], ['Concentric tiles', PAT.squares('.', 'm', 'n')], ['Herringbone', PAT.herringbone(';', '.', ',')], ['Chequer', PAT.checker(4, ':', ',')]],
+      wall: [['Ashlar', PAT.blocks('d', 'W'), null], ['Coursed', PAT.bricks(4, 2, 'd', 'W', 'n'), PAT.bricks(4, 2, 'w', 'x', 'h')], ['Banded', PAT.bands(1, 'n', 'W'), null]],
+    },
+    growth: {
+      floor: [['Mossy flags', PAT.offsetSlabs(8, 4, 'm', '.', 'M')], ['Old paving', PAT.slabs(4, 'G', 'g', ',')], ['Leaf mould', PAT.checker(2, '.', 'm')], ['Root weave', PAT.herringbone('l', '.', ',')]],
+      wall: [['Ashlar', PAT.blocks('d', 'W'), null], ['Green courses', PAT.bricks(4, 2, 'm', 'W', 'W'), PAT.bricks(4, 2, 'M', 'x', 'w')], ['Banded', PAT.bands(1, 'W', 'd'), null]],
+    },
+    shrines: {
+      floor: [['Temple flags', PAT.offsetSlabs(8, 4, ';', 's', 'S')], ['Mosaic', PAT.squares('r', 'y', 'm')], ['Herringbone', PAT.herringbone(';', '.', 'r')], ['Chequer', PAT.checker(4, 's', 'm')]],
+      wall: [['Ashlar', PAT.blocks('d', 'W'), null], ['Coursed', PAT.bricks(4, 2, 'd', 'W', 'm'), PAT.bricks(4, 2, 'w', 'x', 'h')], ['Banded', PAT.bands(2, 'm', 'W'), null]],
+    },
+  };
   const SETS = TILESETS.map(learn);
   const KMAX = Math.max(...SETS.map(s => s.K));
   const GTILES = [null], OFFSET = [];

@@ -48,7 +48,7 @@
         <div class="row"><span class="seed">world seed <b id="seedOut">1</b></span><button class="btn" id="reseed" type="button">New world</button></div>
         <div class="seg" role="group" aria-label="Preset" style="grid-template-columns:repeat(3,minmax(0,1fr))"><button type="button" data-preset="underdark">Underdark</button><button type="button" data-preset="arsenal">Arsenal</button><button type="button" data-preset="generic">Generic</button></div>
         <div class="controls">
-          <div class="ctl"><label for="pBand">Sectors per tier</label><output id="vBand"></output><input id="pBand" type="range" min="3" max="6" step="1"><small>How many sectors deep each tier band runs before the next (3 or more keeps cross-tier branches to two)</small></div>
+          <div class="ctl"><label for="pBand">Sectors per tier</label><output id="vBand"></output><input id="pBand" type="range" min="2" max="6" step="1"><small>How many sectors deep each tier band runs before the next (2 or more keeps cross-tier branches to two)</small></div>
           <div class="ctl"><label for="pLoops">Loop doorways</label><output id="vLoops"></output><input id="pLoops" type="range" min="0" max="100" step="5"><small>Chance of an extra doorway between same-tier neighbours</small></div>
           <div class="ctl"><label for="pDoors">Extra doorways per border</label><output id="vDoors"></output><input id="pDoors" type="range" min="0" max="4" step="1"><small>Up to this many more doorways on borders between same-tier sectors, so borders read as ordinary walls</small></div>
           <div class="ctl"><label for="pHubs">Hubs per sector</label><output id="vHubs"></output><input id="pHubs" type="range" min="5" max="14" step="1"></div>
@@ -79,6 +79,7 @@
 <script src="gen/mazes.js"></script>
 <script src="gen/core.js"></script>
 <script src="gen/dressing.js"></script>
+<script src="gen/rooms.js"></script>
 <script src="gen/world.js"></script>
 <script src="gen/wasm.js"></script>
 <script src="infinite/infinite.js"></script>

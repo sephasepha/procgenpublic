@@ -33,6 +33,34 @@ Progression stays legible:
 - Light falls off with walking distance from you; places you have seen stay dimly remembered.
 - The close view is drawn in a slight **3/4 perspective**: walls rise above the floor, so their tops sit higher and their front faces show; floors darken where they meet walls, and figures cast small shadows. It is a render-time extrusion of the same tiles, the 2D stand-in for meshes with height.
 
+## Room-based sectors: themes, a room grammar, districts
+
+Underdark sectors are laid out as believable buildings rather than caverns (`gen/rooms.js`; the WFC cavern
+layout is still used by the Arsenal and Generic presets, and by the Underdark with `layout=caverns`):
+
+1. **Theme.** Each stratum has three sector themes (Observatory, Glyph labyrinth, Archive; Greenhouse, Root
+   cellars, Overgrown halls; Reliquary, Pilgrim hostel, Ossuary), chosen from the sector's coordinates.
+2. **Room grammar.** A theme is a small grammar over room types (each with a size range, a shape: rect, pillared,
+   colonnaded hall, octagon, round, cloister, cross; and public or private access). Expanding it from the start
+   room gives the mission graph, e.g. Reliquary: antechamber → nave → 2–4 side chapels + the sanctum.
+3. **Suites.** Rooms are placed next to their parent, separated by one wall with a door, or a short corridor
+   away. The spine from the start room to the goal room grows towards the sector's way onward.
+4. **Progression.** The doorways onward to the next stratum (seals and pits) are reached only from the goal room,
+   by private corridors; private rooms open only onto their parent. With the goal room closed, the way onward is
+   unreachable (`tests/world.js` checks this on every sector).
+5. **Wings and districts.** The sector splits into 2–3 districts, each with its own theme; wings (a root room
+   with its own children, from the district's grammar) pack the space, half of them grown off existing public
+   rooms into building complexes. Near a seal, a district may belong to the neighbouring stratum, so the next
+   stratum is felt a region before it is reached. Strata change every two sectors.
+6. **Corridors.** The space between is filled with a maze on the odd lattice, straightened per theme, joined to
+   public rooms by connector doors and trimmed back, so corridors link rooms rather than fill the sector.
+7. **Crossings.** Every doorway into the next sector is a processional hall three cells wide through the border,
+   opening into a gate room on each side, sized from the shared border key so the halves mirror each other. It
+   is dressed with its own **Threshold** tiles (runner, banners, braziers, sigils), the same in every stratum.
+8. **Materials.** Floors and walls get structured surfaces laid per room and district at render time (slabs,
+   herringbone, concentric tiles, chequer; ashlar, coursed brick, bands), aligned to the world in 2x2-tile
+   repeats: one masonry per building, one floor per room.
+
 ## Dressing: example-driven tile WFC
 
 Every cell of a finished layout has a **context** read from the floor/wall pattern around it: a wall with floor below is a south face, a floor with walls left and right is a corridor, and so on (wall faces, outer and inner corners, thin walls, wall ends, pillars, wall shadows, corner shadows, corridors, dead ends, room centres).
@@ -55,7 +83,7 @@ The world is an endless grid of sectors, each a full dungeon from the Workbench 
 The grammar holds globally even though no sector ever sees the whole world:
 
 - **Connectivity:** every sector links to a parent one step closer to the start, chosen from its own coordinates. All sectors form one tree rooted at the start, so everything is reachable.
-- **Tiers:** a sector's tier comes from its distance to the start (`band` sectors per tier, at least 3), cycling through the preset's three tiers (Mazes → Growth → Shrines, or Outer → Works → Keep), then on into the next level. Neighbours differ by at most one tier, so nothing can skip one.
+- **Tiers:** a sector's tier comes from its distance to the start (`band` sectors per tier, at least 2; 2 by default for the Underdark), cycling through the preset's three tiers (Mazes → Growth → Shrines, or Outer → Works → Keep), then on into the next level. Neighbours differ by at most one tier, so nothing can skip one.
 - **Caps:** extra loop doorways only join sectors of the same tier, and the parent choice avoids axis sectors, so no sector has more than two cross-tier branches.
 - **Seams you don't notice:** sector grids overlap their neighbours by a few cells, and each shared border has one contract, computed from that border's coordinates: a wobbly line (up to ±4 cells) that decides which sector owns each overlapping cell, whether the border is open, and where its doorways are. Same-tier borders usually open with several narrow doorways; borders between tiers keep a single designed seal. Both neighbours compute the contract independently, so generation order never matters, and the border reads as one more irregular wall of the labyrinth.
 - **Doctrine (Arsenal):** you enter the Keep only through Checkpoints, you leave it only through a Vault, which is the descent to the next level's Gatehouse, and Works sectors place foundries with power and cooling, away from magazines.
@@ -101,7 +129,8 @@ lab/lab.js        Maze Lab UI
 explore/explore.js  walkable explore mode shared by both pages
 gen/world.js        infinite world: sector tree, tiers, border contracts, sector generation
 infinite/           streaming explorer, generation worker, home page
-gen/dressing.js     tilesets, example rooms, learning, dressing WFC
+gen/dressing.js     tilesets, example rooms, materials, learning, dressing WFC
+gen/rooms.js        room-based sector layout: themes, room grammar, suites, districts, crossings
 gen/wasm.js         loads wasm/gen.wasm and swaps in the WebAssembly kernels
 wasm/               C sources of the WebAssembly kernels and build.sh
 tools/bench.js, tools/bench-browser.py, tools/profile.js   performance tracking

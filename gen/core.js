@@ -64,6 +64,7 @@ const PRESETS = {
     used: [0, 3, 1, 4],
     colors: ['#aab8ff', '#8fdc6e', '#eaa65a'],
     tilesets: [5, 6, 6, 5, 7], // dressing tileset for each architecture style
+    layout: 'rooms', // sectors are themed rooms and maze corridors (gen/rooms.js); S.layout = 'caverns' for the WFC layout
   },
 };
 let PRESET = 'generic';

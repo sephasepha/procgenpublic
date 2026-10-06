@@ -14,9 +14,9 @@
 //   * Each sector is validated as it is generated: every hub and doorway inside must connect.
 (function (root) {
   const isNode = typeof module !== 'undefined' && module.exports && typeof window === 'undefined' && typeof importScripts === 'undefined';
-  if (isNode) Object.assign(globalThis, require('./mazes.js'), require('./core.js'), require('./dressing.js'));
+  if (isNode) { Object.assign(globalThis, require('./mazes.js'), require('./core.js'), require('./dressing.js')); Object.assign(globalThis, require('./rooms.js')); }
 
-  const WORLD_DEFAULTS = { seed: 1, preset: 'underdark', band: 3, loops: 70, doors: 3, hubs: 9, maze: 60, algo: 'growing', ruin: 10 };
+  const WORLD_DEFAULTS = { seed: 1, preset: 'underdark', band: 2, loops: 70, doors: 3, hubs: 9, maze: 60, algo: 'growing', ruin: 10 };
   // Sector grids are COLS x ROWS cells but sit CW x CH apart, so neighbours overlap by MARGIN cells each side.
   const MARGIN = 5, CW = COLS - 2 * MARGIN, CH = ROWS - 2 * MARGIN;
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
@@ -40,7 +40,11 @@
     else if (cands.length === 2) {
       // prefer a parent off the axes: axis sectors already carry a forced child, so this keeps branching low
       const axis = c => c[0] === 0 || c[1] === 0, a0 = axis(cands[0]), a1 = axis(cands[1]);
-      parent = a0 && !a1 ? cands[1] : a1 && !a0 ? cands[0] : cands[h32(S.seed, sx, sy, 77) & 1];
+      if (Math.abs(sx) === 1 && Math.abs(sy) === 1) {
+        // the four diagonal neighbours of the start take their parents in rotation, so each axis sector next to
+        // the start has exactly one diagonal child: with tiers two sectors deep, no sector gets three cross-tier branches
+        parent = sx * sy > 0 ? [sx, 0] : [0, sy];
+      } else parent = a0 && !a1 ? cands[1] : a1 && !a0 ? cands[0] : cands[h32(S.seed, sx, sy, 77) & 1];
     }
     return { sx, sy, depth, tierIndex, type, level, parent, name: tierName(S, type, level) };
   }
@@ -131,6 +135,7 @@
     const arsenal = S.preset === 'arsenal';
     const t0 = now(), timing = {};
     const info = sectorInfo(S, sx, sy), portals = sectorPortals(S, sx, sy);
+    if (PRESETS[S.preset].layout === 'rooms' && S.layout !== 'caverns') return genRoomSector(S, info, portals, sx, sy, t0, timing);
     const origin = sx === 0 && sy === 0;
     let last = null;
     for (let attempt = 0; attempt < 6; attempt++) {
@@ -186,39 +191,7 @@
       const pass = new Uint8Array(SW * SH), col = new Uint8Array(SW * SH).fill(255);
       for (let i = 0; i < SW * SH; i++) if (val.dist[i] >= 0) { pass[i] = 1; const st = subStyle(sub.tileOf, i); col[i] = st < 0 ? 254 : st; }
       // dressing: example-driven tile WFC over the finished layout (walls take their region's tileset)
-      let deco = null, dressStats = null;
-      if (typeof dress === 'function' && S.dress !== false) {
-        const P = PRESETS[S.preset], tsOf = st => P.tilesets ? P.tilesets[st] : st;
-        const setOf = new Uint8Array(SW * SH);
-        for (let i = 0; i < SW * SH; i++) {
-          const c = (((i / SW) | 0) / 3 | 0) * COLS + ((i % SW) / 3 | 0);
-          setOf[i] = tsOf(pass[i] && col[i] < 5 ? col[i] : field.prim[c]);
-        }
-        // strata bleed into each other around the seals between them, so a change of stratum is
-        // announced before you reach it: blobs of the neighbouring stratum's tiles, denser near the seal
-        if (P.tilesets) {
-          const strata = [P.tilesets[0], P.tilesets[1], P.tilesets[4]], R = 10;
-          const src = portals.filter(p => p.cross).map(p => ({ x: p.door[0], y: p.door[1], set: strata[p.toType] }));
-          if (src.length) {
-            const nz = makeNoise(seed ^ 0x5bd1);
-            for (let i = 0; i < SW * SH; i++) {
-              const cx = (i % SW) / 3, cy = ((i / SW) | 0) / 3;
-              let best = null, bd = R;
-              src.forEach(q => { const d = Math.hypot(q.x + 0.5 - cx, q.y + 0.5 - cy); if (d < bd) { bd = d; best = q; } });
-              if (best && nz(cx * 0.8, cy * 0.8) < 1.25 * Math.pow(1 - bd / R, 1.3)) setOf[i] = best.set;
-            }
-          }
-        }
-        // landmarks show their stratum's centrepiece (star chart, bloom heart, unsealed pit)
-        const pins = [];
-        if (P.tilesets) pts.forEach(p => { if (!p.fn || p.fn === 'SE') return; const c = centrepieceAt(pass, setOf, SW, SH, p.cx * 3, p.cy * 3, 5); if (c) pins.push(...c); });
-        // the WebAssembly kernel when it is loaded (bit-identical to the JS, about 15x faster)
-        const useWasm = S.wasm !== false && typeof DRESS_WASM !== 'undefined' && DRESS_WASM;
-        const td = now();
-        const d = (useWasm ? DRESS_WASM.dress : dress)(pass, setOf, SW, SH, seed * 31 + 7, pins);
-        timing.dress = now() - td; timing.wasm = !!useWasm;
-        deco = d.tiles; dressStats = { fallbacks: d.fallbacks, violations: d.violations };
-      }
+      const { deco, dressStats } = dressSector(S, pass, col, c => field.prim[c], pts.filter(p => p.fn && p.fn !== 'SE').map(p => [p.cx * 3, p.cy * 3]), portals, seed, timing);
       const hubs = pts.map((p, i) => ({ i: (p.cy * 3 + 1) * SW + p.cx * 3 + 1, label: p.label, type: info.type, fn: p.fn || null, portal: !!p.portal }));
       const [ox, oy] = originOf(sx, sy);
       timing.total = now() - t0; timing.layout = timing.total - (timing.dress || 0);
@@ -226,6 +199,81 @@
     }
     return { sx, sy, info, portals, ok: false, error: last, ms: Math.round(now() - t0) };
   }
+  // dressing: example-driven tile WFC over a finished layout. Walls take the tileset of their cell's style;
+  // pinAt: sub-cell spots where a landmark's centrepiece should go
+  function dressSector(S, pass, col, primOf, pinAt, portals, seed, timing, extra) {
+    if (typeof dress !== 'function' || S.dress === false) return { deco: null, dressStats: null };
+    const P = PRESETS[S.preset], tsOf = st => P.tilesets ? P.tilesets[st] : st;
+    const setOf = new Uint8Array(SW * SH);
+    for (let i = 0; i < SW * SH; i++) {
+      const c = (((i / SW) | 0) / 3 | 0) * COLS + ((i % SW) / 3 | 0);
+      setOf[i] = tsOf(pass[i] && col[i] < 5 ? col[i] : extra && extra.wallOf ? extra.wallOf(i) : primOf(c));
+    }
+    // strata bleed into each other around the seals between them, so a change of stratum is
+    // announced before you reach it: blobs of the neighbouring stratum's tiles, denser near the seal
+    if (P.tilesets) {
+      const strata = [P.tilesets[0], P.tilesets[1], P.tilesets[4]], R = 10;
+      const src = portals.filter(p => p.cross).map(p => ({ x: p.door[0], y: p.door[1], set: strata[p.toType] }));
+      if (src.length) {
+        const nz = makeNoise(seed ^ 0x5bd1);
+        for (let i = 0; i < SW * SH; i++) {
+          const cx = (i % SW) / 3, cy = ((i / SW) | 0) / 3;
+          let best = null, bd = R;
+          src.forEach(q => { const d = Math.hypot(q.x + 0.5 - cx, q.y + 0.5 - cy); if (d < bd) { bd = d; best = q; } });
+          if (best && nz(cx * 0.8, cy * 0.8) < 1.25 * Math.pow(1 - bd / R, 1.3)) setOf[i] = best.set;
+        }
+      }
+    }
+    // processional halls at the crossings take the Threshold tiles, with a runner and braziers pinned
+    const pins = [];
+    if (extra && extra.passage) {
+      const th = DRESS_SETS.findIndex(t => t.key === 'threshold');
+      for (let i = 0; i < SW * SH; i++) if (extra.passage[i] === 1) setOf[i] = th; else if (extra.passage[i] === 2) setOf[i] = tsOf(col[i] < 5 ? col[i] : primOf(0));
+      extra.runner.forEach(([i, o]) => pins.push([i, o === 'h' ? 'N' : 'V']));
+      extra.braziers.forEach(i => pins.push([i, 'T']));
+    }
+    // landmarks show their stratum's centrepiece (star chart, bloom heart, unsealed pit)
+    if (P.tilesets) pinAt.forEach(([x, y]) => { const c = centrepieceAt(pass, setOf, SW, SH, x, y, 5); if (c) pins.push(...c); });
+    // the WebAssembly kernel when it is loaded (bit-identical to the JS, about 15x faster)
+    const useWasm = S.wasm !== false && typeof DRESS_WASM !== 'undefined' && DRESS_WASM;
+    const td = now();
+    const d = (useWasm ? DRESS_WASM.dress : dress)(pass, setOf, SW, SH, seed * 31 + 7, pins);
+    timing.dress = now() - td; timing.wasm = !!useWasm;
+    return { deco: d.tiles, dressStats: { fallbacks: d.fallbacks, violations: d.violations } };
+  }
+
+  // ---------- room-based sectors (gen/rooms.js): themes, a room grammar, suites, maze corridors ----------
+  const STRATUM_STYLE = [0, 1, 4]; // the Underdark's architecture style (and tileset) for each stratum
+  function genRoomSector(S, info, portals, sx, sy, t0, timing) {
+    const own = ownedMask(S, sx, sy), [ox, oy] = originOf(sx, sy), origin = sx === 0 && sy === 0;
+    let last = null;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const seed = 1 + (h32(S.seed, sx, sy, 1000 + attempt) % 999983);
+      const L = roomsLayout(S, info, portals, own, ox, oy, seed, doorSub);
+      if (!L.ok) { last = L.error; continue; }
+      const pass = L.pass, style = STRATUM_STYLE[info.type], col = new Uint8Array(SW * SH).fill(255);
+      for (let i = 0; i < SW * SH; i++) if (pass[i]) col[i] = STRATUM_STYLE[L.stratumOf[i]];
+      // landmarks: the camp at the start, the theme's goal room, seals and pits at the borders between strata
+      const hubs = [], pinAt = [];
+      if (origin) { hubs.push({ i: L.startSub, label: 'PG', type: info.type, fn: 'PG', portal: false }); pinAt.push([L.startSub % SW, (L.startSub / SW) | 0]); }
+      const lm = UD_LANDMARK[info.type];
+      hubs.push({ i: L.goal.cy * SW + L.goal.cx, label: lm, type: info.type, fn: lm, portal: false, room: L.goal.name }); pinAt.push([L.goal.cx, L.goal.cy]);
+      portals.forEach((p, k) => {
+        const cx = Math.max(1, Math.min(COLS - 2, p.hub[0])), cy = Math.max(1, Math.min(ROWS - 2, p.hub[1]));
+        const fn = p.cross ? ((info.type === 2 && p.toType === 0) || (info.type === 0 && p.toType === 2) ? 'PT' : 'SE') : null;
+        hubs.push({ i: (cy * 3 + 1) * SW + cx * 3 + 1, label: fn, type: info.type, fn, portal: true });
+        if (fn === 'PT' && L.halls[k] && !L.halls[k].hallOnly) pinAt.push([L.halls[k].cx, L.halls[k].cy]);
+      });
+      const doors = portals.map(p => doorSub(p));
+      timing.layout = now() - t0;
+      const { deco, dressStats } = dressSector(S, pass, col, c => STRATUM_STYLE[L.stratumOf[((c / COLS) | 0) * 3 * SW + 3 * (c % COLS) + SW + 1]], pinAt, portals, seed, timing, { passage: L.passage, runner: L.runner, braziers: L.braziers, wallOf: i => STRATUM_STYLE[L.stratumOf[i]] });
+      timing.total = now() - t0;
+      return { sx, sy, ox, oy, own, info, portals, doors, pass, col, deco, dressStats, hubs, doctrine: null, attempts: attempt + 1, ms: Math.round(timing.total), timing,
+        entranceSub: L.startSub, ok: true, layout: 'rooms', theme: L.theme, rooms: L.rooms, roomOf: L.roomOf, mission: L.mission, doorWide: L.doorWide, halls: L.halls, districts: L.districts, distOf: L.distOf, mat: L.mat };
+    }
+    return { sx, sy, info, portals, ok: false, error: last, ms: Math.round(now() - t0) };
+  }
+
   // the subcell on the sector's edge where a doorway opens
   function doorSub(p) {
     const c = portalCells(p), [x, y] = c.door;

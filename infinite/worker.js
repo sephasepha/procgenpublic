@@ -1,6 +1,6 @@
 // Generates sectors off the main thread so play stays smooth. The generator runs in WebAssembly
 // (wasm/gen.wasm) once loaded, falling back to the bit-identical JavaScript if it can't load.
-importScripts('../gen/mazes.js', '../gen/core.js', '../gen/dressing.js', '../gen/world.js', '../gen/wasm.js');
+importScripts('../gen/mazes.js', '../gen/core.js', '../gen/dressing.js', '../gen/rooms.js', '../gen/world.js', '../gen/wasm.js');
 const ready = GenWasm.load('../wasm/gen.wasm');
 onmessage = async e => {
   await ready;

@@ -308,6 +308,30 @@
     ax.putImageData(img, 0, 0);
     atlas.cols = COLSA;
   }
+  // ---------- material atlas: tiles re-surfaced with a floor or wall material, built on first use ----------
+  // key: tile, spin, jitter, which material, and the tile's phase in the 2x2 (16 px) world-aligned pattern
+  const MAT = { cv: null, g: null, map: new Map(), next: 0, cols: 64, rows: 64 };
+  function matSlot(t, sp, j, kind, m, phase) {
+    const key = ((((t * 4 + sp) * 4 + j) * 2 + (kind === 'w' ? 1 : 0)) * 16 + m) * 4 + phase;
+    let k = MAT.map.get(key); if (k !== undefined) return k;
+    if (!MAT.cv) { MAT.cv = document.createElement('canvas'); MAT.cv.width = MAT.cols * SLOT; MAT.cv.height = MAT.rows * SLOT; MAT.g = MAT.cv.getContext('2d'); }
+    if (MAT.next >= MAT.cols * MAT.rows) { MAT.map.clear(); MAT.next = 0; st.layerDirty = true; } // full: start over (rare)
+    k = MAT.next++; MAT.map.set(key, k);
+    const v = DRESS_TILES[t], set = DRESS_SETS[v.ts], N = v.size || 4, chars = v.pxs[sp], f = 0.93 + j / 3 * 0.12;
+    const mm = kind === 'w' ? set.materials.wall[m - 1] : set.materials.floor[m - 1], ox = (phase & 1) * 8, oy = (phase >> 1) * 8;
+    const img = MAT.g.createImageData(SLOT, SLOT), d = img.data;
+    for (let y = 0; y < SLOT; y++) for (let x = 0; x < SLOT; x++) {
+      const ch = chars[(y * N / SLOT) | 0][(x * N / SLOT) | 0], pi = (oy + y) * 16 + ox + x;
+      let c = set.pal[ch] || [255, 0, 255];
+      if (kind === 'f' && (ch === '.' || ch === ',' || ch === ':')) c = mm.rgb[pi];
+      else if (kind === 'w' && ch === 'W') c = mm.face[pi];
+      else if (kind === 'w' && mm.top && (ch === 'x' || ch === 'w')) c = mm.top[pi];
+      const o = (y * SLOT + x) * 4; d[o] = cl(c[0] * f); d[o + 1] = cl(c[1] * f); d[o + 2] = cl(c[2] * f); d[o + 3] = 255;
+    }
+    MAT.g.putImageData(img, (k % MAT.cols) * SLOT, ((k / MAT.cols) | 0) * SLOT);
+    return k;
+  }
+
   // soft round sprites for glows and fog, drawn once
   const sprites = {};
   function glowSprite(hexc) {
@@ -359,7 +383,7 @@
     layer.x0 = x0; layer.y0 = y0; layer.glows = [];
     L.clearRect(0, 0, layer.cv.width, layer.cv.height);
     // gather the window: kind 0 nothing (unseen or unloaded), 1 floor, 2 wall; atlas slot or flat colour; light
-    const n = w * h, kind = new Uint8Array(n), slot = new Int32Array(n).fill(-1), bright = new Float32Array(n), flat = new Array(n);
+    const n = w * h, kind = new Uint8Array(n), slot = new Int32Array(n).fill(-1), fromMat = new Uint8Array(n), bright = new Float32Array(n), flat = new Array(n);
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const gx = x0 + x, gy = y0 + y, s = secAt(gx, gy), c = y * w + x;
       if (!s || s.failed) continue;
@@ -368,8 +392,15 @@
       const lit = !fog || s.lit[i];
       kind[c] = s.pass[i] ? 1 : 2;
       if (st.tiles && s.deco) {
-        const t = s.deco[i], hsh = cellHash(gx, gy);
-        slot[c] = slotBase[t] + ((hsh & 3) % slotSpins[t]) * 4 + ((hsh >>> 8) & 3);
+        const t = s.deco[i], hsh = cellHash(gx, gy), sp = (hsh & 3) % slotSpins[t], jt = (hsh >>> 8) & 3;
+        slot[c] = slotBase[t] + sp * 4 + jt;
+        // materials: structured floors and masonry laid per room and district (8x8 tilesets that define them)
+        const m = s.mat ? s.mat[i] : 0, tv = DRESS_TILES[t];
+        if (m && st.tiles && DRESS_SETS[tv.ts].materials) {
+          const fm = m & 15, wm = m >> 4, ph = (gx & 1) | ((gy & 1) << 1);
+          if (tv.walk && fm) { slot[c] = matSlot(t, slotSpins[t] > 1 ? (hsh & 3) : 0, jt, 'f', fm, ph); fromMat[c] = 1; }
+          else if (!tv.walk && wm) { slot[c] = matSlot(t, slotSpins[t] > 1 ? (hsh & 3) : 0, jt, 'w', wm, ph); fromMat[c] = 1; }
+        }
         const v = DRESS_TILES[t]; if (v.glow && (!v.strict || v.letter === '1')) layer.glows.push(v.letter === '1' ? [gx + 0.5, gy + 0.5, v.glow, lit, 1] : [gx, gy - (v.walk ? 0 : E / SLOT), v.glow, lit, 0]);
       } else flat[c] = css(s.pass[i] ? (s.col[i] < FLOOR.length ? FLOOR[s.col[i]] : OTHER) : WALL);
       // light: bright near you, falling off with walking distance; remembered places stay dim
@@ -378,7 +409,7 @@
       bright[c] = b;
     }
     const tile = (c, dx, dy, sy, hh) => {
-      if (slot[c] >= 0) { const k = slot[c]; L.drawImage(atlas, (k % atlas.cols) * SLOT, ((k / atlas.cols) | 0) * SLOT + sy, SLOT, hh, dx, dy, SLOT, hh); }
+      if (slot[c] >= 0) { const k = slot[c], A = fromMat[c] ? MAT.cv : atlas, cols = fromMat[c] ? MAT.cols : atlas.cols; L.drawImage(A, (k % cols) * SLOT, ((k / cols) | 0) * SLOT + sy, SLOT, hh, dx, dy, SLOT, hh); }
       else { L.fillStyle = flat[c]; L.fillRect(dx, dy, SLOT, hh); }
     };
     const dark = (a, x, y, ww, hh) => { if (a <= 0.01) return; L.globalAlpha = a; L.fillStyle = 'rgb(4,4,8)'; L.fillRect(x, y, ww, hh); L.globalAlpha = 1; };

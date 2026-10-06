@@ -13,8 +13,8 @@ const DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
 
 for (const preset of ['underdark', 'arsenal', 'generic']) {
   // small bands so the window reaches the Keep (Arsenal) and the pits into the next level (Underdark)
-  const S = { ...W.WORLD_DEFAULTS, preset, seed: preset === 'arsenal' ? 7 : preset === 'underdark' ? 5 : 3, band: preset === 'underdark' ? 1 : 3 };
-  const R = quick ? 2 : preset === 'generic' ? 3 : preset === 'arsenal' ? 7 : 5;
+  const S = { ...W.WORLD_DEFAULTS, preset, seed: preset === 'arsenal' ? 7 : preset === 'underdark' ? 5 : 3, band: preset === 'underdark' ? 2 : 3 };
+  const R = quick ? 2 : preset === 'generic' ? 3 : preset === 'arsenal' ? 7 : 6;
   console.log(`${preset}: sectors within ${R} of the start`);
   const sec = new Map(), key = (x, y) => x + ',' + y, times = [];
   for (let x = -R; x <= R; x++) for (let y = -R; y <= R; y++) {
@@ -26,7 +26,7 @@ for (const preset of ['underdark', 'arsenal', 'generic']) {
     check(s.ms < 3000, `${preset} sector ${x},${y} took ${s.ms} ms to generate (budget 3000)`);
     times.push(s.ms);
   }
-  let worksDoctrine = 0, worksSectors = 0, landmarks = 0, shown = 0;
+  let worksDoctrine = 0, worksSectors = 0, landmarks = 0, shown = 0, gated = 0, gateRooms = 0, crossings = 0;
   sec.forEach(s => {
     if (!s.ok) return;
     const { sx, sy, info } = s;
@@ -57,7 +57,7 @@ for (const preset of ['underdark', 'arsenal', 'generic']) {
     }
     // cross-tier children at most 2
     const kids = s.portals.filter(p => p.kind === 'child' && p.cross).length;
-    if (S.band >= 3) check(kids <= 2, `${preset} ${sx},${sy}: ${kids} cross-tier children`); // the cap needs tiers at least 3 sectors deep
+    if (S.band >= 2) check(kids <= 2, `${preset} ${sx},${sy}: ${kids} cross-tier children`); // the cap needs tiers at least 2 sectors deep
     // underdark: pits only where the strata begin again (a new level), seals between the other strata,
     // and every landmark shows its stratum's centrepiece in the dressing
     if (preset === 'underdark') {
@@ -75,6 +75,23 @@ for (const preset of ['underdark', 'arsenal', 'generic']) {
         }
       });
     }
+    // room grammar: every Underdark sector is themed rooms; the way onward to the next stratum is reached
+    // only through the theme's goal room (flood from the entrance with the goal room closed)
+    if (preset === 'underdark') {
+      check(s.layout === 'rooms' && s.theme && s.rooms.length >= 8, `${preset} ${sx},${sy}: not a room layout (${s.rooms ? s.rooms.length : 0} rooms)`);
+      const gk = s.rooms.findIndex(r => r.goal);
+      check(gk >= 0, `${preset} ${sx},${sy}: no goal room`);
+      const onward = s.portals.map((p, k) => k).filter(k => s.portals[k].cross && s.portals[k].kind !== 'parent' && s.portals[k].kind !== 'parent-extra');
+      if (gk >= 0 && onward.length) {
+        const seen = new Uint8Array(s.pass.length), q = [s.entranceSub]; seen[s.entranceSub] = 1;
+        for (let h = 0; h < q.length; h++) { const c = q[h]; for (let d = 0; d < 4; d++) { const j = c + DX[d] + DY[d] * C.SW; if (j >= 0 && j < s.pass.length && s.pass[j] && !seen[j] && s.roomOf[j] !== gk) { seen[j] = 1; q.push(j); } } }
+        onward.forEach(k => check(!seen[s.doors[k]], `${preset} ${sx},${sy}: the way onward (dir ${s.portals[k].dir}) bypasses the goal room`));
+        gated++;
+      }
+      // every crossing opens into a gate room
+      check(s.halls.every(h => h), `${preset} ${sx},${sy}: a crossing without a processional hall`);
+      gateRooms += s.halls.filter(h => h && !h.hallOnly).length; crossings += s.portals.length;
+    }
     // the Keep is entered only through Checkpoints, and left only through Vaults
     if (preset === 'arsenal') {
       s.portals.forEach((p, k) => {
@@ -91,7 +108,8 @@ for (const preset of ['underdark', 'arsenal', 'generic']) {
     let overlap = 0;
     sec.forEach((s, k) => { if (!s.ok) return; for (let i = 0; i < s.pass.length; i++) if (s.pass[i]) { const gk = (s.ox * 3 + i % C.SW) + ',' + (s.oy * 3 + ((i / C.SW) | 0)); if (g.has(gk)) overlap++; g.set(gk, k); } });
     check(overlap === 0, `${preset}: ${overlap} sub-cells claimed by two sectors`);
-    const doorSet = new Set(); sec.forEach(s => { if (s.ok) s.doors.forEach(i => doorSet.add((s.ox * 3 + i % C.SW) + ',' + (s.oy * 3 + ((i / C.SW) | 0)))); });
+    // a doorway may be wider than one sub-cell (the processional halls open the whole edge of the door cell)
+    const doorSet = new Set(); sec.forEach(s => { if (s.ok) (s.doorWide ? s.doorWide.flat() : s.doors).forEach(i => doorSet.add((s.ox * 3 + i % C.SW) + ',' + (s.oy * 3 + ((i / C.SW) | 0)))); });
     let leaks = 0, crossings = 0;
     g.forEach((k, gk) => {
       const [x, y] = gk.split(',').map(Number);
@@ -112,7 +130,7 @@ for (const preset of ['underdark', 'arsenal', 'generic']) {
     s.portals.forEach(p => { const k = key(p.to[0], p.to[1]); if (sec.has(k) && !seen.has(k)) { seen.add(k); q.push(p.to); } });
   }
   check(seen.size === sec.size, `${preset}: only ${seen.size}/${sec.size} sectors reachable from the start`);
-  if (preset === 'underdark') { console.log(`  ${shown}/${landmarks} landmarks show their centrepiece`); check(shown >= landmarks * 0.9, `underdark: only ${shown}/${landmarks} landmarks show their centrepiece`); }
+  if (preset === 'underdark') { console.log(`  ${shown}/${landmarks} landmarks show their centrepiece; ${gated} sectors gate the way onward through their goal room; ${gateRooms}/${crossings} crossings open into a gate room`); check(gateRooms >= crossings * 0.9, `underdark: only ${gateRooms}/${crossings} crossings have a gate room`); check(shown >= landmarks * 0.9, `underdark: only ${shown}/${landmarks} landmarks show their centrepiece`); }
   if (preset === 'arsenal') console.log(`  Works doctrine fully satisfied in ${worksDoctrine}/${worksSectors} Works sectors`);
 
   // order independence: regenerate sectors in a scrambled order, interleaved with another preset
