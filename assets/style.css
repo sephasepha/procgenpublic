@@ -150,3 +150,5 @@ html.xp-open, html.xp-open body { overflow: hidden; }
 .xp-key:active { background: var(--brass); color: var(--ink); border-color: var(--brass); }
 .xp-key.up { grid-area: up; } .xp-key.left { grid-area: left; } .xp-key.right { grid-area: right; } .xp-key.down { grid-area: down; }
 .xp button:focus-visible { outline: 2px solid var(--gate); outline-offset: 2px; }
+
+.explore-top { font-size: 0.95rem; padding: 9px 16px; }
