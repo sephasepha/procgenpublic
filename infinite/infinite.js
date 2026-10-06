@@ -663,6 +663,8 @@
       frameP95: q(dts, 0.95), workMedian: q(work, 0.5), workP95: q(work, 0.95), drops: P.drops,
       layerMedian: q(P.layer, 0.5), layerP95: q(P.layer, 0.95),
       genCount: g.length, genMedian: q(field('total'), 0.5), genP95: q(field('total'), 0.95), genMax: q(field('total'), 1),
+      // after warm-up: each worker's first sectors pay for compiling the JavaScript stages
+      genSteadyP95: q(g.slice(2 * Math.max(1, pool.filter(w => !w.dead).length)).map(x => x.total), 0.95),
       dressMedian: q(field('dress'), 0.5), wfcMedian: q(field('wfc'), 0.5),
       wasm: g.length ? g.every(x => x.wasm) : null, wasmError: g.length ? g[g.length - 1].wasmError : null,
       firstSector: P.firstSector, workers: pool.filter(w => !w.dead).length, pending: st.pending.size, loaded: st.sectors.size,
@@ -675,7 +677,8 @@
       row('frame rate', `${f(p.fps, 0)} fps · p95 ${f(p.frameP95)} ms`, p.frameP95 < 25) +
       row('work per frame', `${f(p.workMedian)} ms · p95 ${f(p.workP95)} ms`, p.workP95 < 8) +
       row('view rebuild', `${f(p.layerMedian)} ms · p95 ${f(p.layerP95)} ms`) +
-      row('sector generation', `${f(p.genMedian, 0)} ms · p95 ${f(p.genP95, 0)} ms (${p.genCount})`, p.genP95 < 150) +
+      row('sector generation', `${f(p.genMedian, 0)} ms · p95 ${f(p.genP95, 0)} ms (${p.genCount})`) +
+      row('  steady p95 (after warm-up)', p.genSteadyP95 ? `${f(p.genSteadyP95, 0)} ms` : '…', p.genSteadyP95 ? p.genSteadyP95 < 150 : undefined) +
       row('  layout WFC / dressing', `${f(p.wfcMedian)} / ${f(p.dressMedian)} ms`) +
       row('generator', p.wasm === null ? '…' : p.wasm ? 'WebAssembly' : 'JavaScript' + (p.wasmError ? ' (' + p.wasmError + ')' : ''), p.wasm !== false) +
       row('first sector ready', `${f(p.firstSector, 0)} ms`, p.firstSector < 1500) +

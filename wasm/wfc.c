@@ -3,8 +3,9 @@
 // collapses to exactly the same tiles as the JavaScript. JS still builds the per-cell domains and weights.
 #include "rt.h"
 
-static int NC_, T_, COLS_, ROWS_;
-static u8 *dom; static const u8 *init, *sock, *ex; static const float *Wt; static double *WL; // WL = w * log(w), once per cell and tile
+static int NC_, T_, COLS_, ROWS_, TW, NSOCK; // TW: 32-bit words per domain bitset; NSOCK: socket values in use
+static u32 *dom, *initB; static const u8 *sock, *ex; static const float *Wt; static double *WL; // WL = w * log(w), per cell and tile
+static u32 *sockSet; // [4][32][TW]: tiles whose socket on side d is s
 static short *cnt; static float *ent;
 static u32 rs;
 static double rng(void) {
@@ -14,16 +15,22 @@ static double rng(void) {
   return (double)(t ^ (t >> 14)) / 4294967296.0;
 }
 static const int DX[4] = { 0, 1, 0, -1 }, DY[4] = { -1, 0, 1, 0 };
+#define FOR_BITS(D, t, body) for (int w_ = 0; w_ < TW; w_++) { u32 b_ = (D)[w_]; while (b_) { u32 low_ = b_ & (0u - b_); int t = w_ * 32 + 31 - clz(low_); body; b_ ^= low_; } }
 
+// sums in ascending tile order, exactly as the JS loop over t
 static void recalc(int c) {
-  int n = 0; double sw = 0, swl = 0; const u8 *d = dom + c * T_; const float *w = Wt + c * T_;
-  const double *wl = WL + c * T_;
-  for (int t = 0; t < T_; t++) if (d[t]) { n++; sw += (double)w[t]; swl += wl[t]; }
+  int n = 0; double sw = 0, swl = 0; const float *w = Wt + c * T_; const double *wl = WL + c * T_;
+  FOR_BITS(dom + c * TW, t, { n++; sw += (double)w[t]; swl += wl[t]; });
   cnt[c] = (short)n; ent[c] = n > 1 ? (float)(flog(sw) - swl / sw) : 0.0f;
 }
-static u32 sideMask(int c, int d) { u32 m = 0; const u8 *dd = dom + c * T_; for (int t = 0; t < T_; t++) if (dd[t]) m |= 1u << sock[t * 4 + d]; return m; }
+static u32 sideMask(int c, int d) {
+  u32 m = 0; const u32 *dd = dom + c * TW;
+  for (int s = 0; s < NSOCK; s++) { const u32 *ss = sockSet + (d * 32 + s) * TW; for (int w = 0; w < TW; w++) if (dd[w] & ss[w]) { m |= 1u << s; break; } }
+  return m;
+}
 
 static int *q; static int qN; static u8 *inQ;
+static u32 allowB[32];
 static int propagate(void) {
   while (qN) {
     int c = q[--qN]; inQ[c] = 0;
@@ -33,8 +40,11 @@ static int propagate(void) {
       if (nx < 0 || ny < 0 || nx >= COLS_ || ny >= ROWS_) continue;
       int n = ny * COLS_ + nx;
       if (ex[c] || ex[n]) continue; // no constraints across a sector border
-      u32 m = sideMask(c, d); int od = (d + 2) & 3; u8 *b = dom + n * T_; int changed = 0;
-      for (int t = 0; t < T_; t++) if (b[t] && !(m & (1u << sock[t * 4 + od]))) { b[t] = 0; changed = 1; }
+      u32 m = sideMask(c, d); int od = (d + 2) & 3;
+      for (int w = 0; w < TW; w++) allowB[w] = 0;
+      for (int s = 0; s < NSOCK; s++) if ((m >> s) & 1) { const u32 *ss = sockSet + (od * 32 + s) * TW; for (int w = 0; w < TW; w++) allowB[w] |= ss[w]; }
+      u32 *b = dom + n * TW; int changed = 0;
+      for (int w = 0; w < TW; w++) { u32 nv = b[w] & allowB[w]; if (nv != b[w]) { b[w] = nv; changed = 1; } }
       if (changed) {
         recalc(n);
         if (cnt[n] == 0) return n;
@@ -50,7 +60,7 @@ static void qadd(int c) { q[qN++] = c; inQ[c] = 1; }
 
 static int resets, restarts, done, collapsed;
 static void restart(void) {
-  memcpy(dom, init, (unsigned long)NC_ * T_);
+  memcpy(dom, initB, (unsigned long)NC_ * TW * 4);
   for (int c = 0; c < NC_; c++) recalc(c);
   qstart(); for (int c = 0; c < NC_; c++) qadd(c);
   propagate();
@@ -63,7 +73,7 @@ static void fix(int fail) {
     if (resets > 400) { restarts++; resets = 0; restart(); return; }
     int x0 = fail % COLS_, y0 = fail / COLS_;
     for (int y = y0 - r < 0 ? 0 : y0 - r; y <= (y0 + r > ROWS_ - 1 ? ROWS_ - 1 : y0 + r); y++)
-      for (int x = x0 - r < 0 ? 0 : x0 - r; x <= (x0 + r > COLS_ - 1 ? COLS_ - 1 : x0 + r); x++) { int c = y * COLS_ + x; memcpy(dom + c * T_, init + c * T_, T_); recalc(c); }
+      for (int x = x0 - r < 0 ? 0 : x0 - r; x <= (x0 + r > COLS_ - 1 ? COLS_ - 1 : x0 + r); x++) { int c = y * COLS_ + x; memcpy(dom + c * TW, initB + c * TW, TW * 4); recalc(c); }
     qstart();
     int r1 = r + 1;
     for (int y = y0 - r1 < 0 ? 0 : y0 - r1; y <= (y0 + r1 > ROWS_ - 1 ? ROWS_ - 1 : y0 + r1); y++)
@@ -77,11 +87,12 @@ static int step(void) {
   int best = -1; double be = 1e9;
   for (int c = 0; c < NC_; c++) if (cnt[c] > 1) { double e = (double)ent[c] + rng() * 1e-3; if (e < be) { be = e; best = c; } }
   if (best < 0) { done = 1; return 0; }
-  u8 *b = dom + best * T_; const float *w = Wt + best * T_; double sw = 0;
-  for (int t = 0; t < T_; t++) if (b[t]) sw += (double)w[t];
+  u32 *b = dom + best * TW; const float *w = Wt + best * T_; double sw = 0;
+  FOR_BITS(b, t, { sw += (double)w[t]; });
   double r = rng() * sw; int pick = -1;
-  for (int t = 0; t < T_; t++) if (b[t]) { r -= (double)w[t]; pick = t; if (r <= 0) break; }
-  for (int t = 0; t < T_; t++) b[t] = t == pick ? 1 : 0;
+  for (int w_ = 0; w_ < TW && !(pick >= 0 && r <= 0); w_++) { u32 b_ = b[w_]; while (b_) { u32 low_ = b_ & (0u - b_); int t = w_ * 32 + 31 - clz(low_); r -= (double)w[t]; pick = t; if (r <= 0) break; b_ ^= low_; } }
+  for (int k = 0; k < TW; k++) b[k] = 0;
+  b[pick >> 5] = 1u << (pick & 31);
   recalc(best); collapsed++;
   qstart(); qadd(best);
   int fail = propagate();
@@ -92,15 +103,20 @@ static int step(void) {
 // solve from a fresh restart, as the world does: while (wfc.step() && guard++ < maxSteps) {}
 // in: init[NC*T], W[NC*T] (float32), sock[T*4], ex[NC]; out: dom[NC*T], cnt[NC], stats [resets, restarts, done, collapsed]
 EXPORT int wfc_solve(int cols, int rows, int T, const u8 *initIn, const float *wIn, const u8 *sockIn, const u8 *exIn, int seed, int maxSteps, u8 *domOut, short *cntOut, int *stats) {
-  COLS_ = cols; ROWS_ = rows; NC_ = cols * rows; T_ = T;
-  init = initIn; Wt = wIn; sock = sockIn; ex = exIn; dom = domOut; cnt = cntOut;
+  COLS_ = cols; ROWS_ = rows; NC_ = cols * rows; T_ = T; TW = (T + 31) / 32;
+  Wt = wIn; sock = sockIn; ex = exIn; cnt = cntOut;
   ent = rt_scratch(NC_ * 4); q = rt_scratch(NC_ * 4 * 4); inQ = rt_scratch(NC_);
   WL = rt_scratch(NC_ * T_ * 8);
-  for (int k = 0; k < NC_ * T_; k++) if (init[k]) { double x = Wt[k]; WL[k] = x * flog(x); }
+  dom = rt_scratch(NC_ * TW * 4); initB = rt_scratch(NC_ * TW * 4); sockSet = rt_scratch(4 * 32 * TW * 4);
+  memset(initB, 0, (unsigned long)NC_ * TW * 4); memset(sockSet, 0, 4ul * 32 * TW * 4);
+  for (int k = 0; k < NC_ * T_; k++) if (initIn[k]) { initB[(k / T_) * TW + ((k % T_) >> 5)] |= 1u << ((k % T_) & 31); double x = Wt[k]; WL[k] = x * flog(x); }
+  NSOCK = 1;
+  for (int t = 0; t < T_; t++) for (int d = 0; d < 4; d++) { int so = sock[t * 4 + d] & 31; sockSet[(d * 32 + so) * TW + (t >> 5)] |= 1u << (t & 31); if (so + 1 > NSOCK) NSOCK = so + 1; }
   rs = (u32)seed; resets = 0; restarts = 0;
   restart();
   int guard = 0;
   for (;;) { if (!step()) break; if (!(guard++ < maxSteps)) break; }
+  for (int c = 0; c < NC_; c++) { u8 *o = domOut + c * T_; const u32 *dd = dom + c * TW; for (int t = 0; t < T_; t++) o[t] = (u8)((dd[t >> 5] >> (t & 31)) & 1); }
   stats[0] = resets; stats[1] = restarts; stats[2] = done; stats[3] = collapsed;
   return 0;
 }

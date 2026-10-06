@@ -81,14 +81,14 @@ workers that run the generator in **WebAssembly**:
 
 | Metric | Budget | Where |
 | --- | --- | --- |
-| Sector generation p95 (WebAssembly) | < 150 ms | `npm run bench` (Node), Perf panel, browser bench |
+| Sector generation p95 (WebAssembly, after warm-up) | < 150 ms | `npm run bench` (Node), Perf panel, browser bench |
 | Frame interval p95 | < 25 ms (60 fps target) | Perf panel, `npm run bench:browser` |
 | Main-thread work per frame p95 | < 8 ms | Perf panel, browser bench |
 | First sector ready after opening | < 1.5 s | Perf panel, browser bench |
 | Any single sector (tests) | < 3 s | `tests/world.js` |
 
 `npm run bench` and `npm run bench:browser` (headless Chromium at phone size, walking for 15 s) append a record
-with the commit to `perf/history.jsonl`, so every build's numbers stay comparable. In the app, the **Perf** chip
+with the commit to `perf/history.jsonl` (each worker's first two sectors run slower while the JavaScript stages compile, so the browser bench reports steady-state p95 alongside the overall figure), so every build's numbers stay comparable. In the app, the **Perf** chip
 shows the same numbers live, red when over budget.
 
 ## Layout

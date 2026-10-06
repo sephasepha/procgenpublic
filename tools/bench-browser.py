@@ -24,7 +24,7 @@ with sync_playwright() as p:
     t0 = time.time(); pg.goto(url)
     pg.wait_for_function('Infinite.state() && Infinite.state().placed', timeout=60000)
     placed = (time.time() - t0) * 1000
-    perf = pg.evaluate(WALK, 15000)
+    perf = pg.evaluate(WALK, 25000)
     b.close()
 commit = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], capture_output=True, text=True, cwd=root).stdout.strip()
 rec = {'kind': 'browser', 'date': datetime.datetime.now().isoformat(timespec='seconds'), 'commit': commit, 'placedMs': round(placed), **{k: (round(v, 2) if isinstance(v, float) else v) for k, v in perf.items()}, 'errors': errs[:3]}
