@@ -52,6 +52,7 @@
 
   function refresh() {
     $('seedOut').textContent = S.seed;
+    $('heroWorld').textContent = `World ${S.seed} · ${S.preset === 'arsenal' ? 'Arsenal' : 'Generic'}`;
     document.querySelectorAll('[data-preset]').forEach(b => b.classList.toggle('on', b.dataset.preset === S.preset));
     $('ruinCtl').hidden = S.preset !== 'arsenal';
     $('algos').innerHTML = ALGOS.map(k => `<button type="button" data-algo="${k}" class="${k === S.algo ? 'on' : ''}">${MAZE_ALGOS[k].short}</button>`).join('');
@@ -66,8 +67,10 @@
   bind('Ruin', 'ruin', v => v + '%');
   document.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => { S.preset = b.dataset.preset; refresh(); });
   $('algos').addEventListener('click', e => { const b = e.target.closest('[data-algo]'); if (b) { S.algo = b.dataset.algo; refresh(); } });
-  $('reseed').onclick = () => { S.seed = 1 + Math.floor(Math.random() * 999999); refresh(); };
+  $('reseed').onclick = $('reseedTop').onclick = () => { S.seed = 1 + Math.floor(Math.random() * 999999); refresh(); };
   $('descend').onclick = () => Infinite.open({ ...S });
   window.addEventListener('resize', preview);
   refresh();
+  // the infinite world is the main event: open straight into it
+  Infinite.open({ ...S });
 })();

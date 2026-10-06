@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111318">
+<title>Tile Dressing</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon-192.png">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+.sets { display: flex; flex-wrap: wrap; gap: 6px; }
+.sets button { appearance: none; font: inherit; font-size: 0.82rem; padding: 7px 11px; border-radius: 999px; border: 1px solid var(--rule); background: var(--slab); color: var(--dim); cursor: pointer; }
+.sets button.on { background: var(--brass); border-color: var(--brass); color: var(--ink); font-weight: 700; }
+.pix { image-rendering: pixelated; display: block; max-width: 100%; height: auto; border: 1px solid var(--rule); border-radius: 4px; background: #0b0c10; }
+.tilegrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px; }
+.tile { appearance: none; font: inherit; background: var(--ink); border: 1px solid var(--rule); border-radius: 8px; padding: 6px; display: grid; gap: 4px; justify-items: center; cursor: pointer; color: var(--text); min-width: 0; }
+.tile.on { border-color: var(--brass); }
+.tile canvas { width: 48px; height: 48px; image-rendering: pixelated; }
+.tile b { font-family: var(--f-mono); font-weight: 500; font-size: 0.8rem; }
+.tile span { font-size: 0.68rem; color: var(--dim); text-align: center; line-height: 1.2; }
+.nbrs { display: grid; gap: 6px; }
+.nbr { display: grid; grid-template-columns: 4.5rem minmax(0, 1fr); gap: 8px; align-items: center; font-size: 0.8rem; color: var(--dim); }
+.nbr div { display: flex; flex-wrap: wrap; gap: 3px; }
+.nbr canvas { width: 24px; height: 24px; image-rendering: pixelated; border: 1px solid var(--rule); }
+.examples { display: grid; gap: 10px; }
+.code { font-family: var(--f-mono); font-size: 0.72rem; line-height: 1.25; background: var(--ink); border: 1px solid var(--rule); border-radius: 6px; padding: 8px 10px; overflow-x: auto; white-space: pre; color: var(--dim); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Tile Dressing</h1>
+      <p class="sub">Hand-drawn example rooms, and the wave function collapse that learns from them</p>
+    </div>
+    <nav class="topnav" aria-label="Pages"><a href="./">Infinite</a><a href="workbench.html">Workbench</a><a href="lab.html">Maze Lab</a><a href="tiles.html" aria-current="page">Tiles</a></nav>
+  </header>
+
+  <div class="sets" id="sets" role="group" aria-label="Tileset"></div>
+
+  <div class="layout">
+    <div style="display:grid;gap:10px;min-width:0">
+      <canvas class="pix" id="gen" aria-label="Generated patch"></canvas>
+      <div class="nav"><span class="note" id="genNote"></span><span class="grow"></span><button class="btn" id="layoutBtn" type="button">Layout: maze</button><button class="btn primary" id="regen" type="button">Generate again</button></div>
+    </div>
+
+    <div class="panel">
+      <section class="card">
+        <div class="eyebrow">How this works</div>
+        <p class="desc">Each biome has a tileset of 4×4 pixel tiles and a few example rooms built from them. The algorithm learns three things from the examples: the tiles (directional ones in all four rotations), which tile may sit next to which in each direction, and how often each appears. It then fills a floor/wall layout so that every neighbouring pair is one it saw in an example. The patch on the left is a fresh layout dressed only from these rules.</p>
+        <p class="note">In a 3D engine nothing changes but the payload: each tile becomes a modular mesh, and the same learned neighbour rules place them.</p>
+      </section>
+
+      <section class="card">
+        <div class="eyebrow" id="tilesEyebrow">Tiles</div>
+        <div class="tilegrid" id="tiles"></div>
+        <div class="nbrs" id="nbrs"></div>
+      </section>
+
+      <section class="card">
+        <div class="eyebrow">Example rooms (what it learns from)</div>
+        <div class="examples" id="examples"></div>
+      </section>
+    </div>
+  </div>
+</div>
+<script src="gen/mazes.js"></script>
+<script src="gen/dressing.js"></script>
+<script src="tiles/tiles.js"></script>
+<script src="assets/sw-register.js"></script>
+</body>
+</html>

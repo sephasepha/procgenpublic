@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111318">
+<title>Undercroft Workbench</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon-192.png">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Undercroft Workbench</h1>
+      <p class="sub" id="subtitle">A progression grammar on the region graph, wave function collapse for the architecture</p>
+    </div>
+    <nav class="topnav" aria-label="Pages"><a href="./">Infinite</a><a href="workbench.html" aria-current="page">Workbench</a><a href="lab.html">Maze Lab</a><a href="tiles.html">Tiles</a></nav>
+    <div class="seg preset" role="group" aria-label="Preset"><button type="button" data-preset="generic">Generic</button><button type="button" data-preset="arsenal">Arsenal</button></div>
+    <button class="btn primary explore-top" id="exploreNow" type="button" title="Finish the generation and walk it">Explore ▸</button>
+    <div class="seed">seed <b id="seedOut">1</b> <button class="btn" id="reseed" type="button" style="padding:5px 10px;font-size:0.8rem">New seed</button></div>
+  </header>
+
+  <div class="layout">
+    <div style="display:grid;gap:10px;min-width:0">
+      <nav class="rail" id="rail" aria-label="Pipeline stages"></nav>
+      <div class="plate">
+        <canvas id="cv" aria-label="Dungeon map preview"></canvas>
+        <div class="compass">N ↑</div>
+      </div>
+      <div class="inspect" id="inspect">Tap the map to inspect a cell.</div>
+      <div class="nav">
+        <button class="btn" id="prev" type="button">◂ Back</button>
+        <button class="btn" id="play" type="button" hidden>Pause</button>
+        <span class="grow"></span>
+        <button class="btn primary" id="next" type="button">Next ▸</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <section class="card">
+        <div class="eyebrow" id="eyebrow">Stage 1 of 7</div>
+        <h2 id="stageTitle">Regions</h2>
+        <p class="desc" id="stageDesc"></p>
+        <div class="stats" id="stats"></div>
+        <div class="key" id="key"></div>
+      </section>
+
+      <section class="card" id="stageCtl"></section>
+
+      <section class="card">
+        <div class="eyebrow">Progression rules</div>
+        <div class="prods" id="prods" aria-live="polite"></div>
+        <div class="pairs" role="group" aria-label="Which tiers may connect">
+          <label class="pair"><input type="checkbox" id="rEM"><span id="lEM"></span></label>
+          <label class="pair"><input type="checkbox" id="rMH"><span id="lMH"></span></label>
+          <label class="pair"><input type="checkbox" id="rEH"><span id="lEH"></span></label>
+        </div>
+        <div class="controls">
+          <div class="ctl"><label for="pCapEM" id="lCapEM">Medium branches per Easy region</label><output id="oCapEM"></output><input id="pCapEM" type="range" min="1" max="4" step="1"></div>
+          <div class="ctl"><label for="pCapMH" id="lCapMH">Hard branches per Medium region</label><output id="oCapMH"></output><input id="pCapMH" type="range" min="1" max="4" step="1"></div>
+          <div class="ctl"><label for="pEsc">Escalation</label><output id="oEsc"></output><input id="pEsc" type="range" min="1" max="5" step="1"><small>How quickly the preferred tier rises with distance from the entrance</small></div>
+          <div class="ctl" id="ruinCtl" hidden><label for="pRuin">Ruin</label><output id="oRuin"></output><input id="pRuin" type="range" min="0" max="50" step="5"><small>Share of regions collapsed into breaches. Breaches blend with anything, so they open shortcuts the doctrine forbids.</small></div>
+        </div>
+        <p class="note">Same-tier regions can always link. Rules are hard constraints on the graph; escalation is only a preference.</p>
+      </section>
+
+      <section class="card">
+        <div class="eyebrow">Parameters</div>
+        <div class="controls">
+          <div class="ctl"><label for="pRegions">Region hubs</label><output id="oRegions"></output><input id="pRegions" type="range" min="6" max="24" step="1"></div>
+          <div class="ctl"><label for="pLoops">Loop edges kept</label><output id="oLoops"></output><input id="pLoops" type="range" min="0" max="80" step="5"><small>Share of legal non-tree links added back as cycles</small></div>
+          <div class="ctl"><label for="pMaze">Labyrinth strength</label><output id="oMaze"></output><input id="pMaze" type="range" min="0" max="100" step="5"><small>How strongly WFC follows the maze, before each biome's own factor</small></div>
+          <div class="ctl"><label for="pBand">Transition band</label><output id="oBand"></output><input id="pBand" type="range" min="1.5" max="6" step="0.5"><small>How far a style border bleeds, in cells</small></div>
+          <div class="ctl"><label for="pSpeed">Collapse speed</label><output id="oSpeed"></output><input id="pSpeed" type="range" min="1" max="60" step="1"><small>Cells collapsed per frame in the WFC stage</small></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="eyebrow">Biomes by tier</div>
+        <div class="legend" id="legend"></div>
+        <p class="note">All four share one socket tileset (<span id="tileCount"></span> tiles). A biome is a weight table plus a rock ratio; its tier decides where the grammar may place it.</p>
+      </section>
+    </div>
+  </div>
+</div>
+<script src="gen/mazes.js"></script>
+<script src="gen/core.js"></script>
+<script src="explore/explore.js"></script>
+<script src="workbench/app.js"></script>
+<script src="assets/sw-register.js"></script>
+</body>
+</html>

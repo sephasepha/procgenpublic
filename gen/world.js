@@ -12,7 +12,7 @@
 //   * Each sector is validated as it is generated: every hub and doorway inside must connect.
 (function (root) {
   const isNode = typeof module !== 'undefined' && module.exports && typeof window === 'undefined' && typeof importScripts === 'undefined';
-  if (isNode) Object.assign(globalThis, require('./mazes.js'), require('./core.js'));
+  if (isNode) Object.assign(globalThis, require('./mazes.js'), require('./core.js'), require('./dressing.js'));
 
   const WORLD_DEFAULTS = { seed: 1, preset: 'arsenal', band: 3, loops: 30, hubs: 9, maze: 60, algo: 'growing', ruin: 10 };
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
@@ -138,8 +138,19 @@
       // output: walkable floor (unreachable pockets pruned), its architecture, landmarks
       const pass = new Uint8Array(SW * SH), col = new Uint8Array(SW * SH).fill(255);
       for (let i = 0; i < SW * SH; i++) if (val.dist[i] >= 0) { pass[i] = 1; const st = subStyle(sub.tileOf, i); col[i] = st < 0 ? 254 : st; }
+      // dressing: example-driven tile WFC over the finished layout (walls take their region's tileset)
+      let deco = null, dressStats = null;
+      if (typeof dress === 'function' && S.dress !== false) {
+        const setOf = new Uint8Array(SW * SH);
+        for (let i = 0; i < SW * SH; i++) {
+          const c = (((i / SW) | 0) / 3 | 0) * COLS + ((i % SW) / 3 | 0);
+          setOf[i] = pass[i] && col[i] < 5 ? col[i] : field.prim[c];
+        }
+        const d = dress(pass, setOf, SW, SH, seed * 31 + 7);
+        deco = d.tiles; dressStats = { fallbacks: d.fallbacks, violations: d.violations };
+      }
       const hubs = pts.map((p, i) => ({ i: (p.cy * 3 + 1) * SW + p.cx * 3 + 1, label: p.label, type: info.type, fn: p.fn || null, portal: !!p.portal }));
-      return { sx, sy, info, portals, doors, pass, col, hubs, doctrine, attempts: attempt + 1, ms: Date.now() - t0, entranceSub: val.start, ok: true };
+      return { sx, sy, info, portals, doors, pass, col, deco, dressStats, hubs, doctrine, attempts: attempt + 1, ms: Date.now() - t0, entranceSub: val.start, ok: true };
     }
     return { sx, sy, info, portals, ok: false, error: last, ms: Date.now() - t0 };
   }

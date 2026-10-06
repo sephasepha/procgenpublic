@@ -8,6 +8,7 @@
   const OTHER = hex('#6b5a33'), WALL = hex('#2a2e38'), DARK = [7, 8, 11];
   const TIER_COL = ['#a8d672', '#f0b34b', '#e05a5a'];
   const K = (x, y) => x + ',' + y;
+  const TPX = 4; // pixels per tile: each walkable/solid sub-cell is one 4x4 dressing tile
   let el = null, st = null, pool = [], queue = [];
 
   // ---------- generation pool ----------
@@ -40,9 +41,9 @@
     st.pending.delete(k);
     if (!r.ok) { st.sectors.set(k, { ...r, failed: true }); st.failures++; return; }
     if (!st.seen.has(k)) st.seen.set(k, new Uint8Array(SW * SH));
-    const cv = document.createElement('canvas'); cv.width = SW; cv.height = SH;
-    const cx = cv.getContext('2d'), img = cx.createImageData(SW, SH);
-    const sec = { ...r, cv, cx, img, px: new Uint32Array(img.data.buffer), seen: st.seen.get(k), lit: new Uint8Array(SW * SH), dirty: true };
+    const cv = document.createElement('canvas'); cv.width = SW * TPX; cv.height = SH * TPX;
+    const cx = cv.getContext('2d'), img = cx.createImageData(SW * TPX, SH * TPX);
+    const sec = { ...r, cv, cx, img, px: new Uint32Array(img.data.buffer), seen: st.seen.get(k), lit: new Uint8Array(SW * SH), dirty: true, cells: [] };
     st.sectors.set(k, sec);
     st.charted.add(k);
     if (r.sx === st.cs[0] && r.sy === st.cs[1] && !st.placed) place();
@@ -70,7 +71,7 @@
     el.hidden = true;
     el.innerHTML = `
       <div class="xp-top">
-        <button class="xp-btn" data-x="close" type="button" aria-label="Close">✕</button>
+        <button class="xp-btn" data-x="close" type="button" aria-label="Menu: world settings and tools">☰</button>
         <div class="xp-title"></div>
         <div class="xp-stats" aria-live="polite"></div>
       </div>
@@ -84,6 +85,7 @@
           <button class="xp-chip" data-x="fog" type="button">Light: on</button>
           <button class="xp-chip" data-x="zoom" type="button">View: close</button>
           <button class="xp-chip" data-x="run" type="button">Run: on</button>
+          <button class="xp-chip" data-x="tiles" type="button">Tiles: on</button>
           <button class="xp-chip" data-x="rules" type="button">Rules</button>
         </div>
         <div class="xp-pad" role="group" aria-label="Move">
@@ -107,6 +109,7 @@
       if (k === 'close') close();
       if (k === 'fog') { st.fog = !st.fog; x.textContent = 'Light: ' + (st.fog ? 'on' : 'off'); st.sectors.forEach(s => s.dirty = true); }
       if (k === 'zoom') { st.map = !st.map; x.textContent = 'View: ' + (st.map ? 'map' : 'close'); }
+      if (k === 'tiles') { st.tiles = !st.tiles; x.textContent = 'Tiles: ' + (st.tiles ? 'on' : 'off'); st.sectors.forEach(s => s.dirty = true); }
       if (k === 'run') { st.run = !st.run; x.textContent = 'Run: ' + (st.run ? 'on' : 'off'); }
       if (k === 'rules') { const r = el.querySelector('.rules'); r.hidden = !r.hidden; if (!r.hidden) rules(); }
       st.redraw = true;
@@ -137,12 +140,13 @@
       S: { ...WORLD_DEFAULTS, ...settings }, gen,
       sectors: new Map(), pending: new Set(), seen: new Map(), charted: new Set(), visited: new Set(['0,0']),
       cs: [0, 0], gx: 0, gy: 0, from: [0, 0], t: 1, placed: false, litList: [],
-      fog: true, map: false, run: true, steps: 0, started: 0, failures: 0, deepest: 0, redraw: true,
+      fog: true, map: false, run: true, tiles: true, steps: 0, started: 0, failures: 0, deepest: 0, redraw: true,
     };
     queue = [];
     el.querySelector('[data-x="fog"]').textContent = 'Light: on';
     el.querySelector('[data-x="zoom"]').textContent = 'View: close';
     el.querySelector('[data-x="run"]').textContent = 'Run: on';
+    el.querySelector('[data-x="tiles"]').textContent = 'Tiles: on';
     el.querySelector('.rules').hidden = true;
     el.hidden = false;
     document.documentElement.classList.add('xp-open');
@@ -204,13 +208,13 @@
   // ---------- light ----------
   function light() {
     if (!st.placed) return;
-    st.litList.forEach(([s, i]) => { s.lit[i] = 0; s.dirty = true; });
+    st.litList.forEach(([s, i]) => { s.lit[i] = 0; s.cells.push(i); });
     st.litList = [];
     const R = 11, start = [st.gx, st.gy], q = [start], dist = new Map([[K(st.gx, st.gy), 0]]);
     const mark = (gx, gy) => {
       const s = secAt(gx, gy); if (!s || s.failed) return;
       const i = (gy - s.sy * SH) * SW + (gx - s.sx * SW);
-      if (!s.lit[i]) { s.lit[i] = 1; st.litList.push([s, i]); s.dirty = true; }
+      if (!s.lit[i]) { s.lit[i] = 1; st.litList.push([s, i]); s.cells.push(i); }
       s.seen[i] = 1;
     };
     mark(st.gx, st.gy);
@@ -240,21 +244,29 @@
   }
   const rgba = (c, a) => (255 << 24) | (Math.round(c[2] * a + DARK[2] * (1 - a)) << 16) | (Math.round(c[1] * a + DARK[1] * (1 - a)) << 8) | Math.round(c[0] * a + DARK[0] * (1 - a));
   const BLACK = rgba(DARK, 1);
+  // paint one sub-cell as a 4x4 tile: the dressing tile if dressing is on, else the flat layout colour
+  function paintCell(s, i) {
+    const px = s.px, fog = st.fog, lit = !fog || s.lit[i], seen = !fog || s.seen[i];
+    const x = (i % SW) * TPX, y = ((i / SW) | 0) * TPX, row = SW * TPX;
+    if (!seen) { for (let py = 0; py < TPX; py++) px.fill(BLACK, (y + py) * row + x, (y + py) * row + x + TPX); return; }
+    const a = lit ? 1 : (s.pass[i] ? 0.4 : 0.5);
+    const tile = st.tiles && s.deco ? DRESS_TILES[s.deco[i]] : null;
+    if (tile) { for (let k = 0; k < 16; k++) px[(y + (k >> 2)) * row + x + (k & 3)] = rgba(tile.rgb[k], a); return; }
+    const c = rgba(s.pass[i] ? (s.col[i] < FLOOR.length ? FLOOR[s.col[i]] : OTHER) : WALL, a);
+    for (let py = 0; py < TPX; py++) px.fill(c, (y + py) * row + x, (y + py) * row + x + TPX);
+  }
   function paint(s) {
-    const px = s.px, fog = st.fog;
-    for (let i = 0; i < SW * SH; i++) {
-      const lit = !fog || s.lit[i], seen = !fog || s.seen[i];
-      if (!seen) { px[i] = BLACK; continue; }
-      if (s.pass[i]) { const c = s.col[i] < FLOOR.length ? FLOOR[s.col[i]] : OTHER; px[i] = rgba(c, lit ? 1 : 0.4); }
-      else px[i] = rgba(WALL, lit ? 1 : 0.5);
-    }
-    s.cx.putImageData(s.img, 0, 0);
-    s.dirty = false;
+    if (s.dirty) { for (let i = 0; i < SW * SH; i++) paintCell(s, i); s.cx.putImageData(s.img, 0, 0); s.dirty = false; s.cells = []; return; }
+    // only repaint what the light touched, within its bounding box
+    let x0 = SW, y0 = SH, x1 = -1, y1 = -1;
+    s.cells.forEach(i => { paintCell(s, i); const x = i % SW, y = (i / SW) | 0; if (x < x0) x0 = x; if (y < y0) y0 = y; if (x > x1) x1 = x; if (y > y1) y1 = y; });
+    s.cells = [];
+    if (x1 >= 0) s.cx.putImageData(s.img, 0, 0, x0 * TPX, y0 * TPX, (x1 - x0 + 1) * TPX, (y1 - y0 + 1) * TPX);
   }
   function loop() {
     st.raf = requestAnimationFrame(loop);
     if (st.t < 1) { st.t = Math.min(1, st.t + 0.34); st.redraw = true; }
-    st.sectors.forEach(s => { if (!s.failed && s.dirty) { paint(s); st.redraw = true; } });
+    st.sectors.forEach(s => { if (!s.failed && (s.dirty || s.cells.length)) { paint(s); st.redraw = true; } });
     if (st.started && (performance.now() | 0) % 1000 < 17) hud();
     if (!st.redraw) return;
     st.redraw = false;

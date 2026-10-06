@@ -8,16 +8,24 @@ Open it on your phone and use **Add to Home Screen** to install it as an app. It
 
 ## Pages
 
-- **Workbench** (`index.html`): the full pipeline in seven stages: hubs → candidate links → progression rules → style field → corridors and maze → WFC → validation. Two presets:
-  - *Generic*: Easy / Medium / Hard tiers with four biomes.
-  - *Arsenal*: a dead empire's arsenal with clearance rings, function nodes assigned by doctrine, and a ruin pass that opens breaches.
-- **Maze Lab** (`lab.html`): nine classic maze algorithms on a plain grid, with carving replay, solution and distance overlays, and a comparison table across many seeds.
+- **Infinite** (`index.html`, the home page): an endless world of sectors that generates around you as you walk. It opens straight into the explorer; the menu button (☰) shows world settings and the other tools.
+- **Workbench** (`workbench.html`): the full pipeline for one dungeon in seven stages: hubs → candidate links → progression rules → style field → corridors and maze → WFC → validation. Generic and Arsenal presets.
+- **Maze Lab** (`lab.html`): nine classic maze algorithms on a plain grid, with carving replay, overlays and a comparison table.
+- **Tiles** (`tiles.html`): the hand-drawn tilesets and example rooms the dressing WFC learns from, the learned neighbour rules for each tile, and a freshly dressed patch.
 
-- **Infinite** (`infinite.html`): an endless world of sectors that generates around you as you walk. See below.
+The Workbench and Maze Lab also have a simple **Explore** mode. Every setting lives in the page URL, so any generation can be bookmarked, shared or replayed exactly.
 
-Both the Workbench and the Maze Lab have an **Explore** mode: you start at the entrance and walk the generated space with an on-screen arrow pad, swipes or the keyboard. A light radius spreads along corridors (never through walls), explored areas stay dimly mapped, **Run** follows a corridor to the next junction, and reaching the goal (the maze exit, or the Vault / deepest hub in a dungeon) shows your steps against the shortest route.
+## Dressing: example-driven tile WFC
 
-Every setting lives in the page URL, so any generation can be bookmarked, shared or replayed exactly.
+Each biome has a small tileset of 4×4 pixel tiles and a few example rooms built from them (`gen/dressing.js`). From the examples the generator learns:
+
+- the tiles, with directional ones (a niche, a furnace, a banner) in all four rotations,
+- which tile may sit next to which, in each direction,
+- how often each tile appears.
+
+After a sector's layout is finished, a second WFC pass fills every floor sub-cell with a walkable tile and every wall sub-cell with a solid one, so that each neighbouring pair is one that appeared side by side in an example. Plain floor, plain wall and deep rock can always meet, so any layout can be filled, while detail tiles keep the local arrangements of the examples (furnaces only above heat grates, banners only on walls facing a room, and so on).
+
+To add or change art, edit a tileset's `tiles` (4 rows of 4 palette characters each) and draw example rooms as grids of tile letters. In a 3D engine the same learned rules would place modular meshes instead of pixel tiles.
 
 ## Infinite world
 
@@ -43,7 +51,9 @@ workbench/app.js  workbench UI
 lab/lab.js        Maze Lab UI
 explore/explore.js  walkable explore mode shared by both pages
 gen/world.js        infinite world: sector tree, tiers, border contracts, sector generation
-infinite/           streaming explorer, generation worker, Infinite page
+infinite/           streaming explorer, generation worker, home page
+gen/dressing.js     tilesets, example rooms, learning, dressing WFC
+tiles/              Tiles page
 assets/           shared styles, icons, service worker registration
 tests/run.js      generator test suite
 ```
@@ -53,7 +63,7 @@ No build step: the files are served as-is, so pushing to `main` is the deploy.
 ## Tests
 
 ```
-npm test          # pipeline + infinite world suites, about a minute and a half
+npm test          # pipeline, infinite world and dressing suites, about a minute and a half
 QUICK=1 npm test  # short run
 ```
 
