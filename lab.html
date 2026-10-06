@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111318">
+<title>Maze Lab</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon-192.png">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+.metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; }
+@media (min-width: 520px) { .metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.m { display: grid; gap: 1px; min-width: 0; }
+.m span { font-size: 0.74rem; color: var(--dim); }
+.m b { font-family: var(--f-mono); font-weight: 500; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.tablewrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; min-width: 560px; }
+th, td { padding: 7px 9px; text-align: right; font-size: 0.8rem; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+th { font-family: var(--f-mono); font-weight: 500; font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); background: var(--ink); position: sticky; top: 0; }
+th:first-child, td:first-child { text-align: left; position: sticky; left: 0; background: var(--slab); }
+th:first-child { background: var(--ink); }
+td { font-family: var(--f-mono); }
+td:first-child { font-family: var(--f-body); }
+tr.sel td { color: var(--brass); }
+tr[data-algo] { cursor: pointer; }
+td .bar { display: inline-block; height: 6px; border-radius: 3px; background: var(--brass-dim); vertical-align: middle; margin-right: 6px; }
+td.hi { color: var(--s1); } td.lo { color: var(--s2); }
+.blurb { margin: 0; color: var(--dim); font-size: 0.86rem; max-width: 62ch; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Maze Lab</h1>
+      <p class="sub">Classic maze algorithms side by side, measured the same way</p>
+    </div>
+    <nav class="topnav" aria-label="Pages"><a href="./">Workbench</a><a href="lab.html" aria-current="page">Maze Lab</a></nav>
+  </header>
+
+  <div class="layout">
+    <div style="display:grid;gap:10px;min-width:0">
+      <div class="algos" id="algos" role="group" aria-label="Algorithm"></div>
+      <div class="plate"><canvas id="cv" aria-label="Maze preview"></canvas></div>
+      <div class="nav">
+        <button class="btn" id="animBtn" type="button">Replay carving</button>
+        <span class="grow"></span>
+        <span class="seed">seed <b id="seedOut">1</b></span>
+        <button class="btn primary" id="reseed" type="button">New maze</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <section class="card">
+        <div class="eyebrow" id="algoEyebrow">Algorithm</div>
+        <h2 id="algoName"></h2>
+        <p class="blurb" id="algoBlurb"></p>
+        <div class="metrics" id="metrics"></div>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="oSol"> Solution path</label>
+          <label class="check"><input type="checkbox" id="oHeat"> Distance from start</label>
+          <label class="check"><input type="checkbox" id="oDead"> Dead ends</label>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="eyebrow">Settings</div>
+        <div class="controls">
+          <div class="ctl"><label for="pW">Width</label><output id="vW"></output><input id="pW" type="range" min="6" max="60" step="1"><small>Height follows at roughly 4:3 portrait</small></div>
+          <div class="ctl"><label for="pBraid">Braid</label><output id="vBraid"></output><input id="pBraid" type="range" min="0" max="100" step="5"><small>Chance each dead end is knocked through into a loop</small></div>
+          <div class="ctl"><label for="pStraight">Straightness</label><output id="vStraight"></output><input id="pStraight" type="range" min="0" max="100" step="5"><small>Bias to keep going the same way. Applies to backtracker, growing tree and hunt-and-kill</small></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="eyebrow">Compare every algorithm</div>
+        <p class="note">Runs each algorithm on <span id="cmpN">20</span> seeds at the current size, braid and straightness, then averages. Tap a row to view that algorithm.</p>
+        <button class="btn" id="cmpBtn" type="button">Run comparison</button>
+        <div class="tablewrap" id="cmpWrap" hidden><table id="cmp"></table></div>
+      </section>
+
+      <section class="card">
+        <div class="eyebrow">Reading the numbers</div>
+        <p class="note"><b>Dead ends</b>, <b>junctions</b> and <b>straight</b> are shares of all cells. <b>River</b> is the average length of a dead-end branch: high means long blind alleys. <b>Tortuosity</b> is the corner-to-corner path length divided by the straight-line grid distance. <b>Longest path</b> is the maze's diameter as a share of cells. <b>Loops</b> counts extra connections beyond a perfect maze, which come from braiding.</p>
+      </section>
+    </div>
+  </div>
+</div>
+<script src="gen/mazes.js"></script>
+<script src="lab/lab.js"></script>
+<script src="assets/sw-register.js"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "name": "undercroft-workbench",
+  "private": true,
+  "description": "Procedural dungeon and maze generation workbench",
+  "scripts": {
+    "test": "node tests/run.js"
+  }
+}
