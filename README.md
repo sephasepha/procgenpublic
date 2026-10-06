@@ -46,7 +46,7 @@ Each biome's tileset (`gen/dressing.js`) is a **shared structural kit** drawn in
 
 A WFC pass with backtracking then fills each sector cell by cell. When drawn, plain floor tiles take a random quarter turn and every tile gets a slight brightness jitter, so repeats don't read as repeats.
 
-To add art: draw a tile as four rows of palette characters, give it an `anchor` if it faces a direction, then use its letter in an example room. `node tools/autotile.js` checks the example rooms and rewrites structural letters to match their geometry. In a 3D engine the same learned rules would place modular meshes.
+To add set dressing without drawing new example rooms, give a tile `like: 'X'` and a `share`: it goes wherever tile X was learned (same contexts, same turning) at that share of X's weight, so `like: 'F'` is a floor prop, `like: 'A'` a wall-face variant, `like: 'K'` something standing against a wall. To add art: draw a tile as rows of palette characters, give it an `anchor` if it faces a direction, then use its letter in an example room. `node tools/autotile.js` checks the example rooms and rewrites structural letters to match their geometry. In a 3D engine the same learned rules would place modular meshes.
 
 ## Infinite world
 

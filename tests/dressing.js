@@ -11,7 +11,7 @@ const t0 = Date.now();
 
 console.log('Tilesets');
 D.DRESS_SETS.forEach(s => {
-  check(s.K <= 3, `${s.key}: ${s.n} variants exceed the 96 the engine supports`);
+  check(s.K <= 8, `${s.key}: ${s.n} variants exceed the 256 the engines support`);
   ['F', 'E', 'R'].forEach(L => check(s.index[L + '0'] !== undefined, `${s.key}: missing base tile ${L}`));
   // every variant that can actually be placed (it has a context) must have somewhere for its neighbours to go
   s.variants.forEach((v, i) => { if (!s.classesOf[i].size) return; for (let d = 0; d < 4; d++) check(s.allow[d][i].some(w => w !== 0), `${s.key}: tile ${v.letter}${v.r} has no allowed neighbour ${d}`); });

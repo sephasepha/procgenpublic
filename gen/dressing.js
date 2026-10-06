@@ -248,13 +248,27 @@
     },
     // ---------- the Labyrinthine Underdark: 8x8 strata ----------
     { key: 'mazes', name: 'Constellation of Mazes', size: 8,
-      palette: { '.': '#8c93a8', ',': '#7e859b', ':': '#a3aabd', ';': '#5f6680', 'k': '#6d7389', 'K': '#565c72', 'w': '#6b7894', 'x': '#8a97b3', 'W': '#4a5571', 'h': '#b4c0da', 'H': '#2c3349', 'd': '#353d56', '#': '#10142a', '+': '#3a4470', '*': '#cfd8ff', 'g': '#6fe0a0', 'G': '#2f8f5f', 'o': '#d9a441', 'O': '#a8742a', 'm': '#a9b2cb', 'n': '#5c6684' },
+      palette: { '.': '#8c93a8', ',': '#7e859b', ':': '#a3aabd', ';': '#5f6680', 'k': '#6d7389', 'K': '#565c72', 'w': '#6b7894', 'x': '#8a97b3', 'W': '#4a5571', 'h': '#b4c0da', 'H': '#2c3349', 'd': '#353d56', '#': '#10142a', '+': '#3a4470', '*': '#cfd8ff', 'g': '#6fe0a0', 'G': '#2f8f5f', 'o': '#d9a441', 'O': '#a8742a', 'm': '#a9b2cb', 'n': '#5c6684', 'b': '#c9b37a', 'c': '#e9e2ff', 'e': '#8fb4ff', 'u': '#4f6fd0', 'f': '#2f3f8f', 'i': '#ffd86b', 'y': '#fff2b0', 'l': '#ccd3e6', 's': '#7a819a', 't': '#4b516b' },
       tiles: {
         r: { px: ['xwxxxwxx', 'xxwxxxwx', 'wxxwxxxw', 'hhhhhhhh', 'WnnnWnnW', 'WnWnnnWW', 'WnnWWnnW', 'HHHHHHHH'], walk: 0, anchor: 4, w: 3, name: 'Maze relief' },
         e: { px: ['xwxxxwxx', 'xxWWWWxx', 'xWnggnWx', 'hWgGGgWh', 'WWnggnWW', 'WWWWWWWW', 'WdWWWWWW', 'HHHHHHHH'], walk: 0, anchor: 4, w: 0.6, glow: '#6fe0a0', name: 'Watching eye' },
         u: { px: ['Kk.mm.kK', 'Kk.n..kK', 'Kk.mm.kK', 'Kk..n.kK', 'Kk.mm.kK', 'Kk.n..kK', 'Kk.mm.kK', 'Kk..n.kK'], walk: 1, anchor: FLOOR | 10, strict: 1, w: 0.3, name: 'Engraved path' },
         l: { px: ['........', '..o.....', '.oO.....', '......o.', '.....Oo.', '........', '..o.....', '........'], walk: 1, spin: 1, name: 'Gold leaves' },
         c: { px: ['..mmmm..', '.m....m.', 'm..nn..m', 'm.n..n.m', 'm.n..n.m', 'm..nn..m', '.m....m.', '..mmmm..'], walk: 1, name: 'Engraved ring' },
+        // set dressing: like-tiles go wherever their source tile was learned
+        q: { px: ['........', '.nnnnnn.', '.n....n.', '.n.,..n.', '.n....n.', '.n..:.n.', '.nnnnnn.', '........'], walk: 1, like: 'F', share: 0.08, spin: 1, name: 'Inlaid square' },
+        j: { px: ['........', '....m...', '...mnm..', '..mn*nm.', '...mnm..', '....m...', '.,......', '......:.'], walk: 1, like: 'F', share: 0.06, spin: 1, name: 'Star inlay' },
+        z: { px: ['........', '.s......', '.t..l...', '....st..', '.l......', '......s.', '..st..t.', '........'], walk: 1, like: 'F', share: 0.1, spin: 1, name: 'Pebbles' },
+        a: { px: ['..obbo..', '.o.ll.o.', 'o.lssl.o', 'o.sllt.o', '.o.tt.o.', '..oOOo..', '..tsst..', '.KKKKKK.'], walk: 1, like: 'F', share: 0.025, name: 'Orrery' },
+        b: { px: ['........', '..llls..', '.lslsst.', '.lnlnst.', '.lsssst.', '..ltst..', '.KKKKK..', '........'], walk: 1, like: 'F', share: 0.03, name: 'Fallen head' },
+        v: { px: ['........', '....c...', '..c.ce..', '.cec.ec.', '.eeu.ue.', '..uuuu..', '.KKKKKK.', '........'], walk: 1, like: 'F', share: 0.03, glow: '#9fd0ff', name: 'Crystal cluster' },
+        t: { px: ['...ii...', '..iyyi..', '..iyyi..', '...tt...', '...st...', '...st...', '..tsst..', '..KKKK..'], walk: 1, like: 'F', share: 0.02, glow: '#ffd86b', name: 'Lantern' },
+        f: { px: ['xwxxxwxx', 'xxwxxxwx', 'wxxwxxxw', 'hhhhhhhh', 'WnnnnnnW', 'WnWWWWnW', 'WnnnWnnW', 'HHHHHHHH'], walk: 0, like: 'A', share: 0.35, name: 'Glyph relief' },
+        i: { px: ['xwxxxwxx', 'xxwxxxwx', 'wxfffxxw', 'hhfofhhh', 'WWfffWWW', 'WWfofWWW', 'WWfffWWW', 'HHHfHHHH'], walk: 0, like: 'A', share: 0.12, name: 'Star banner' },
+        k: { px: ['xwxxxwxx', 'xxwx*xwx', 'wxxw*xxw', 'hhhh*hhh', 'WWW*WWWW', 'WW*cWWWW', 'WWW*WWWW', 'HHHHHHHH'], walk: 0, like: 'A', share: 0.08, glow: '#cfd8ff', name: 'Starlit crack' },
+        w: { px: ['KKKKKKKK', 'kbbkkllk', '.bob.ls.', '.bbb.ll.', '..,..t..', '......:.', '........', '...,....'], walk: 1, like: 'K', share: 0.12, name: 'Scroll pile' },
+        h: { px: ['KKKKKKKK', 'ktttttts', '.lllllls', '.t....t.', '........', '.,......', '........', '...,....'], walk: 1, like: 'K', share: 0.1, name: 'Stone bench' },
+        o: { px: ['########', '#*######', '##+#####', '###++*##', '#####+##', '######+#', '#######*', '########'], walk: 0, like: 'R', share: 0.15, spin: 1, name: 'Constellation' },
         ...quad(['....mmmmmmmm....', '..mm..*.....mm..', '.m..........*.m.', '.m..mmmmmmmm..m.', 'm..m........m..m', 'm.m...nnnn...m.m', 'm.m..n....n..m.m', 'm.m.n..gg..n.m.m', 'm.m.n..gg..n.m.m', 'm.m..n....n..m.m', 'm.m...nnnn...m.m', 'm..m........m..m', '.m..mmmmmmmm..m.', '.m.*..........m.', '..mm.....*..mm..', '....mmmmmmmm....'], 'Star chart', { glow: '#9fb4ff' }),
       },
       examples: [
@@ -283,13 +297,27 @@
       ],
     },
     { key: 'growth', name: 'Uncontrollable Growth', size: 8,
-      palette: { '.': '#3f7a3a', ',': '#346a33', ':': '#5f9a45', ';': '#2a5229', 'k': '#2b5530', 'K': '#1f4026', 'x': '#5b6b4e', 'w': '#4a5940', 'W': '#34412f', 'h': '#8fb86a', 'H': '#1b2a1c', 'd': '#263322', '#': '#0f1d16', '+': '#16301f', '*': '#1d3d29', 'f': '#f4f0d0', 'y': '#f2d35b', 'v': '#8fd14f', 'V': '#c8f07a', 'r': '#6b4e2e', 'p': '#d77fa1' },
+      palette: { '.': '#3f7a3a', ',': '#346a33', ':': '#5f9a45', ';': '#2a5229', 'k': '#2b5530', 'K': '#1f4026', 'x': '#5b6b4e', 'w': '#4a5940', 'W': '#34412f', 'h': '#8fb86a', 'H': '#1b2a1c', 'd': '#263322', '#': '#0f1d16', '+': '#16301f', '*': '#1d3d29', 'f': '#f4f0d0', 'y': '#f2d35b', 'v': '#8fd14f', 'V': '#c8f07a', 'r': '#6b4e2e', 'p': '#d77fa1', 'm': '#2f6b2a', 'M': '#5ea040', 'b': '#2d5f7a', 'B': '#6fb3c9', 'l': '#7a5a2e', 'L': '#b9792f', 'a': '#c95a5a', 'A': '#f08a7a', 's': '#e8dcc0', 'c': '#9cffd0', 'C': '#3fae8a', 'e': '#5a3d22', 'E': '#8a6236', 'n': '#3a2716', 'g': '#6f7a66', 'G': '#98a28c' },
       tiles: {
         v: { px: ['xvxxwxvx', 'xVvxxvVx', 'wvxwvxvw', 'hvhhvhvh', 'WvWWvWvW', 'WVWWWWvW', 'WvWWWWVW', 'HvHHHHvH'], walk: 0, anchor: 4, w: 1.6, name: 'Vines' },
         t: { px: ['..v.....', '.vV..v..', '.v..vV..', '....v...', '.v......', 'vV...v..', '.v..vV..', '......v.'], walk: 1, spin: 1, w: 1.4, name: 'Tall grass' },
         f: { px: ['........', '..f.....', '.fyf..v.', '..f..vV.', '.....f..', '..v.fyf.', '.vV..f..', '........'], walk: 1, spin: 1, name: 'Flowers' },
         o: { px: ['KvhhhhvK', 'vxVxwxxh', 'hxwvxwxh', 'hxxxvxxv', 'hvhhhhvh', 'WWvWWWvW', 'WvWWWWWW', 'KHvHHHHK'], walk: 0, anchor: 15, name: 'Overgrown pillar' },
         u: { px: ['Kk.rr.kK', 'Kk..r.kK', 'Kk.rr.kK', 'Kkr...kK', 'Kk.rr.kK', 'Kk..rrkK', 'Kk.r..kK', 'Kk.rr.kK'], walk: 1, anchor: FLOOR | 10, strict: 1, w: 0.3, name: 'Root run' },
+        // set dressing: like-tiles go wherever their source tile was learned
+        m: { px: ['........', '.mm.....', 'mMmm..,.', '.mm.....', '.....mm.', '....mMmm', '..,..mm.', '........'], walk: 1, like: 'F', share: 0.12, spin: 1, name: 'Moss' },
+        g: { px: ['........', '..v.....', '.vVv....', '..v...v.', '.....vVv', '.v....v.', 'vVv.....', '.v......'], walk: 1, like: 'F', share: 0.1, spin: 1, name: 'Clover' },
+        l: { px: ['........', '.L......', '..l..L..', '.....l..', '.l......', '....L...', '..L...l.', '........'], walk: 1, like: 'F', share: 0.08, spin: 1, name: 'Leaf litter' },
+        d: { px: ['........', '..bbbb..', '.bbBbbb.', '.bbbBbb.', '.bbbbbb.', '..bbbb..', '........', '........'], walk: 1, like: 'F', share: 0.03, spin: 1, name: 'Puddle' },
+        a: { px: ['..aaaa..', '.aAAaaa.', 'aaAaaaaa', '.aaaaaa.', '...ss...', '...ss...', '..ssss..', '.KKKKKK.'], walk: 1, like: 'F', share: 0.03, name: 'Giant mushroom' },
+        c: { px: ['........', '.c...c..', 'cCc.cCc.', '.s...s..', '.s.c.s..', '...Cc...', '..KsK...', '..KKK...'], walk: 1, like: 'F', share: 0.035, glow: '#9cffd0', name: 'Glowcaps' },
+        e: { px: ['........', '........', '.nEEEEEn', 'nEeeeeEe', 'neeeeeee', '.nnnnnnn', '.KKKKKKK', '........'], walk: 1, like: 'F', share: 0.02, name: 'Fallen log' },
+        s: { px: ['..gGGg..', '.gGvGgg.', '.gvVggg.', '.gGvgvg.', '..gggv..', '.vgggg..', '.KKKKKK.', '........'], walk: 1, like: 'F', share: 0.02, name: 'Overgrown statue' },
+        h: { px: ['xwxxnxwx', 'xxwnxxwx', 'wxnwxxxw', 'hhnhhhhh', 'WWnWWnWW', 'WnWWnWWW', 'WnWWWnWW', 'HnHHHnHH'], walk: 0, like: 'A', share: 0.25, name: 'Roots through wall' },
+        i: { px: ['xMxxmxMx', 'xmMxxmMx', 'mxxmMxxm', 'hMhhmhhM', 'WWmWWWmW', 'WmWWWWWW', 'WWWmWWWW', 'HHHHHHHH'], walk: 0, like: 'A', share: 0.25, name: 'Moss-covered face' },
+        n: { px: ['xvxxxwvx', 'xvwxxxvx', 'wvxwvxvw', 'hvhhvhvh', 'WfWWvWfW', 'WvWWfWvW', 'WWWWvWWW', 'HHHHHHHH'], walk: 0, like: 'A', share: 0.15, name: 'Hanging flowers' },
+        k: { px: ['KKKKKKKK', 'kvVvvVvk', '.vVvVvv.', '..vvvv..', '........', '.,......', '........', '...,....'], walk: 1, like: 'K', share: 0.15, name: 'Bush against wall' },
+        x: { px: ['########', '#nn#####', '###n####', '####nn##', '##n###n#', '#n#####n', '########', '###nn###'], walk: 0, like: 'R', share: 0.15, spin: 1, name: 'Roots in the dark' },
         ...quad(['......vv........', '....vVvvv.......', '...vv.pppp.vv...', '..v..pppppp.Vv..', '.vV.pppffppp..v.', '.v.ppffyyffpp.v.', 'v..ppfyyyyfpp..v', 'v.pppfyyyyfppp.v', 'v.pppfyyyyfppp.v', 'v..ppfyyyyfpp..v', '.v.ppffyyffpp.v.', '.v..pppffppp.Vv.', '..vV.pppppp..v..', '...vv.pppp.vv...', '.......vvvVv....', '........vv......'], 'Bloom heart', { glow: '#ffd36a' }),
       },
       examples: [
@@ -318,7 +346,7 @@
       ],
     },
     { key: 'shrines', name: 'Unsealed Shrines', size: 8,
-      palette: { '.': '#b07a3a', ',': '#9e6c33', ':': '#c48a42', ';': '#7f5428', 'k': '#8c5f2c', 'K': '#6e4a24', 'x': '#b8ae98', 'w': '#9a917d', 'W': '#6f675a', 'h': '#ddd3bc', 'H': '#3e3830', 'd': '#4e473d', '#': '#2a1d14', '+': '#33241a', '*': '#3d2b1f', 'p': '#8a7aa8', 'P': '#6e5a8c', 'g': '#7f9a3f', 's': '#c9c2b0', 'S': '#a39c8a', 'c': '#f0d080', 'v': '#1a1620', 'm': '#8c8476' },
+      palette: { '.': '#b07a3a', ',': '#9e6c33', ':': '#c48a42', ';': '#7f5428', 'k': '#8c5f2c', 'K': '#6e4a24', 'x': '#b8ae98', 'w': '#9a917d', 'W': '#6f675a', 'h': '#ddd3bc', 'H': '#3e3830', 'd': '#4e473d', '#': '#2a1d14', '+': '#33241a', '*': '#3d2b1f', 'p': '#8a7aa8', 'P': '#6e5a8c', 'g': '#7f9a3f', 's': '#c9c2b0', 'S': '#a39c8a', 'c': '#f0d080', 'v': '#1a1620', 'm': '#8c8476', 'b': '#3a3530', 'o': '#ffb040', 'O': '#fff0a0', 'u': '#a0522d', 'U': '#cd7f4f', 't': '#8f2a2a', 'T': '#c0443a', 'e': '#e8e0c8', 'r': '#d49a52', 'y': '#e0b84a' },
       tiles: {
         a: { px: ['xwxxxwxx', 'xxWWWWxx', 'xWHccHWx', 'hWHcHHWh', 'WWHHHHWW', 'WWWWWWWW', 'WdWWWWWW', 'HHHHHHHH'], walk: 0, anchor: 4, glow: '#ffc457', name: 'Candle alcove' },
         u: { px: ['Kk.ss.kK', 'Kk.SS.kK', 'Kk....kK', 'Kk.ss.kK', 'Kk.SS.kK', 'Kk....kK', 'Kk.ss.kK', 'Kk.SS.kK'], walk: 1, anchor: FLOOR | 10, strict: 1, w: 0.35, name: 'Stepping stones' },
@@ -326,6 +354,22 @@
         g: { px: ['..g.....', '.g......', '......g.', '.....g..', '..g.....', '.g......', '......g.', '...g....'], walk: 1, spin: 1, w: 2.2, name: 'Grass tufts' },
         z: { px: ['........', '.sss....', '.sSs.ss.', '.sss.sSs', '.....ss.', '..ss....', '..sS....', '........'], walk: 1, spin: 1, w: 1.6, name: 'Path stones' },
         o: { px: ['KhhhhhhK', 'hxcxxwxh', 'hxwxxxxh', 'hxxxwxxh', 'hhhhhhhh', 'WWWdWWWW', 'WWWWWWWW', 'KHHHHHHK'], walk: 0, anchor: 15, name: 'Shrine pillar' },
+        // set dressing: like-tiles go wherever their source tile was learned
+        f: { px: ['.;....;.', '.;....;.', ';;;;;;;;', '....;...', '....;...', '....;...', ';;;;;;;;', '.;....;.'], walk: 1, like: 'F', share: 0.12, spin: 1, name: 'Flagstones' },
+        r: { px: ['........', '.rr.....', '...rr...', '.....rr.', '........', 'rr......', '..rr....', '....rr..'], walk: 1, like: 'F', share: 0.12, spin: 1, name: 'Sand ripples' },
+        l: { px: ['........', '.e......', '..e..ee.', '...e....', '.....e..', '.ee...e.', '........', '........'], walk: 1, like: 'F', share: 0.03, spin: 1, name: 'Old bones' },
+        q: { px: ['........', '..T.....', '.T.t....', '....T...', '.t......', '.....tT.', '..T.....', '........'], walk: 1, like: 'F', share: 0.04, spin: 1, name: 'Offered petals' },
+        b: { px: ['..oOo...', '.oOOOo..', '.bobob..', 'bbbbbbb.', '.bSSSb..', '..bbb...', '.b...b..', 'KKKKKKK.'], walk: 1, like: 'F', share: 0.025, glow: '#ffb040', name: 'Brazier' },
+        d: { px: ['...uu...', '..UUuu..', '.UUuuuu.', '.Uuuuuu.', '.uuuuuu.', '..uuuu..', '..KKKK..', '........'], walk: 1, like: 'F', share: 0.035, name: 'Urn' },
+        e: { px: ['..mmmm..', '.mSSSSm.', '.mSddSm.', '.mSSSSm.', '.mSddSm.', '.mSSSSm.', '.mmmmmm.', 'KKKKKKKK'], walk: 1, like: 'F', share: 0.02, name: 'Prayer stele' },
+        i: { px: ['...SS...', '..SssS..', '...ss...', '..SsssS.', '.SsssssS', '.ssssss.', '.mmmmmm.', '.KKKKKK.'], walk: 1, like: 'F', share: 0.015, name: 'Kneeling statue' },
+        j: { px: ['........', '.O...O..', '.c...c..', '.s.O.s..', '.s.c.s..', '...s....', '.K.s.K..', '...K....'], walk: 1, like: 'F', share: 0.03, glow: '#ffc457', name: 'Floor candles' },
+        t: { px: ['........', '........', '..yyyy..', '.yTtTty.', '.yyyyyy.', '..yyyy..', '..KKKK..', '........'], walk: 1, like: 'F', share: 0.02, name: 'Offering bowl' },
+        h: { px: ['xwxxxwxx', 'xxmmmmwx', 'wxmddmxw', 'hhmddmhh', 'WWmddmWW', 'WWmddmWW', 'WWmddmWW', 'HHHHHHHH'], walk: 0, like: 'A', share: 0.12, name: 'Sealed doorway' },
+        n: { px: ['xwxxxwxx', 'xtttttwx', 'wtTtTtxw', 'htttttth', 'WtTyTtWW', 'WtttttWW', 'WWtWtWWW', 'HHHHHHHH'], walk: 0, like: 'A', share: 0.06, name: 'Tapestry' },
+        w: { px: ['xwxxxwxx', 'xxwxdxwx', 'wxxddxxw', 'hhhdhhhh', 'WWWdrWWW', 'WWdrr.WW', 'Wdr....W', 'Hr......'], walk: 0, like: 'A', share: 0.1, name: 'Sand spill' },
+        k: { px: ['KKKKKKKK', 'kOkkOkOk', '.c.Oc.c.', '.s.cs.s.', '.s.ss.s.', '......:.', '........', '...,....'], walk: 1, like: 'K', share: 0.12, glow: '#ffc457', name: 'Wall candles' },
+        x: { px: ['KKKKKKKK', 'kmmmmmmk', '.SSSSSS.', '.m....m.', '........', '.,......', '........', '...,....'], walk: 1, like: 'K', share: 0.1, name: 'Bench' },
         ...quad(['....mmmmmmmm....', '..mmhhhhhhhhmm..', '.mhhmmmmmmmmhhm.', '.mhmWWWWWWWWmhm.', 'mhmWWvvvvvvWWmhm', 'mhmWvvvvvvvvWmhm', 'mhWvvvvvvvvvvWhm', 'mhWvvvvvvvvvvWhm', 'mhWvvvvvvvvvvWhm', 'mhWvvvvvvvvvvWhm', 'mhmWvvvvvvvvWmhm', 'mhmWWvvvvvvWWmhm', '.mhmWWWWWWWWmhm.', '.mhhmmmmmmmmhhm.', '..mmhhhhhhhhmm..', '....mmmmmmmm....'], 'Unsealed pit', { glow: '#a77cff' }),
       },
       examples: [
@@ -363,6 +407,14 @@
   function learn(ts, tsIndex) {
     const size = ts.size || 4;
     const tiles = { ...(size === 8 ? KIT8 : KIT), ...ts.tiles };
+    // a tile with like: 'X' goes wherever X was learned (same contexts, same turning), at a share of X's weight;
+    // that is how set dressing is added without drawing new example rooms
+    Object.entries(tiles).forEach(([L, t]) => {
+      if (!t.like) return;
+      const src = tiles[t.like]; if (!src) throw new Error(`${ts.key}: tile ${L} is like unknown tile ${t.like}`);
+      if (src.strict) throw new Error(`${ts.key}: tile ${L} cannot be like a strict tile`);
+      if (src.anchor !== undefined && t.anchor === undefined) tiles[L] = { ...t, anchor: src.anchor };
+    });
     const variants = [], index = {};
     Object.entries(tiles).forEach(([L, t]) => {
       let px = t.px; const seen = {};
@@ -413,6 +465,18 @@
     // a centrepiece quarter is strict only towards its other quarters: its outer edges meet any loose tile
     const quarter = i => variants[i].strict && tiles[variants[i].letter].anchor === undefined;
     const outer = (i, d) => quarter(i) && ![...learned[d][i]].some(j => variants[j].strict);
+    // like-tiles meet strict tiles wherever their source does
+    Object.entries(tiles).forEach(([L, t]) => {
+      if (!t.like) return;
+      for (let r = 0; r < 4; r++) {
+        const v = index[L + r], src = index[t.like + r];
+        if (v === undefined || src === undefined || (r > 0 && v === index[L + 0])) continue;
+        for (let d = 0; d < 4; d++) {
+          learned[d][v] = new Set(learned[d][src]);
+          variants.forEach((sv, i) => { if (sv.strict && learned[d][i].has(src)) learned[d][i].add(v); });
+        }
+      }
+    });
     const allow = [0, 1, 2, 3].map(d => variants.map((v, a) => {
       if (v.strict) return outer(a, d) ? mask(loose.concat([...learned[d][a]])) : mask([...learned[d][a]]);
       const strictOk = variants.map((s, i) => i).filter(i => variants[i].strict && (learned[(d + 2) & 3][i].has(a) || outer(i, (d + 2) & 3)));
@@ -421,6 +485,16 @@
     // structural kit tiles are always allowed in the context they are drawn for, so no context is ever
     // left with only strict pieces to choose from
     variants.forEach((v, i) => { if (KIT[v.letter] && v.cls !== null && !v.strict) classesOf[i].add(v.cls); });
+    // like-tiles take their source's contexts, weight share and strict neighbours, rotation by rotation
+    Object.entries(tiles).forEach(([L, t]) => {
+      if (!t.like) return;
+      for (let r = 0; r < 4; r++) {
+        const v = index[L + r], src = index[t.like + r];
+        if (v === undefined || src === undefined || (r > 0 && v === index[L + 0])) continue;
+        classesOf[v] = new Set(classesOf[src]);
+        weight[v] = weight[src] * (t.share || 0.1);
+      }
+    });
     // contexts: which tiles may go in each context
     const byClass = new Map();
     classesOf.forEach((set, t) => set.forEach(c => { if (!byClass.has(c)) byClass.set(c, []); byClass.get(c).push(t); }));
