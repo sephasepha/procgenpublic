@@ -21,6 +21,23 @@ console.log('Fire');
 { const c = camp(bed); S.strike(c, 0, 2); run(c, 25, (cc, t) => { if (t === 250) S.placePiece(cc, 'fuel', 0.03, 2.03); }); run(c, 300); check(!S.burning(c), 'one log alone burns down and the fire goes out: it has to be fed'); }
 { const c = camp(bed); S.strike(c, 0, 2); run(c, 30); const out = c.pieces.filter(p => p.ash).length; check(out >= 1, 'the tinder burns away to ash'); }
 
+console.log('Breath and the gauge');
+// four logs dropped on a young fire choke it; blowing on it keeps it alive through the worst of it
+const heap = (cc, t) => { if (t === 60) for (let k = 0; k < 4; k++) S.placePiece(cc, 'fuel', k % 2 ? 0.03 : -0.03, k > 1 ? 2.03 : 1.97); };
+{ const a = camp(bed), b = camp(bed); S.strike(a, 0, 2); S.strike(b, 0, 2);
+  run(a, 20, heap); run(b, 20, (cc, t) => { heap(cc, t); if (t > 60 && t < 200 && t % 8 === 0) S.blow(cc); });
+  check(!S.burning(a) && S.burning(b), 'blowing on a choking fire saves it; left alone it is snuffed out');
+  check(S.fireState(a).state === 'Snuffed out', `a smothered fire reads as snuffed out (${S.fireState(a).state})`);
+  check(b.stats.exhaustion > a.stats.exhaustion, 'blowing tires you'); }
+{ const c = camp(bed); S.strike(c, 0, 2); run(c, 60); const q = c.pieces.filter(p => p.ash && p.ember > 0); check(q.length > 0, 'burnt-out kindling leaves embers');
+  const e0 = q[0].ember, before = S.fireState(c).out; S.blow(c); S.step(c, 0.1); check(S.fireState(c).out > before, 'a breath makes the embers flare'); check(q[0].ember < e0, 'and burns them down'); }
+{ const c = camp(() => {}); check(S.fireState(c).state === 'Empty pit' && S.fireState(c).strength === 0, 'an empty pit reads empty');
+  bed(c); check(S.fireState(c).state === 'Cold', 'a laid fire reads cold'); S.strike(c, 0, 2); run(c, 10);
+  const f = S.fireState(c); check(f.lit > 0 && f.strength > 0.2 && f.strength < 0.8 && f.flame > 0 && f.fuel > 0, `a kindling fire reads as a middling fire (${f.state} ${f.strength.toFixed(2)})`);
+  run(c, 120); check(['Embers', 'Starving'].includes(S.fireState(c).state) || !S.burning(c), 'an unfed fire runs down to embers'); }
+{ const c = camp(bed); S.strike(c, 0, 2); const seen = new Set(); run(c, 240, (cc, t) => { tend(cc, t); if (t % 10 === 0) { const f = S.fireState(cc); seen.add(f.state); check(f.strength >= 0 && f.strength <= 1 && f.air >= 0 && f.air <= 1, 'gauge values stay in range'); } });
+  check(seen.has('Burning steady'), `a tended fire reads burning steady at some point (${[...seen].join(', ')})`); }
+
 console.log('Cooking');
 function cook(type, dx, items, secs) {
   const c = camp(bed); S.strike(c, 0, 2); let v = null, cookedAt = -1, burntAt = -1;

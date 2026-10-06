@@ -99,30 +99,42 @@ The **Rules** panel in the explorer re-checks these live against every loaded se
 
 ## Camp: fire and cooking
 
-The **Camp** button (♨) in the explorer switches to a second screen: a fixed first-person view down at a fire pit
-on the cavern floor. It is two mini-games run by a small simulation (`camp/sim.js`, no DOM, tested in
-`tests/camp.js`), and it is entirely diegetic: no bars or menus, only things in the scene.
+The **Camp** tab (♨) switches to a second screen: a fixed first-person view down at a fire pit on the cavern floor.
+It is two mini-games run by a small simulation (`camp/sim.js`, no DOM, tested in `tests/camp.js`). The scene is the
+pit, the vessels and the fire; what you use and what you need to know are plain, readable controls over it.
 
-- **Making and keeping a fire.** Drag tinder, kindling and fuel from the kit cloth onto the floor and draw the
-  striker over the tinder. Every piece has a temperature and a remaining mass; its temperature relaxes towards
-  what the flames around it give, its own flame if it burns, less what cold mass beside it soaks up. Burning
-  needs air, and packing things together takes it away. So tinder lights kindling laid around it; a log on a
-  bed of burning kindling catches; a lone log dies; logs in pairs keep each other going; and heaping on kindling
-  or fuel, or dropping a log on a small flame, smothers the fire, which then has to be laid and struck again.
-  Burnt-out pieces leave embers that fade over a minute or so. A tended fire burns for as long as you feed it.
-- **Cooking.** Put out the pot, pan or skewer and drag ingredients onto it. A vessel's temperature follows the heat
-  where it stands: right over the flames a pan burns its contents in seconds, at the edge it fries them, too far
-  and nothing happens. A pot holds at the boil while it has water and scorches once it boils dry. Juggling the
-  vessels while feeding the fire is the game.
-- **Eating.** Draw a vessel to your hands at the bottom of the view. Raw food is dangerous, cooked food is barely
-  edible, burnt food hurts. 20 base ingredients across six themes (cosmic, growth, shrine, deep, pilgrim...) make
-  10 dishes, each a vessel and an exact set of ingredients, cooked and not burnt, for a bonus.
+- **The tray** along the bottom holds labelled buttons with counts: Tinder, Kindling, Fuel and Strike; a large
+  **Blow** button; the Pot, Pan and Skewer; the **Larder** drawer (all 20 ingredients); and Forage. Tap a button to
+  pick it up (it stays in hand, so you can lay several pieces), then tap the floor or a vessel to use it. Tap it
+  again, or press Esc, to put it down. You can also drag straight from a button into the scene. Drag a piece or an
+  empty vessel back onto the tray to take it back.
+- **The fire gauge** (top right) shows how the fire is doing:
+  - a strength bar from Snuffed through Steady to Roaring, coloured like the fire (dull red, orange, yellow-white);
+  - Air (it turns red and blinks when the fire is smothered) and Fuel, with an estimate of how long it will last;
+  - which signs are showing: flame, embers, smoke;
+  - a state with what to do about it: Empty pit, Cold, Catching, Burning steady, Roaring, Starving, Choking,
+    Smouldering, Embers, Snuffed out. A trend arrow shows whether it is rising or falling.
+- **The fire itself shows its health.** Flames are taller, denser and whiter the harder it burns, and small, low and
+  red when it is weak or starved of air. A choking fire throws thick dark smoke, a warming log thin grey wisps.
+  Embers glow and pulse in the bed, and a breath brightens them.
+- **Making and keeping a fire.** Every piece has a temperature and a remaining mass. Its temperature relaxes towards
+  what the flames around it give, plus its own flame if it burns, less what cold mass beside it soaks up. Burning
+  needs air, and packing things together takes it away. So tinder lights kindling laid around it, a log on burning
+  kindling catches, a lone log dies, and heaping on too much at once smothers the fire, which then has to be laid
+  and struck again.
+- **Blowing** (the Blow button, or B or Space) puts air back into the bed, adds heat to anything already warm,
+  makes embers flare (and burn down faster), and can coax a smouldering piece back to flame. It can save a fire
+  that has had too much put on it. Each breath tires you a little.
+- **Cooking.** Set a vessel down and add ingredients. A vessel's temperature follows the heat where it stands: right
+  over the flames a pan burns its contents in seconds, at the edge it fries them, too far and nothing happens. A pot
+  holds at the boil while it has water and scorches once it boils dry. Tap a vessel to open its panel: its
+  temperature, each ingredient's cooking progress (and scorch), the dish it is becoming, and **Eat** and **Put
+  away** buttons. Drawing a vessel to your hands also eats from it.
+- **Eating.** Raw food is dangerous, cooked food is barely edible, burnt food hurts. The 20 base ingredients span six
+  themes (cosmic, growth, shrine, deep, pilgrim and others) and make 10 dishes. Each dish is a vessel and an exact
+  set of ingredients, cooked and not burnt, and gives a bonus.
 - **The body.** Five charms hang at the edge of sight: a blood vial (health), the soul lantern (SOUL), a bowl
-  (hunger), a waterskin (thirst) and a candle stub (exhaustion). Hunger and thirst grow with time; resting by a
-  burning fire eases exhaustion and feeds the soul; the cold dark does the opposite.
-- **Everything else is in the scene too:** counts are tally notches on the cloths, cooking shows as browning,
-  steam, bubbles and smoke, the sack beside the pit is foraging, the tunnel in the wall is the way back, and
-  touching anything leaves a scrawled paper note about it.
+  (hunger), a waterskin (thirst) and a candle stub (exhaustion). Tap one for how you are.
 
 ## Screens bar
 

@@ -1,7 +1,8 @@
 // Camp: the fire and cooking screen. A fixed first-person view down at a fire pit on the cavern floor.
-// Everything is in the world: the kit and larder lie on cloths in front of you, your hands take what you eat,
-// five charms hanging at the edge of sight show how you are, the sack beside the pit holds what you find,
-// and the tunnel behind the fire is the way back. Touch anything for a scrawled note about it.
+// The scene is the pit, the vessels and the fire; what you can use is a tray of buttons along the bottom (fire kit,
+// a Blow button, vessels, the larder drawer, foraging), and a gauge shows how the fire is doing. Pick a button and
+// tap the floor (or a vessel) to use it, or drag it straight there. Your hands take what you eat; the five charms
+// show how you are. Touch anything in the scene for a note about it.
 (function (root) {
   const S = root.CampSim, FIRE = root.CAMP_FIRE, STRIKER = root.CAMP_STRIKER, VES = root.CAMP_VESSELS, ING = root.CAMP_INGREDIENTS, STATS = root.CAMP_STATS;
   const PIT = S.CAMP_PIT, H_CAM = 1.3;
@@ -49,31 +50,33 @@
     x.fillStyle = '#0b0a10';
     for (let k = 0; k < LW; k += 4) { const h = 10 + 9 * Math.abs(Math.sin(k * 0.061) + 0.6 * Math.sin(k * 0.21)); x.fillRect(k, 0, 4, h); }
   }
-  const TUNNEL = () => ({ x: Math.round(LW * 0.78), y: 2, w: 26, h: 22 }); // the way back, in the wall
+  const TUNNEL = () => ({ x: Math.round(LW * 0.5 - 13), y: 2, w: 26, h: 22 }); // the way back, in the wall
 
-  // ---------- layout in screen space: cloths, hands, charms, sack ----------
-  const KIT = ['tinder', 'kindling', 'fuel', 'striker', 'pot', 'pan', 'skewer'];
+  // ---------- layout in screen space: hands, charms, sack ----------
+  const KIT = ['tinder', 'kindling', 'fuel', 'striker'], VESK = ['pot', 'pan', 'skewer'];
   const LARDER = Object.keys(ING);
   function layout() {
-    const cy = LH - 34, slot = 17;
-    const kitX = Math.round(LW * 0.06), larX = Math.round(LW - 10 * slot - LW * 0.03);
-    const kit = KIT.map((k, i) => ({ key: k, x: kitX + (i % 4) * slot, y: cy + Math.floor(i / 4) * slot, s: 14 }));
-    const lar = LARDER.map((k, i) => ({ key: k, x: larX + (i % 10) * slot, y: cy + Math.floor(i / 10) * slot, s: 14 }));
     const hands = { x: Math.round(LW / 2 - 30), y: LH - 26, w: 60, h: 26 };
     const charms = STATS.map((k, i) => ({ key: k, x: 6 + i * 13, y: 18 + (i % 2) * 10, w: 11, h: 22 }));
     const sackF = { x: 0.62, z: 1.62 };
-    return { kit, lar, hands, charms, sackF, kitBox: { x: kitX - 6, y: cy - 6, w: 4 * slot + 8, h: 2 * slot + 10 }, larBox: { x: larX - 6, y: cy - 6, w: 10 * slot + 8, h: 2 * slot + 10 } };
+    return { hands, charms, sackF };
   }
+  const artOf = k => FIRE[k] || (k === 'striker' ? STRIKER : null) || VES[k] || ING[k];
+  const NAMES = { tinder: 'Tinder', kindling: 'Kindling', fuel: 'Fuel', striker: 'Strike', pot: 'Pot', pan: 'Pan', skewer: 'Skewer' };
 
   // ---------- particles ----------
   const parts = [];
-  function emit(kind, x, z, h, n) {
-    for (let k = 0; k < n && parts.length < 420; k++) parts.push({ kind, x: x + (Math.random() - 0.5) * 0.03, z: z + (Math.random() - 0.5) * 0.02, h: h || 0, vx: (Math.random() - 0.5) * 0.02, vh: kind === 'flame' ? 0.18 + Math.random() * 0.15 : kind === 'spark' ? 0.4 + Math.random() * 0.5 : 0.08 + Math.random() * 0.06, life: 0, max: kind === 'flame' ? 0.35 + Math.random() * 0.3 : kind === 'spark' ? 0.5 : kind === 'bubble' ? 0.4 : 1.6 + Math.random() });
+  // heat (flames: 0 a weak red lick .. 1.5 a white-hot tongue) and dark (smoke: 0 thin grey wisps .. 1 choking black)
+  function emit(kind, x, z, h, n, heat, dark) {
+    const q = heat === undefined ? 1 : heat;
+    for (let k = 0; k < n && parts.length < 520; k++) parts.push({ kind, heat: q, dark: dark || 0, x: x + (Math.random() - 0.5) * 0.03 * (kind === 'flame' ? 0.6 + q * 0.6 : 1), z: z + (Math.random() - 0.5) * 0.02, h: h || 0, vx: (Math.random() - 0.5) * 0.02, vz: 0,
+      vh: kind === 'flame' ? (0.1 + Math.random() * 0.1) * (0.6 + q * 0.8) : kind === 'spark' ? 0.4 + Math.random() * 0.5 : kind === 'smoke' ? (0.06 + Math.random() * 0.05) * (1 - 0.3 * (dark || 0)) : 0.08 + Math.random() * 0.06,
+      life: 0, max: kind === 'flame' ? (0.25 + Math.random() * 0.25) * (0.7 + q * 0.5) : kind === 'spark' ? 0.5 : kind === 'bubble' ? 0.4 : 1.6 + Math.random() + (dark || 0) });
   }
   function stepParts(dt) {
     for (let k = parts.length - 1; k >= 0; k--) {
       const p = parts[k]; p.life += dt; if (p.life > p.max) { parts.splice(k, 1); continue; }
-      p.h += p.vh * dt; p.x += p.vx * dt + (p.kind === 'smoke' || p.kind === 'steam' ? Math.sin(p.life * 3 + k) * 0.01 * dt : 0);
+      p.h += p.vh * dt; if (p.vz) p.z += p.vz * dt; p.x += p.vx * dt + (p.kind === 'smoke' || p.kind === 'steam' ? Math.sin(p.life * 3 + k) * 0.01 * dt : 0);
       if (p.kind === 'spark') p.vh -= 1.2 * dt;
     }
   }
@@ -85,16 +88,61 @@
 
   function ui() {
     if (el) return;
-    el = document.createElement('div'); el.className = 'camp'; el.hidden = true;
-    el.innerHTML = `<canvas aria-label="Campfire: drag tinder, kindling and fuel into the pit, strike over the tinder, cook in the pot, pan and skewer, and draw a vessel to your hands to eat"></canvas><div class="camp-note" hidden></div>`;
+    el = document.createElement('div'); el.className = 'camp fire-screen'; el.hidden = true;
+    const btn = (k, label, cls) => `<button type="button" class="cf-btn ${cls || ''}" data-k="${k}" aria-pressed="false"><canvas width="8" height="8" aria-hidden="true"></canvas><span class="nm">${label}</span><span class="ct"></span></button>`;
+    el.innerHTML = `<canvas class="scene" aria-label="The fire pit. Choose something from the tray, then tap the floor or a vessel to use it, or drag it there."></canvas>
+      <div class="camp-note" hidden></div>
+      <section class="cf-gauge" aria-label="The fire">
+        <div class="cf-head"><b class="cf-state">Empty pit</b><span class="cf-trend" aria-hidden="true"></span></div>
+        <div class="cf-meter" role="meter" aria-label="Fire strength" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i class="cf-fill"></i><i class="cf-mark" style="left:30%"></i><i class="cf-mark" style="left:82%"></i></div>
+        <div class="cf-scale" aria-hidden="true"><span>Snuffed</span><span>Steady</span><span>Roaring</span></div>
+        <div class="cf-mini"><label>Air</label><div class="cf-bar air" role="meter" aria-label="Air" aria-valuemin="0" aria-valuemax="100"><i></i></div><label>Fuel</label><div class="cf-bar fuel" role="meter" aria-label="Fuel left" aria-valuemin="0" aria-valuemax="100"><i></i></div><span class="cf-time"></span></div>
+        <div class="cf-signs"><span data-s="flame">Flame</span><span data-s="embers">Embers</span><span data-s="smoke">Smoke</span></div>
+        <p class="cf-hint" aria-live="polite"></p>
+      </section>
+      <div class="cf-ctx" hidden></div>
+      <div class="cf-larder" hidden role="group" aria-label="Larder">${LARDER.map(k => btn(k, ING[k].name, 'ing')).join('')}</div>
+      <nav class="cf-tray" aria-label="Camp kit">
+        <div class="cf-group" role="group" aria-label="Fire">${KIT.map(k => btn(k, NAMES[k])).join('')}</div>
+        <button type="button" class="cf-blow" aria-label="Blow on the fire"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h11a3 3 0 1 0-3-3M3 13h15a3 3 0 1 1-3 3M3 17h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Blow</span></button>
+        <div class="cf-group" role="group" aria-label="Vessels">${VESK.map(k => btn(k, NAMES[k])).join('')}</div>
+        <div class="cf-group" role="group" aria-label="Supplies">
+          <button type="button" class="cf-btn cf-open" aria-expanded="false" aria-label="Larder: ingredients"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16l-1.5 12h-13zM8 8V6a4 4 0 0 1 8 0v2" fill="none" stroke="currentColor" stroke-width="2"/></svg><span class="nm">Larder</span></button>
+          <button type="button" class="cf-btn cf-forage" aria-label="Forage in the sack (tiring)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 10c0-3 3-5 6-5s6 2 6 5l2 9H4zM9 5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span class="nm">Forage</span></button>
+        </div>
+      </nav>`;
     document.body.appendChild(el);
-    cv = el.querySelector('canvas'); g = cv.getContext('2d');
+    cv = el.querySelector('canvas.scene'); g = cv.getContext('2d');
+    el.querySelectorAll('.cf-btn[data-k]').forEach(b => { const x = b.querySelector('canvas').getContext('2d'); x.drawImage(sprite(b.dataset.k, artOf(b.dataset.k)), 0, 0); });
     cv.addEventListener('pointerdown', down); cv.addEventListener('pointermove', moveP); cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', () => { drag = null; });
+    cv.addEventListener('pointerleave', () => { if (st) st.hover = null; });
+    // tray buttons: tap to pick up (tap again to put down), or drag straight into the scene
+    el.querySelectorAll('.cf-btn[data-k]').forEach(b => {
+      b.addEventListener('pointerdown', e => { if (e.button) return; drag = { from: 'slot', key: b.dataset.k, start: { cx: e.clientX, cy: e.clientY }, p: P(e), moved: false, btn: true }; });
+      b.addEventListener('click', e => { if (e.detail === 0) select(b.dataset.k); }); // keyboard
+    });
+    window.addEventListener('pointermove', e => {
+      if (!drag || !drag.btn) return; drag.p = P(e);
+      if (Math.hypot(e.clientX - drag.start.cx, e.clientY - drag.start.cy) > 8) drag.moved = true;
+    });
+    window.addEventListener('pointerup', e => {
+      if (!drag || !drag.btn) return; const d = drag; drag = null;
+      if (!d.moved) return select(d.key);
+      if (e.target === cv) dropSlot(d.key, P(e));
+    });
+    el.querySelector('.cf-blow').addEventListener('click', blow);
+    el.querySelector('.cf-open').addEventListener('click', () => larder());
+    el.querySelector('.cf-forage').addEventListener('click', forage);
+    el.querySelector('.cf-ctx').addEventListener('click', ctxAction);
     window.addEventListener('resize', () => { if (!el.hidden) size(); });
-    window.addEventListener('keydown', e => { if (!el.hidden && e.key === 'Escape') leave(); });
+    window.addEventListener('keydown', e => {
+      if (el.hidden) return;
+      if (e.key === 'Escape') { if (st.sel || st.vsel) { select(null); st.vsel = null; ctx(); } else if (!el.querySelector('.cf-larder').hidden) larder(false); else leave(); }
+      if ((e.key === 'b' || e.key === ' ') && !e.repeat && !(e.target && e.target.closest && e.target.closest('button'))) { e.preventDefault(); blow(); }
+    });
   }
   function size() {
-    const r = el.getBoundingClientRect(), aspect = r.width / Math.max(1, r.height);
+    const r = cv.getBoundingClientRect(), aspect = r.width / Math.max(1, r.height);
     LH = 270; LW = Math.max(300, Math.min(760, Math.round(LH * aspect)));
     if (aspect < 1) { LW = 360; LH = Math.round(LW / aspect); } // portrait: taller scene, same width
     cv.width = LW; cv.height = LH; g.imageSmoothingEnabled = false;
@@ -107,16 +155,16 @@
     if (!st) {
       const c = S.createCamp(1), saved = load();
       if (saved) { Object.assign(c.stats, saved.stats); Object.assign(c.stock, saved.stock); }
-      st = { c, L: null, saveAt: 0 };
+      st = { c, L: null, saveAt: 0, sel: null, vsel: null, hover: null, uiAt: 0, flash: 0 };
     }
     return st.c;
   }
   function open(leaveFn) {
     ui(); onLeave = leaveFn; ensure();
     el.hidden = false; document.documentElement.classList.add('xp-open');
-    size();
+    size(); refresh(true);
     if (!raf) { last = performance.now(); raf = requestAnimationFrame(loop); }
-    note('The fire pit. Lay tinder in the ring, kindling around it, then strike.', LW / 2, LH * 0.35, 4200);
+    note('The fire pit. Lay tinder in the ring, kindling around it, then strike over the tinder.', LW / 2, LH * 0.35, 4200);
   }
   function leave(silent) { // silent: another screen is taking over, so don't hand back to the world
     el.hidden = true; cancelAnimationFrame(raf); raf = 0; if (st) save();
@@ -148,10 +196,11 @@
     return v.items.map(it => `${ING[it.id].name}: ${state(it)}`).join(', ') + '.' + water + (j.dish ? ` It has become ${j.dish.name}.` : j.possible ? ` Could be ${j.possible.name}.` : '');
   }
 
-  // ---------- input: drag from the cloths, move things on the floor, draw food to your hands ----------
+  // ---------- input: pick from the tray and tap the scene, or drag; move things on the floor; draw food to your hands ----------
   let drag = null;
   const P = e => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * LW, y: (e.clientY - r.top) / r.height * LH }; };
   const inBox = (p, b) => p.x >= b.x && p.y >= b.y && p.x < b.x + b.w && p.y < b.y + b.h;
+  const overTray = e => { const t = el.querySelector('.cf-tray').getBoundingClientRect(); return e.clientY >= t.top; };
   function hitPlaced(p) {
     // nearest first: vessels, then pieces
     const vs = st.c.vessels.slice().sort((a, b) => a.z - b.z);
@@ -160,69 +209,170 @@
     for (const q of ps) if (q.box && inBox(p, q.box)) return { type: 'piece', obj: q };
     return null;
   }
+  // the item in hand: what a tap on the scene will do
+  function select(k) {
+    const c = st.c;
+    if (k && k === st.sel) k = null;
+    if (k && VES[k] && c.vessels.some(v => v.type === k)) { const v = c.vessels.find(q => q.type === k); st.vsel = v.id; k = null; } // already out: select it instead
+    st.sel = k;
+    refresh(true); ctx();
+    if (k) {
+      const what = FIRE[k] ? `Tap the floor to lay ${FIRE[k].name.toLowerCase()}. Tinder in the middle of the ring, kindling close around it, fuel once it is going.` : k === 'striker' ? 'Tap over the tinder to strike.' : VES[k] ? `Tap the floor to set the ${VES[k].name.toLowerCase()} down: close to the flames is hot, further out is gentle.` : `Tap a pot, pan or skewer to put ${ING[k].name} in it.`;
+      note(what, LW / 2, LH * 0.3, 3200);
+    }
+  }
   function down(e) {
     e.preventDefault(); cv.setPointerCapture?.(e.pointerId);
-    const p = P(e), L = st.L;
-    const slot = [...L.kit, ...L.lar].find(s => p.x >= s.x - 1 && p.y >= s.y - 1 && p.x < s.x + s.s + 1 && p.y < s.y + s.s + 1);
-    if (slot) { drag = { from: 'slot', key: slot.key, p, start: p, moved: false }; return; }
-    const hit = hitPlaced(p);
-    if (hit) { drag = { from: hit.type, obj: hit.obj, p, start: p, moved: false, ox: 0, oz: 0 }; return; }
+    const p = P(e), hit = hitPlaced(p);
+    if (hit && !(st.sel && ING[st.sel] && hit.type === 'vessel') && !(st.sel && (FIRE[st.sel] || st.sel === 'striker'))) { drag = { from: hit.type, obj: hit.obj, p, start: p, moved: false }; return; }
     drag = { from: 'tap', p, start: p, moved: false };
   }
   function moveP(e) {
-    if (!drag) return;
-    const p = P(e); drag.p = p;
+    const p = P(e); st.hover = p;
+    if (!drag || drag.btn) return;
+    drag.p = p;
     if (Math.hypot(p.x - drag.start.x, p.y - drag.start.y) > 3) drag.moved = true;
     if ((drag.from === 'vessel' || drag.from === 'piece') && drag.moved) { const f = toFloor(p.x, p.y + 3); if (f && f.z < 4.5) { drag.obj.x = f.x; drag.obj.z = f.z; } }
   }
-  function up(e) {
-    if (!drag) return;
-    const d = drag, p = P(e), L = st.L, c = st.c; drag = null;
-    const f = toFloor(p.x, p.y + 3), onFloor = f && f.z < 4.5 && !inBox(p, L.kitBox) && !inBox(p, L.larBox) && !inBox(p, L.hands);
-    if (!d.moved) return tap(d, p);
-    if (d.from === 'slot') {
-      const k = d.key;
-      if (FIRE[k]) { if (!onFloor) return; if (c.stock[k] <= 0) return note(`No ${FIRE[k].name.toLowerCase()} left. The sack might have some.`, p.x, p.y); S.placePiece(c, k, f.x, f.z); return; }
-      if (k === 'striker') { if (!onFloor) return; S.strike(c, f.x, f.z); emit('spark', f.x, f.z, 0.03, 14); return; }
-      if (VES[k]) { if (!onFloor) return; if (!S.placeVessel(c, k, f.x, f.z)) note(`The ${VES[k].name.toLowerCase()} is already out.`, p.x, p.y); return; }
-      if (ING[k]) {
-        const hit = hitPlaced(p);
-        if (hit && hit.type === 'vessel') {
-          const v = hit.obj, I = ING[k];
-          if (c.stock[k] <= 0) return note(`No ${I.name} left.`, p.x, p.y);
-          if (I.only && !I.only.includes(v.type)) return note(`${I.name} only goes in the pot.`, p.x, p.y);
-          if (!S.addToVessel(c, v.id, k)) return note(`The ${VES[v.type].name.toLowerCase()} is full.`, p.x, p.y);
-          return;
-        }
-        return note(`${ING[k].name} needs a pot, pan or skewer.`, p.x, p.y);
+  const onFloorAt = p => { const f = toFloor(p.x, p.y + 3); return f && f.z < 4.5 && !inBox(p, st.L.hands) ? f : null; };
+  // use an item at a point in the scene (a drop from the tray, or a tap with it in hand)
+  function dropSlot(k, p) {
+    const c = st.c, f = onFloorAt(p);
+    if (FIRE[k]) { if (!f) return; if (c.stock[k] <= 0) { note(`No ${FIRE[k].name.toLowerCase()} left. Forage in the sack for more.`, p.x, p.y); return select(null); } S.placePiece(c, k, f.x, f.z); refresh(true); return; }
+    if (k === 'striker') { if (!f) return; const n = S.strike(c, f.x, f.z); emit('spark', f.x, f.z, 0.03, 14); if (!n) note('Sparks on bare stone. Strike over the tinder.', p.x, p.y, 2200); return; }
+    if (VES[k]) { if (!f) return; const v = S.placeVessel(c, k, f.x, f.z); if (!v) note(`The ${VES[k].name.toLowerCase()} is already out.`, p.x, p.y); else { st.vsel = v.id; select(null); } refresh(true); return; }
+    if (ING[k]) {
+      const hit = hitPlaced(p);
+      if (hit && hit.type === 'vessel') {
+        const v = hit.obj, I = ING[k];
+        if (c.stock[k] <= 0) { note(`No ${I.name} left.`, p.x, p.y); return select(null); }
+        if (I.only && !I.only.includes(v.type)) return note(`${I.name} only goes in the pot.`, p.x, p.y);
+        if (!S.addToVessel(c, v.id, k)) return note(`The ${VES[v.type].name.toLowerCase()} is full.`, p.x, p.y);
+        st.vsel = v.id; refresh(true); ctx(); return;
       }
+      return note(`${ING[k].name} needs a pot, pan or skewer. Set one down first.`, p.x, p.y);
     }
-    if (d.from === 'piece') { if (inBox(p, L.kitBox)) S.removePiece(c, d.obj.id); return; }
+  }
+  function up(e) {
+    if (!drag || drag.btn) return;
+    const d = drag, p = P(e), L = st.L, c = st.c; drag = null;
+    if (!d.moved) return tap(d, p);
+    if (d.from === 'piece') { if (overTray(e)) { S.removePiece(c, d.obj.id); refresh(true); } return; }
     if (d.from === 'vessel') {
       const v = d.obj;
-      if (inBox(p, L.hands)) {
-        const r = S.eat(c, v.id);
-        if (!r) return note('Nothing in it to eat.', p.x, p.y);
-        const j = r.judged, how = j.dish ? `${j.dish.name}. ${j.dish.note}` : j.state === 'raw' ? 'Raw. It fights you all the way down.' : j.state === 'underdone' ? 'Half-cooked. Something in it is still moving.' : j.state === 'burnt' ? 'Burnt to bitterness. It hurts going down.' : 'Cooked. Barely edible. It will keep you alive.';
-        note(how, L.hands.x + 30, L.hands.y - 20, 4200); save(); return;
-      }
-      if (inBox(p, L.kitBox)) { if (v.items.length) return note('Eat it or leave it on the floor; you cannot pack it full.', p.x, p.y); S.removeVessel(c, v.id); }
+      if (inBox(p, L.hands)) return eatFrom(v, p);
+      if (overTray(e)) putAway(v, p);
     }
+  }
+  function eatFrom(v, p) {
+    const L = st.L, r = S.eat(st.c, v.id);
+    if (!r) return note('Nothing in it to eat.', p.x, p.y);
+    const j = r.judged, how = j.dish ? `${j.dish.name}. ${j.dish.note}` : j.state === 'raw' ? 'Raw. It fights you all the way down.' : j.state === 'underdone' ? 'Half-cooked. Something in it is still moving.' : j.state === 'burnt' ? 'Burnt to bitterness. It hurts going down.' : 'Cooked. Barely edible. It will keep you alive.';
+    note(how, L.hands.x + 30, L.hands.y - 20, 4200); save(); ctx();
+  }
+  function putAway(v, p) {
+    if (v.items.length) return note('Eat it or leave it on the floor; you cannot pack it full.', p.x, p.y);
+    S.removeVessel(st.c, v.id); if (st.vsel === v.id) st.vsel = null; refresh(true); ctx();
   }
   function tap(d, p) {
     const L = st.L, c = st.c;
-    if (d.from === 'slot') {
-      const k = d.key, o = FIRE[k] || (k === 'striker' ? STRIKER : null) || VES[k] || ING[k];
-      const n = c.stock[k] !== undefined ? ` (${c.stock[k] > 0 ? c.stock[k] + ' left' : 'none left'})` : '';
-      return note(`${o.name}${n}. ${o.note}`, p.x, p.y, 3600);
+    if (st.sel) {
+      const hit = hitPlaced(p);
+      if (!(ING[st.sel] || st.sel === 'striker') && hit && hit.type === 'vessel' && !FIRE[st.sel]) { st.vsel = hit.obj.id; select(null); return; }
+      return dropSlot(st.sel, p);
     }
-    if (d.from === 'vessel') return note(vesselNote(d.obj), p.x, p.y, 4200);
-    if (d.from === 'piece') { const q = d.obj, k = FIRE[q.kind]; return note(`${k.name}: ${q.ash ? 'ash' : q.burning ? (q.air < 0.45 ? 'burning, choking for air' : 'burning') : q.out ? 'gone out, smouldering' : q.T > 60 ? 'hot' : 'cold'}.`, p.x, p.y); }
+    if (d.from === 'vessel') { st.vsel = st.vsel === d.obj.id ? null : d.obj.id; ctx(); return; }
+    if (d.from === 'piece') { const q = d.obj, k = FIRE[q.kind]; return note(`${k.name}: ${q.ash ? (q.ember > 20 ? 'embers, still glowing' : 'ash') : q.burning ? (q.air < 0.45 ? 'burning, choking for air' : 'burning') : q.out ? 'gone out, smouldering' : q.T > 60 ? 'hot' : 'cold'}. Drag it onto the tray to take it back.`, p.x, p.y); }
     const ch = L.charms.find(b => inBox(p, { x: b.x - 2, y: 0, w: b.w + 4, h: b.y + b.h + 4 }));
     if (ch) return note(`${CHARM_NAME[ch.key]}. ${words[ch.key](c.stats[ch.key])}`, p.x + 20, p.y + 30);
-    if (st.sackBox && inBox(p, st.sackBox)) { const got = S.forage(c); emit('smoke', L.sackF.x, L.sackF.z, 0.02, 4); note(`You rummage in the sack: ${[...new Set(got)].map(k => (ING[k] || FIRE[k] || { name: k }).name).join(', ')}. It tires you.`, p.x, p.y, 4200); save(); return; }
-    const t = TUNNEL(); if (inBox(p, { x: t.x - 6, y: t.y - 6, w: t.w + 12, h: t.h + 12 })) return leave();
-    if (inBox(p, L.hands)) return note('Your hands. Draw a pot, pan or skewer here to eat from it.', p.x, p.y);
+    if (st.sackBox && inBox(p, st.sackBox)) return forage();
+    if (inBox(p, L.hands)) return note('Your hands. Draw a pot, pan or skewer here to eat from it, or choose one and press Eat.', p.x, p.y);
+    if (st.vsel) { st.vsel = null; ctx(); }
+  }
+  function forage() {
+    const c = st.c, L = st.L, got = S.forage(c); emit('smoke', L.sackF.x, L.sackF.z, 0.02, 4);
+    const counts = {}; got.forEach(k => { counts[k] = (counts[k] || 0) + 1; });
+    note(`You rummage in the sack: ${Object.entries(counts).map(([k, n]) => (ING[k] || FIRE[k] || { name: k }).name + (n > 1 ? ' ×' + n : '')).join(', ')}. It tires you.`, sx(L.sackF.x, L.sackF.z), sy(L.sackF.z) - 30, 4200);
+    save(); refresh(true);
+  }
+  // a breath into the bed of the fire
+  function blow() {
+    const c = st.c; S.blow(c); st.flash = 1;
+    const lit = c.pieces.filter(p => !p.ash || p.ember > 10);
+    lit.forEach(p => { emit('spark', p.x, p.z, 0.01, p.ash ? 3 : 2); });
+    for (let k = 0; k < 10; k++) parts.push({ kind: 'breath', x: PIT.x + (Math.random() - 0.5) * 0.3, z: PIT.z - 0.45 - Math.random() * 0.2, h: 0.02, vx: 0, vz: 0.6 + Math.random() * 0.3, vh: 0, life: 0, max: 0.6 });
+    const b = el.querySelector('.cf-blow'); b.classList.remove('puff'); void b.offsetWidth; b.classList.add('puff');
+    if (!c.pieces.length) note('You breathe on cold stone.', LW / 2, LH * 0.45, 1600);
+  }
+  function larder(open) {
+    const L = el.querySelector('.cf-larder'), b = el.querySelector('.cf-open');
+    const show = open === undefined ? L.hidden : open; L.hidden = !show; b.setAttribute('aria-expanded', String(show)); b.classList.toggle('on', show); el.classList.toggle('larder-open', show);
+  }
+
+  // ---------- the tray, the gauge and the vessel panel: plain readable UI over the scene ----------
+  function refresh(now) {
+    const c = st.c;
+    el.querySelectorAll('.cf-btn[data-k]').forEach(b => {
+      const k = b.dataset.k, n = c.stock[k], out = VES[k] && c.vessels.some(v => v.type === k);
+      b.querySelector('.ct').textContent = n === undefined ? (out ? 'out' : '') : String(n);
+      b.classList.toggle('empty', n === 0); b.classList.toggle('out', !!out);
+      const on = st.sel === k; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
+      b.title = artOf(k).name + (n !== undefined ? ` (${n} left)` : '') + '. ' + (artOf(k).note || '');
+    });
+    cv.style.cursor = st.sel ? 'crosshair' : '';
+  }
+  const pct = v => Math.round(Math.max(0, Math.min(1, v)) * 100);
+  function fireColor(s, air) { // dull red when weak, orange, then yellow-white when roaring; browner when choking
+    const stops = [[0, [90, 30, 20]], [0.3, [200, 70, 25]], [0.6, [255, 140, 40]], [0.85, [255, 210, 90]], [1, [255, 248, 220]]];
+    let a = stops[0], b = stops[stops.length - 1];
+    for (let i = 1; i < stops.length; i++) if (s <= stops[i][0]) { a = stops[i - 1]; b = stops[i]; break; }
+    const t = (s - a[0]) / Math.max(1e-6, b[0] - a[0]), m = Math.max(0.55, Math.min(1, air / 0.6));
+    return a[1].map((v, i) => Math.round((v + (b[1][i] - v) * t) * (i === 2 ? m : 1) * (0.75 + 0.25 * m)));
+  }
+  function gauge(fs) {
+    const G = el.querySelector('.cf-gauge'), [r, gg, b] = fireColor(fs.strength, fs.air);
+    G.querySelector('.cf-state').textContent = fs.state;
+    G.querySelector('.cf-trend').textContent = fs.trend > 0 ? '▲ rising' : fs.trend < 0 ? '▼ falling' : '';
+    G.querySelector('.cf-trend').className = 'cf-trend ' + (fs.trend > 0 ? 'up' : fs.trend < 0 ? 'down' : '');
+    const m = G.querySelector('.cf-meter'); m.setAttribute('aria-valuenow', String(pct(fs.strength))); m.setAttribute('aria-valuetext', `${fs.state}, ${pct(fs.strength)}%`);
+    const fill = G.querySelector('.cf-fill'); fill.style.width = pct(fs.strength) + '%';
+    fill.style.background = `linear-gradient(90deg, rgb(${Math.round(r * 0.45)},${Math.round(gg * 0.35)},${Math.round(b * 0.3)}), rgb(${r},${gg},${b}))`;
+    fill.style.boxShadow = fs.strength > 0.05 ? `0 0 ${Math.round(4 + 14 * fs.strength)}px rgba(${r},${gg},${b},${0.3 + 0.5 * fs.strength})` : 'none';
+    const air = G.querySelector('.cf-bar.air'), fuel = G.querySelector('.cf-bar.fuel');
+    air.firstChild.style.width = pct(fs.air) + '%'; air.classList.toggle('low', fs.lit > 0 && fs.air < 0.45); air.setAttribute('aria-valuenow', String(pct(fs.air)));
+    fuel.firstChild.style.width = pct(fs.fuel / 180) + '%'; fuel.classList.toggle('low', fs.lit > 0 && fs.fuel < 25); fuel.setAttribute('aria-valuenow', String(pct(fs.fuel / 180)));
+    const t = Math.round(fs.fuel); G.querySelector('.cf-time').textContent = fs.fuel > 0.5 ? (t >= 60 ? `~${Math.floor(t / 60)}m ${String(t % 60).padStart(2, '0')}s` : `~${t}s`) : '';
+    G.querySelectorAll('.cf-signs span').forEach(sp => { const v = fs[sp.dataset.s]; sp.style.setProperty('--v', v.toFixed(2)); sp.classList.toggle('on', v > 0.05); });
+    const h = G.querySelector('.cf-hint'); if (h.textContent !== fs.hint) h.textContent = fs.hint;
+    G.dataset.state = fs.state.toLowerCase().replace(/ /g, '-');
+  }
+  // the selected vessel: what is in it, how hot, and what you can do with it
+  const heatWord = T => T >= 99 ? (T > 160 ? 'searing' : 'boiling hot') : T > 68 ? 'cooking' : T > 40 ? 'warming' : 'cold';
+  function ctx() {
+    const box = el.querySelector('.cf-ctx'), v = st.vsel && st.c.vessels.find(q => q.id === st.vsel);
+    if (!v) { st.vsel = null; box.hidden = true; box.dataset.key = ''; return; }
+    box.hidden = false;
+    const j = S.judge(v), V = VES[v.type];
+    const stateOf = it => it.scorch >= 0.35 ? 'burnt' : it.progress >= 1 ? 'done' : it.progress >= 0.5 ? 'nearly' : it.progress > 0.05 ? 'cooking' : 'raw';
+    const water = v.type === 'pot' ? (v.water > 0.5 ? 'water' : v.water > 0 ? 'water nearly gone' : 'dry') : '';
+    const dish = j.dish ? `<span class="dish">${j.dish.name}</span>` : j.possible ? `<span class="dish maybe">could be ${j.possible.name}</span>` : '';
+    // rebuild only when something you can read changes, so the buttons stay put under your finger
+    const key = [v.id, water, dish, ...v.items.map(it => it.id + stateOf(it))].join('|');
+    if (box.dataset.key !== key) {
+      box.dataset.key = key;
+      const items = v.items.map(it => `<li class="${stateOf(it)}"><span>${ING[it.id].name}</span><i></i><em>${stateOf(it)}</em></li>`).join('');
+      box.innerHTML = `<div class="hd"><b>${V.name}</b><span class="T"></span>${water ? `<span class="w">${water}</span>` : ''}${dish}</div>${items ? `<ul>${items}</ul>` : `<p>Empty. Open the larder, pick something, and tap the ${V.name.toLowerCase()}.</p>`}
+        <div class="acts"><button type="button" data-a="eat" ${v.items.length ? '' : 'disabled'}>Eat</button><button type="button" data-a="away" ${v.items.length ? 'disabled' : ''}>Put away</button><button type="button" data-a="close" aria-label="Close">✕</button></div>`;
+    }
+    const T = box.querySelector('.T'); T.textContent = `${Math.round(v.T)}° · ${heatWord(v.T)}`; T.className = 'T ' + (v.T > V.burnAt ? 'hot' : v.T > 68 ? 'warm' : '');
+    box.querySelectorAll('li i').forEach((i, n) => { const it = v.items[n]; if (it) { i.style.setProperty('--p', Math.min(1, it.progress).toFixed(3)); i.style.setProperty('--s', Math.min(1, it.scorch / 0.35).toFixed(3)); } });
+  }
+  function ctxAction(e) {
+    const a = e.target.closest('[data-a]'); if (!a) return;
+    const v = st.c.vessels.find(q => q.id === st.vsel), p = { x: LW / 2, y: LH * 0.6 };
+    if (a.dataset.a === 'close' || !v) { st.vsel = null; return ctx(); }
+    if (a.dataset.a === 'eat') eatFrom(v, p);
+    if (a.dataset.a === 'away') putAway(v, p);
   }
 
   // ---------- drawing ----------
@@ -232,10 +382,13 @@
     const c = st.c;
     S.step(c, dt);
     // flames, smoke, steam from the simulation
+    const br = Math.min(1, c.breath || 0);
     c.pieces.forEach(q => {
-      if (q.burning && Math.random() < dt * (8 + 30 * q.vigour)) emit('flame', q.x, q.z, 0.01, 1);
-      if (q.smoke > 0.2 && Math.random() < dt * 6 * Math.min(1, q.smoke)) emit('smoke', q.x, q.z, 0.03, 1);
-      if (q.ash && q.ember > 30 && Math.random() < dt * 1.5) emit('spark', q.x, q.z, 0.01, 1);
+      // flames: more, taller and whiter the harder a piece burns; small, low and red when it is starved of air
+      const heat = q.burning ? Math.min(1.5, q.vigour * (q.air < 0.45 ? 0.6 : 1) * (1 + 0.5 * br) * (q.kind === 'fuel' ? 1.15 : 1)) : 0;
+      if (q.burning && Math.random() < dt * (6 + 34 * heat)) emit('flame', q.x, q.z, 0.01, 1 + (heat > 0.9 && Math.random() < 0.5 ? 1 : 0), heat);
+      if (q.smoke > 0.2 && Math.random() < dt * 7 * Math.min(1.4, q.smoke)) emit('smoke', q.x, q.z, 0.03, 1, 0, q.burning ? (q.air < 0.45 ? 0.8 : 0.2) : 0.6);
+      if (q.ash && q.ember > 30 && Math.random() < dt * (1 + 6 * br) * Math.min(1, q.ember / 150)) emit('spark', q.x, q.z, 0.01, 1);
     });
     c.vessels.forEach(v => {
       if (v.T > 80 && Math.random() < dt * (v.T - 70) / 20) emit('steam', v.x, v.z, 0.12, 1);
@@ -244,11 +397,15 @@
     });
     if (root.Body && Body.tick) Body.tick(dt); // what is eating you keeps eating while you cook
     stepParts(dt);
+    st.flash = Math.max(0, st.flash - dt * 2);
+    if (t - st.uiAt > 120) { st.uiAt = t; gauge(S.fireState(c)); if (st.vsel) ctx(); if (t - (st.trayAt || 0) > 600) { st.trayAt = t; refresh(); } }
     if (t - st.saveAt > 5000) { st.saveAt = t; save(); }
     draw(t / 1000);
   }
   function draw(time) {
-    const c = st.c, L = st.L, out = S.fireOutput(c), glow = Math.min(1, out / 1800) * (0.85 + 0.15 * Math.sin(time * 9) * Math.sin(time * 5.3));
+    const c = st.c, L = st.L, out = S.fireOutput(c), fs = st.fs = S.fireState(c), br = Math.min(1, c.breath || 0);
+    const flicker = fs.air < 0.45 && fs.lit ? 0.35 : 0.15, glow = Math.min(1, out / 1800) * (1 - flicker + flicker * Math.sin(time * 9) * Math.sin(time * 5.3)) * (1 + 0.25 * br);
+    const [fr, fg, fb] = fireColor(fs.strength, fs.air);
     g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
     g.drawImage(floorImg, 0, 0);
     // the tunnel mouth far behind the fire: the way back, faintly lit by the pilgrims' lavender
@@ -257,7 +414,7 @@
     // firelight on the floor
     const px = sx(PIT.x, PIT.z), py = sy(PIT.z), R = sc(PIT.z) * (0.6 + 1.6 * glow);
     g.globalCompositeOperation = 'lighter';
-    if (glow > 0.02) { const gr = g.createRadialGradient(px, py, 0, px, py, R * 2.2); gr.addColorStop(0, `rgba(255,150,60,${0.45 * glow})`); gr.addColorStop(1, 'rgba(255,120,40,0)'); g.fillStyle = gr; g.fillRect(px - R * 2.2, py - R * 1.4, R * 4.4, R * 2.8); }
+    if (glow > 0.02) { const gr = g.createRadialGradient(px, py, 0, px, py, R * 2.2); gr.addColorStop(0, `rgba(${fr},${fg},${fb},${0.5 * glow})`); gr.addColorStop(1, `rgba(${fr},${Math.round(fg * 0.6)},${Math.round(fb * 0.5)},0)`); g.fillStyle = gr; g.fillRect(px - R * 2.2, py - R * 1.4, R * 4.4, R * 2.8); }
     g.globalCompositeOperation = 'source-over';
     // the pit: a ring of stones and a bed of old ash
     g.fillStyle = '#1a1716'; g.beginPath(); g.ellipse(px, py, sc(PIT.z) * PIT.r, sc(PIT.z) * PIT.r * (H_CAM / PIT.z) * 0.9, 0, 0, 7); g.fill();
@@ -276,33 +433,50 @@
     // particles
     parts.forEach(p => {
       const x = sx(p.x, p.z), y = sy(p.z) - p.h * sc(p.z), a = 1 - p.life / p.max, s = Math.max(1, Math.round(sc(p.z) * 0.012));
-      if (p.kind === 'flame') { g.fillStyle = a > 0.7 ? '#fff0a0' : a > 0.4 ? '#ffb040' : '#d84a20'; g.globalAlpha = Math.min(1, a * 1.4); g.fillRect(Math.round(x), Math.round(y), s + 1, s + 1); }
+      if (p.kind === 'flame') { // colour by how hard it burns: white-yellow cores in a strong fire, deep red licks in a weak one
+        const q = p.heat, col = q > 1.2 ? (a > 0.6 ? '#fffbe8' : a > 0.3 ? '#ffe27a' : '#ff9a30') : q > 0.65 ? (a > 0.7 ? '#fff0a0' : a > 0.4 ? '#ffb040' : '#d84a20') : q > 0.35 ? (a > 0.6 ? '#ff9a3a' : a > 0.3 ? '#e0581e' : '#9a2a14') : (a > 0.5 ? '#d85020' : '#7a2010');
+        const z = s + (q > 0.9 ? 1 : 0) + (a > 0.6 && q > 0.6 ? 1 : 0); g.fillStyle = col; g.globalAlpha = Math.min(1, a * 1.4); g.fillRect(Math.round(x), Math.round(y), z, z + (q > 0.8 ? 1 : 0)); }
+      else if (p.kind === 'breath') { g.fillStyle = '#c8d0e0'; g.globalAlpha = a * 0.35; g.fillRect(Math.round(x), Math.round(y), 1, Math.max(2, s * 3)); }
       else if (p.kind === 'spark') { g.fillStyle = '#ffd060'; g.globalAlpha = a; g.fillRect(Math.round(x), Math.round(y), 1, 1); }
       else if (p.kind === 'bubble') { g.fillStyle = '#c8d4e0'; g.globalAlpha = a * 0.8; g.fillRect(Math.round(x), Math.round(y), 1, 1); }
-      else { g.fillStyle = p.kind === 'steam' ? '#d8dce8' : '#3a3540'; g.globalAlpha = a * (p.kind === 'steam' ? 0.35 : 0.55); const r = s + p.life * 3; g.fillRect(Math.round(x - r / 2), Math.round(y - r / 2), Math.round(r), Math.round(r)); }
+      else if (p.kind === 'steam') { g.fillStyle = '#d8dce8'; g.globalAlpha = a * 0.35; const r = s + p.life * 3; g.fillRect(Math.round(x - r / 2), Math.round(y - r / 2), Math.round(r), Math.round(r)); }
+      else { const d = p.dark; g.fillStyle = d > 0.7 ? '#1a1820' : d > 0.4 ? '#2e2a34' : '#6a6672'; g.globalAlpha = a * (0.35 + 0.35 * d); const r = s + p.life * (3 + 3 * d); g.fillRect(Math.round(x - r / 2), Math.round(y - r / 2), Math.round(r), Math.round(r)); }
     });
     g.globalAlpha = 1;
     // darkness beyond the firelight
     const dark = g.createRadialGradient(px, py - 10, 20 + 90 * glow, px, py, LW * 0.75);
     dark.addColorStop(0, 'rgba(4,3,8,0)'); dark.addColorStop(1, `rgba(4,3,8,${0.85 - 0.25 * glow})`);
     g.fillStyle = dark; g.fillRect(0, 0, LW, LH);
-    drawCloths(); drawHands(); drawCharms(g, st.L.charms, c.stats, time);
-    // what is being dragged from a cloth
-    if (drag && drag.from === 'slot' && drag.moved) {
-      const k = drag.key, art = FIRE[k] || (k === 'striker' ? STRIKER : null) || VES[k] || ING[k];
-      g.globalAlpha = 0.9; g.drawImage(sprite(k, art), Math.round(drag.p.x - 8), Math.round(drag.p.y - 8), 16, 16); g.globalAlpha = 1;
-      if (k === 'striker' || FIRE[k] || VES[k]) { const f = toFloor(drag.p.x, drag.p.y + 3); if (f) { const s = sc(f.z); g.strokeStyle = 'rgba(255,240,200,0.35)'; g.beginPath(); g.ellipse(sx(f.x, f.z), sy(f.z), s * 0.06, s * 0.025, 0, 0, 7); g.stroke(); } }
+    // a breath: the whole bed brightens for a moment
+    if (st.flash > 0 && (fs.lit || fs.embers > 0.02)) { g.globalCompositeOperation = 'lighter'; const gr = g.createRadialGradient(px, py, 0, px, py, sc(PIT.z) * 0.5); gr.addColorStop(0, `rgba(255,120,40,${0.35 * st.flash})`); gr.addColorStop(1, 'rgba(255,90,30,0)'); g.fillStyle = gr; g.fillRect(px - sc(PIT.z) * 0.5, py - sc(PIT.z) * 0.3, sc(PIT.z), sc(PIT.z) * 0.6); g.globalCompositeOperation = 'source-over'; }
+    drawHands(); drawCharms(g, st.L.charms, c.stats, time);
+    // the selected vessel
+    const sv = st.vsel && c.vessels.find(v => v.id === st.vsel);
+    if (sv && sv.box) { g.strokeStyle = `rgba(243,211,107,${0.6 + 0.3 * Math.sin(time * 5)})`; g.setLineDash([2, 2]); g.strokeRect(Math.round(sv.box.x) + 0.5, Math.round(sv.box.y) + 0.5, Math.round(sv.box.w), Math.round(sv.box.h)); g.setLineDash([]); }
+    // what is in hand: dragged from the tray, or picked up and waiting for a tap
+    const k = drag && drag.from === 'slot' && drag.moved ? drag.key : st.sel, at = drag && drag.from === 'slot' && drag.moved ? drag.p : st.hover;
+    if (k && at) {
+      g.globalAlpha = 0.9; g.drawImage(sprite(k, artOf(k)), Math.round(at.x - 8), Math.round(at.y - 18), 16, 16); g.globalAlpha = 1;
+      if (k === 'striker' || FIRE[k] || VES[k]) { const f = onFloorAt(at); if (f) { const s = sc(f.z); g.strokeStyle = 'rgba(255,240,200,0.5)'; g.beginPath(); g.ellipse(sx(f.x, f.z), sy(f.z), s * (k === 'striker' ? 0.14 : 0.06), s * (k === 'striker' ? 0.06 : 0.025), 0, 0, 7); g.stroke(); } }
+      if (ING[k]) { const h = hitPlaced(at); if (h && h.type === 'vessel') { g.strokeStyle = 'rgba(243,211,107,0.8)'; g.strokeRect(Math.round(h.obj.box.x) + 0.5, Math.round(h.obj.box.y) + 0.5, Math.round(h.obj.box.w), Math.round(h.obj.box.h)); } }
     }
   }
   function drawPiece(q, time) {
     const k = FIRE[q.kind], s = sc(q.z), size = (q.kind === 'fuel' ? 0.2 : q.kind === 'kindling' ? 0.15 : 0.08) * s, x = sx(q.x, q.z), y = sy(q.z);
     let img;
     if (q.ash) img = tinted(q.kind, k, '#6a6660', 0.85);
-    else if (q.burning) img = tinted(q.kind, k, '#ff7a30', 0.35 + 0.15 * Math.sin(time * 11 + q.id));
+    else if (q.burning) img = tinted(q.kind, k, q.air < 0.45 ? '#a8381a' : q.vigour > 0.9 ? '#ffb040' : '#ff7a30', 0.35 + 0.15 * Math.sin(time * 11 + q.id));
+    else if (q.out && q.T > k.ignite * 0.45) img = tinted(q.kind, k, '#5a2414', 0.5); // smouldering: dull, dark red
     else { const burnt = 1 - q.m / q.m0; img = burnt > 0.05 ? tinted(q.kind, k, '#14100e', Math.min(0.9, burnt * 1.2 + 0.2)) : sprite(q.kind, k); }
     const w = Math.max(3, Math.round(size)), h = q.ash ? Math.max(2, Math.round(w * 0.35)) : w;
     g.drawImage(img, Math.round(x - w / 2), Math.round(y - h + 1), w, h);
-    if (q.ash && q.ember > 20) { g.fillStyle = `rgba(255,110,40,${Math.min(0.8, q.ember / 200)})`; g.fillRect(Math.round(x - w / 4), Math.round(y - 1), Math.max(1, Math.round(w / 2)), 1); }
+    const br = Math.min(1, st.c.breath || 0);
+    if (q.ash && q.ember > 12) { // an ember bed: a pulsing orange glow that a breath brightens
+      const e = Math.min(1, q.ember / 180) * (0.75 + 0.25 * Math.sin(time * 2.3 + q.id * 1.7)) * (1 + 0.8 * br);
+      g.globalCompositeOperation = 'lighter'; const gr = g.createRadialGradient(x, y - 1, 0, x, y - 1, w * 0.9); gr.addColorStop(0, `rgba(255,${Math.round(90 + 60 * Math.min(1, e))},30,${Math.min(0.9, 0.6 * e)})`); gr.addColorStop(1, 'rgba(200,50,20,0)'); g.fillStyle = gr; g.fillRect(x - w, y - w * 0.6, w * 2, w * 1.1); g.globalCompositeOperation = 'source-over';
+      g.fillStyle = `rgba(255,${Math.round(120 + 80 * Math.min(1, e))},50,${Math.min(1, e)})`; for (let i = 0; i < 3; i++) g.fillRect(Math.round(x - w / 3 + i * w / 3 + Math.sin(i * 3 + q.id)), Math.round(y - 1 - (i % 2)), 1, 1);
+    }
+    if (q.burning) { g.globalCompositeOperation = 'lighter'; const v = Math.min(1.3, q.vigour); g.fillStyle = `rgba(255,${q.air < 0.45 ? 70 : 140},40,${0.18 * v})`; g.beginPath(); g.ellipse(x, y - h * 0.4, w * 0.8, h * 0.7, 0, 0, 7); g.fill(); g.globalCompositeOperation = 'source-over'; }
     q.box = { x: x - w / 2 - 2, y: y - h - 2, w: w + 4, h: h + 6 };
   }
   // food changes as it cooks: raw colours, browning, then black
@@ -325,24 +499,6 @@
     else v.items.forEach((it, k) => g.drawImage(itemSprite(it), Math.round(x - w * 0.2 + k * iw * 1.1), Math.round(y - h * 0.9), iw, iw));
     v.box = { x: x - w / 2 - 2, y: y - h - iw / 2 - 2, w: w + 4, h: sy(v.z) + 8 - (y - h - iw / 2 - 2) }; // down to the floor it stands on
     if (v.items.length && S.judge(v).dish) { g.fillStyle = `rgba(243,211,107,${0.25 + 0.2 * Math.sin(time * 3)})`; g.fillRect(Math.round(x - 1), Math.round(y - h - iw), 2, 2); }
-  }
-  function cloth(b, col, edge) {
-    g.fillStyle = col; g.beginPath(); g.moveTo(b.x + 4, b.y); g.lineTo(b.x + b.w - 4, b.y); g.lineTo(b.x + b.w + 2, b.y + b.h); g.lineTo(b.x - 2, b.y + b.h); g.closePath(); g.fill();
-    g.strokeStyle = edge; g.setLineDash([2, 2]); g.beginPath(); g.moveTo(b.x + 6, b.y + 2); g.lineTo(b.x + b.w - 6, b.y + 2); g.stroke(); g.setLineDash([]);
-  }
-  function drawCloths() {
-    const L = st.L, c = st.c;
-    cloth(L.kitBox, '#3a2e24', '#6a5438'); cloth(L.larBox, '#2e2a34', '#5a5068');
-    [...L.kit, ...L.lar].forEach(s => {
-      const k = s.key, art = FIRE[k] || (k === 'striker' ? STRIKER : null) || VES[k] || ING[k], n = c.stock[k];
-      const out = VES[k] && c.vessels.some(v => v.type === k);
-      g.globalAlpha = (n === 0 || out) ? 0.25 : 1;
-      if (n > 1) g.drawImage(sprite(k, art), s.x + 2, s.y - 1, s.s, s.s); // a second one behind: there are more
-      g.drawImage(sprite(k, art), s.x, s.y, s.s, s.s);
-      g.globalAlpha = 1;
-      // tally notches scratched into the cloth for how many
-      if (n !== undefined && n > 0) { g.fillStyle = 'rgba(230,220,200,0.55)'; for (let t = 0; t < Math.min(n, 8); t++) g.fillRect(s.x + 1 + t * 2 - (t >= 5 ? 0 : 0), s.y + s.s + 1, 1, 2); }
-    });
   }
   function drawHands() {
     const b = st.L.hands; g.fillStyle = '#b89a86';
@@ -367,5 +523,7 @@
     });
   }
 
-  root.Camp = { open, leave, state: () => st, shared: ensure, save: () => { if (st) save(); }, drawCharms };
+  // where a floor point is on screen (for scripted checks and, later, aiming in 3D)
+  const at = (x, z) => { const r = cv.getBoundingClientRect(); return { x: r.left + sx(x, z) / LW * r.width, y: r.top + (sy(z) - 3) / LH * r.height }; };
+  root.Camp = { open, leave, at, state: () => st, shared: ensure, save: () => { if (st) save(); }, drawCharms };
 })(window);
