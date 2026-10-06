@@ -64,6 +64,16 @@
     charnel: T('Charnel hall', [15, 21], [5, 7], 'hall', 'public', { long: 1 }),
     niche: T('Ossuary niche', [3, 3], [3, 5], 'rect', 'private'),
     boneChapel: T('Bone chapel', [9, 11], [9, 11], 'cross', 'private', { goal: 1 }),
+    // small rooms off corridors (doors straight off the hallway)
+    study: T('Study', [3, 5], [3, 5], 'rect', 'public'),
+    starCloset: T('Star closet', [3, 3], [3, 5], 'rect', 'public'),
+    mapRoom: T('Map room', [5, 7], [5, 7], 'octagon', 'public'),
+    toolStore: T('Tool store', [3, 5], [3, 3], 'rect', 'public'),
+    seedVault: T('Seed vault', [3, 5], [3, 5], 'rect', 'public'),
+    sporeRoom: T('Spore room', [5, 7], [5, 7], 'round', 'public'),
+    vestry: T('Vestry', [3, 5], [3, 5], 'rect', 'public'),
+    candleStore: T('Candle store', [3, 3], [3, 5], 'rect', 'public'),
+    reliquaryNiche: T('Reliquary', [5, 7], [5, 7], 'octagon', 'public'),
     // seals and pits at the borders between strata
     sealHall: T('Seal', [5, 5], [5, 5], 'rect', 'public'),
     gateHall: T('Passage', [7, 9], [5, 9], 'rect', 'public'),
@@ -76,27 +86,27 @@
   const THEMES = [
     [ // Constellation of Mazes
       { key: 'observatory', name: 'Observatory', start: 'vestibule', goal: 'dome', maze: 0.45, braid: 0.06,
-        rules: { vestibule: [C('gallery', 1, 1, 'corridor')], gallery: [C('alcove', 1, 3), C('dome', 1, 1)] }, wings: [['orrery', [C('alcove', 1, 2)]], ['gallery', [C('alcove', 1, 3)]], ['vestibule', [C('cell', 1, 2)]]], wingCount: [10, 16], straight: 0.6, fill: [['orrery', 1, 2]] },
+        rules: { vestibule: [C('gallery', 1, 1, 'corridor')], gallery: [C('alcove', 1, 3), C('dome', 1, 1)] }, wings: [['orrery', [C('alcove', 1, 2)]], ['gallery', [C('alcove', 1, 3)]], ['vestibule', [C('cell', 1, 2)]]], wingCount: [10, 16], straight: 0.6, side: ['study', 'starCloset', 'mapRoom'], step: 6, fill: [['orrery', 1, 2]] },
       { key: 'glyphs', name: 'Glyph labyrinth', start: 'gate', goal: 'eyeChamber', maze: 0.8, braid: 0.03,
-        rules: { gate: [C('eyeChamber', 1, 1, 'corridor')] }, wings: [['cell', []], ['gate', [C('cell', 1, 2)]], ['orrery', []]], wingCount: [8, 14], straight: 0.2, fill: [['cell', 3, 6]] },
+        rules: { gate: [C('eyeChamber', 1, 1, 'corridor')] }, wings: [['cell', []], ['gate', [C('cell', 1, 2)]], ['orrery', []]], wingCount: [8, 14], straight: 0.2, side: ['cell', 'starCloset'], step: 2, fill: [['cell', 3, 6]] },
       { key: 'archive', name: 'Archive', start: 'index', goal: 'sealedArchive', maze: 0.4, braid: 0.08,
-        rules: { index: [C('stacks', 2, 3), C('reading', 1, 1, 'corridor')], reading: [C('sealedArchive', 1, 1)] }, wings: [['stacks', [C('reading', 0, 1)]], ['index', [C('stacks', 1, 2)]], ['cell', []]], wingCount: [10, 16], straight: 0.75, fill: [['cell', 1, 3]] },
+        rules: { index: [C('stacks', 2, 3), C('reading', 1, 1, 'corridor')], reading: [C('sealedArchive', 1, 1)] }, wings: [['stacks', [C('reading', 0, 1)]], ['index', [C('stacks', 1, 2)]], ['cell', []]], wingCount: [10, 16], straight: 0.75, side: ['study', 'mapRoom', 'cell'], step: 6, fill: [['cell', 1, 3]] },
     ],
     [ // Uncontrollable Growth
       { key: 'greenhouse', name: 'Greenhouse', start: 'pottingShed', goal: 'bloomChamber', maze: 0.4, braid: 0.12,
-        rules: { pottingShed: [C('glasshouse', 1, 1, 'corridor')], glasshouse: [C('bed', 2, 3), C('bloomChamber', 1, 1)] }, wings: [['glasshouse', [C('bed', 1, 3)]], ['pond', []], ['pottingShed', [C('bed', 1, 2)]]], wingCount: [9, 14], straight: 0.4, fill: [['pond', 1, 2]] },
+        rules: { pottingShed: [C('glasshouse', 1, 1, 'corridor')], glasshouse: [C('bed', 2, 3), C('bloomChamber', 1, 1)] }, wings: [['glasshouse', [C('bed', 1, 3)]], ['pond', []], ['pottingShed', [C('bed', 1, 2)]]], wingCount: [9, 14], straight: 0.4, side: ['toolStore', 'seedVault', 'sporeRoom'], step: 6, fill: [['pond', 1, 2]] },
       { key: 'cellars', name: 'Root cellars', start: 'cellarStair', goal: 'rootHeart', maze: 0.55, braid: 0.05,
-        rules: { cellarStair: [C('cellar', 1, 1, 'corridor')], cellar: [C('deepCellar', 1, 1, 'corridor')], deepCellar: [C('rootHeart', 1, 1)] }, wings: [['cellar', [C('deepCellar', 1, 2, 'corridor')]], ['cellarStair', [C('cellar', 0, 1)]]], wingCount: [12, 18], straight: 0.3, fill: [['cellar', 3, 5]] },
+        rules: { cellarStair: [C('cellar', 1, 1, 'corridor')], cellar: [C('deepCellar', 1, 1, 'corridor')], deepCellar: [C('rootHeart', 1, 1)] }, wings: [['cellar', [C('deepCellar', 1, 2, 'corridor')]], ['cellarStair', [C('cellar', 0, 1)]]], wingCount: [12, 18], straight: 0.3, side: ['seedVault', 'toolStore', 'cellar'], step: 6, fill: [['cellar', 3, 5]] },
       { key: 'overgrown', name: 'Overgrown halls', start: 'porch', goal: 'conservatory', maze: 0.4, braid: 0.1,
-        rules: { porch: [C('greatHall', 1, 1)], greatHall: [C('sideRoom', 2, 4), C('conservatory', 1, 1, 'corridor')] }, wings: [['greatHall', [C('sideRoom', 2, 4)]], ['pond', []], ['porch', [C('sideRoom', 1, 2)]]], wingCount: [9, 14], straight: 0.5, fill: [['pond', 0, 1]] },
+        rules: { porch: [C('greatHall', 1, 1)], greatHall: [C('sideRoom', 2, 4), C('conservatory', 1, 1, 'corridor')] }, wings: [['greatHall', [C('sideRoom', 2, 4)]], ['pond', []], ['porch', [C('sideRoom', 1, 2)]]], wingCount: [9, 14], straight: 0.5, side: ['sporeRoom', 'toolStore', 'sideRoom'], step: 6, fill: [['pond', 0, 1]] },
     ],
     [ // Unsealed Shrines
       { key: 'reliquary', name: 'Reliquary', start: 'antechamber', goal: 'sanctum', maze: 0.4, braid: 0.06,
-        rules: { antechamber: [C('nave', 1, 1)], nave: [C('chapel', 2, 4), C('sanctum', 1, 1)] }, wings: [['nave', [C('chapel', 1, 3)]], ['antechamber', [C('chapel', 1, 2)]], ['pilgrimCell', []]], wingCount: [10, 16], straight: 0.7, fill: [['pilgrimCell', 1, 3]] },
+        rules: { antechamber: [C('nave', 1, 1)], nave: [C('chapel', 2, 4), C('sanctum', 1, 1)] }, wings: [['nave', [C('chapel', 1, 3)]], ['antechamber', [C('chapel', 1, 2)]], ['pilgrimCell', []]], wingCount: [10, 16], straight: 0.7, side: ['vestry', 'reliquaryNiche', 'candleStore'], step: 6, fill: [['pilgrimCell', 1, 3]] },
       { key: 'hostel', name: 'Pilgrim hostel', start: 'hostelGate', goal: 'hostelShrine', maze: 0.45, braid: 0.08,
-        rules: { hostelGate: [C('refectory', 1, 1, 'corridor')], refectory: [C('pilgrimCell', 2, 3), C('wellCourt', 1, 1)], wellCourt: [C('hostelShrine', 1, 1)] }, wings: [['refectory', [C('pilgrimCell', 2, 4)]], ['wellCourt', [C('pilgrimCell', 1, 3)]], ['pilgrimCell', []]], wingCount: [12, 18], straight: 0.65, fill: [['pilgrimCell', 3, 6]] },
+        rules: { hostelGate: [C('refectory', 1, 1, 'corridor')], refectory: [C('pilgrimCell', 2, 3), C('wellCourt', 1, 1)], wellCourt: [C('hostelShrine', 1, 1)] }, wings: [['refectory', [C('pilgrimCell', 2, 4)]], ['wellCourt', [C('pilgrimCell', 1, 3)]], ['pilgrimCell', []]], wingCount: [12, 18], straight: 0.65, side: ['pilgrimCell', 'vestry', 'candleStore'], step: 6, fill: [['pilgrimCell', 3, 6]] },
       { key: 'ossuary', name: 'Ossuary', start: 'stairHall', goal: 'boneChapel', maze: 0.5, braid: 0.04,
-        rules: { stairHall: [C('charnel', 1, 1)], charnel: [C('niche', 3, 6), C('boneChapel', 1, 1, 'corridor')] }, wings: [['charnel', [C('niche', 2, 5)]], ['stairHall', [C('niche', 1, 2)]]], wingCount: [10, 16], straight: 0.6, fill: [['pilgrimCell', 1, 2]] },
+        rules: { stairHall: [C('charnel', 1, 1)], charnel: [C('niche', 3, 6), C('boneChapel', 1, 1, 'corridor')] }, wings: [['charnel', [C('niche', 2, 5)]], ['stairHall', [C('niche', 1, 2)]]], wingCount: [10, 16], straight: 0.6, side: ['candleStore', 'reliquaryNiche', 'pilgrimCell'], step: 6, fill: [['pilgrimCell', 1, 2]] },
     ],
   ];
 
@@ -173,6 +183,14 @@
       }
       return out;
     }
+    // shape masks cached by type and size, so candidate positions are checked without building cell lists
+    const maskCache = new Map();
+    function shapeMask(type, w, h) {
+      const key = type + ':' + w + 'x' + h; let m = maskCache.get(key); if (m) return m;
+      const t = ROOM_TYPES[type], cells = shapeCells(t, 0, 0, w - 1, h - 1, t.goal); m = new Uint8Array(w * h);
+      cells.forEach(i => { m[((i / W) | 0) * w + (i % W)] = 1; }); maskCache.set(key, m); return m;
+    }
+    const inShape = (type, x0, y0, x1, y1) => { const w = x1 - x0 + 1, m = shapeMask(type, w, y1 - y0 + 1); return i => { const x = i % W - x0, y = ((i / W) | 0) - y0; return x >= 0 && y >= 0 && x < w && y <= y1 - y0 && m[y * w + x] === 1; }; };
     // can a rect (plus its one-cell margin) go here? cells reserved by `except` (the parent) may be shared
     function fits(x0, y0, x1, y1, except, absorb) {
       if (x0 < 2 || y0 < 2 || x1 > W - 3 || y1 > H - 3) return false;
@@ -371,7 +389,7 @@
         }
         const x1 = x0 + w - 1, y1 = y0 + h - 1;
         if (!node(x0, y0) || !fits(x0, y0, x1, y1, link === 'door' ? P.f : -2)) continue;
-        const spots = linkSpots(P, { x0, y0, x1, y1, cells: new Set(shapeCells(t, x0, y0, x1, y1, t.goal)) }, d);
+        const spots = linkSpots(P, { x0, y0, x1, y1, has: inShape(type, x0, y0, x1, y1) }, d);
         if (!spots.length) continue;
         const sc = toward ? Math.hypot((x0 + x1) / 2 - toward[0], (y0 + y1) / 2 - toward[1]) : 0;
         if (sc < bs) { bs = sc; best = { x0, y0, x1, y1, d, spots }; }
@@ -396,7 +414,7 @@
     // shared span where both rooms have floor and the cells between are free; returns the wall/corridor cells
     function linkSpots(P, R, d, gap) {
       const out = [], horiz = d === 1 || d === 3, s = d === 1 || d === 2 ? 1 : -1;
-      const isR = i => R.cells ? R.cells.has(i) : floorAt(i);
+      const isR = i => R.has ? R.has(i) : floorAt(i);
       const lo = horiz ? Math.max(P.y0, R.y0) + 1 : Math.max(P.x0, R.x0) + 1, hi = horiz ? Math.min(P.y1, R.y1) - 1 : Math.min(P.x1, R.x1) - 1;
       for (let v = lo; v <= hi; v++) {
         const a = horiz ? v * W + (d === 1 ? P.x1 : P.x0) : (d === 2 ? P.y1 : P.y0) * W + v;
@@ -493,21 +511,24 @@
       }
     });
 
-    // ---------- the maze: growing tree on the odd lattice through free space ----------
+    // ---------- the corridors: growing tree on a lattice through free space ----------
+    // the theme sets the spacing: 2 is a dense labyrinth; 4-6 leaves room between hallways for rooms off them
     const MAZE = newFeature('public');
     const free = i => occ[i] === 0 && allowed[i];
+    const K = theme.step || 2, onGrid = (v, o) => ((((v + o - 1) % K) + K) % K) === 0;
     const lattice = [], lastDir = new Int8Array(N).fill(-1);
-    for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) if (node(x, y) && free(y * W + x)) lattice.push(y * W + x);
+    for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) if (onGrid(x, ox * 3) && onGrid(y, oy * 3) && free(y * W + x)) lattice.push(y * W + x);
     for (let k = lattice.length - 1; k > 0; k--) { const j = Math.floor(rng() * (k + 1)); [lattice[k], lattice[j]] = [lattice[j], lattice[k]]; }
     for (const s0 of lattice) {
       if (occ[s0] !== 0) continue;
       carve(s0, MAZE); const stack = [s0];
       while (stack.length) {
         const pick = rng() < 0.75 ? stack.length - 1 : Math.floor(rng() * stack.length), c = stack[pick], x = c % W, y = (c / W) | 0;
-        const dirs = [0, 1, 2, 3].filter(d => { const nx = x + 2 * DX[d], ny = y + 2 * DY[d]; return nx > 0 && ny > 0 && nx < W - 1 && ny < H - 1 && free(ny * W + nx) && free((y + DY[d]) * W + x + DX[d]); });
+        const dirs = [0, 1, 2, 3].filter(d => { const nx = x + K * DX[d], ny = y + K * DY[d]; if (nx < 1 || ny < 1 || nx >= W - 1 || ny >= H - 1) return false; for (let k = 1; k <= K; k++) if (!free((y + k * DY[d]) * W + x + k * DX[d])) return false; return true; });
         if (!dirs.length) { stack.splice(pick, 1); continue; }
         const ld = lastDir[c], d = ld >= 0 && dirs.includes(ld) && rng() < (theme.straight || 0) ? ld : dirs[Math.floor(rng() * dirs.length)];
-        carve((y + DY[d]) * W + x + DX[d], MAZE); const nn = (y + 2 * DY[d]) * W + x + 2 * DX[d]; carve(nn, MAZE); lastDir[nn] = d; stack.push(nn);
+        for (let k = 1; k < K; k++) carve((y + k * DY[d]) * W + x + k * DX[d], MAZE);
+        const nn = (y + K * DY[d]) * W + x + K * DX[d]; carve(nn, MAZE); lastDir[nn] = d; stack.push(nn);
       }
     }
 
@@ -569,10 +590,13 @@
     const doors = portals.map(p => doorSub(p));
     // link-up: a public crossing (gate room or path) the maze could not reach gets a corridor to the nearest
     // reachable public floor, through free cells and public margins only (never past private rooms)
-    for (let round = 0; round < portals.length; round++) {
-      const lost = portalInfo.find((pi, k) => !pi.forward && dist[doors[k]] < 0);
-      if (!lost) break;
-      const f = lost.f, prev = new Int32Array(N).fill(-2), q = [];
+    // public rooms the corridors did not reach get the same treatment (wider corridor spacing leaves some)
+    const lostRooms = () => rooms.find(r => features[r.f].access === 'public' && !r.gate && !r.cells.some(i => dist[i] >= 0) && !r.linkTried);
+    for (let round = 0; round < portals.length + rooms.length; round++) {
+      const lostP = portalInfo.find((pi, k) => !pi.forward && dist[doors[k]] < 0 && !pi.linkTried), lostR = lostP ? null : lostRooms();
+      if (!lostP && !lostR) break;
+      if (lostP) lostP.linkTried = true; else lostR.linkTried = true;
+      const f = lostP ? lostP.f : lostR.f, prev = new Int32Array(N).fill(-2), q = [];
       for (let i = 0; i < N; i++) if (pass[i] && feat[i] === f) { prev[i] = -1; q.push(i); }
       let hit = -1;
       for (let h = 0; h < q.length && hit < 0; h++) {
@@ -588,10 +612,84 @@
           prev[j] = c; q.push(j);
         }
       }
-      if (hit < 0) break;
-      for (let c = prev[hit]; c >= 0 && feat[c] !== f; c = prev[c]) { carve(c, MAZE); pass[c] = 1; }
-      dist = bfs(null);
+      if (hit < 0) continue;
+      const added = [];
+      for (let c = prev[hit]; c >= 0 && feat[c] !== f; c = prev[c]) { carve(c, MAZE); pass[c] = 1; added.push(c); }
+      // extend the reach from the new link only, instead of flooding the whole sector again
+      const q2 = added.filter(c => dist[c] < 0); q2.forEach(c => { dist[c] = 1; });
+      for (let h = 0; h < q2.length; h++) { const c = q2[h]; for (let d = 0; d < 4; d++) { const j = c + DX[d] + DY[d] * W; if (pass[j] && dist[j] < 0) { dist[j] = dist[c] + 1; q2.push(j); } } }
     }
+    // ---------- rooms off the corridors (after link-up, so its corridors get rooms too) ----------
+    // A long hallway in a real building has doors along it: along every straight run of corridor, small rooms
+    // from the district's theme open straight off it every few cells, alternating sides; and a corridor that
+    // ends blind ends in a room instead.
+    {
+      const isCorr = i => occ[i] === 1 && feat[i] >= 0 && features[feat[i]].kind !== 'room';
+      const offCorridor = (cx, cy, d) => { // a room beyond one wall on side d of corridor cell (cx, cy); returns success
+        const dk = districtAt(cx, cy), th = districts[dk].theme, list = th.side || ['cell'];
+        const type = list[Math.floor(rng() * list.length)], t = ROOM_TYPES[type];
+        for (let tr = 0; tr < 4; tr++) {
+          let w = randOdd(t.w[0], t.w[1]), h = randOdd(t.h[0], t.h[1]);
+          if (tr >= 2) { w = 3; h = 3; }
+          let x0, y0;
+          if (d === 0 || d === 2) { x0 = cx - 1 - Math.floor(rng() * Math.max(1, w - 2)); y0 = d === 0 ? cy - 1 - h : cy + 2; }
+          else { y0 = cy - 1 - Math.floor(rng() * Math.max(1, h - 2)); x0 = d === 3 ? cx - 1 - w : cx + 2; }
+          const x1 = x0 + w - 1, y1 = y0 + h - 1, door = (cy + DY[d]) * W + cx + DX[d];
+          if (!fits(x0, y0, x1, y1, feat[cy * W + cx])) continue; // may share the corridor's own margin
+          if (!inShape(type, x0, y0, x1, y1)(door + DX[d] + DY[d] * W)) continue; // the door must open onto floor
+          if (occ[door] === 1 || [1, 3].some(e => occ[door + DX[(d + e) & 3] + DY[(d + e) & 3] * W] === 1)) continue;
+          const R = addRoom(type, x0, y0, x1, y1, { depth: -1, district: dk, off: true });
+          carve(door, R.f); isDoor[door] = 1;
+          return true;
+        }
+        return false;
+      };
+      // a public room already across the wall gets a door onto the hallway
+      const doorInto = (x, y, d) => {
+        const w = (y + DY[d]) * W + x + DX[d], r = w + DX[d] + DY[d] * W;
+        if (occ[w] === 1 || occ[r] !== 1 || feat[r] < 0) return false;
+        const fr = features[feat[r]];
+        if (fr.kind !== 'room' || fr.access !== 'public' || rooms[fr.room].gate) return false;
+        const s1 = w + DX[(d + 1) & 3] + DY[(d + 1) & 3] * W, s2 = w + DX[(d + 3) & 3] + DY[(d + 3) & 3] * W;
+        if (occ[s1] === 1 || occ[s2] === 1) return false;
+        carve(w, feat[r]); isDoor[w] = 1; return true;
+      };
+      // straight runs, both orientations: each stretch of about eight cells gets a door, into a room that is
+      // already across the wall if there is one, else into a new room built off the hallway
+      for (const horiz of [true, false]) {
+        const A = horiz ? H : W, B = horiz ? W : H, at = (a, b) => horiz ? a * W + b : b * W + a;
+        const runs = [];
+        for (let a = 2; a < A - 2; a++) {
+          let run = [];
+          for (let b = 1; b < B - 1; b++) {
+            const i = at(a, b), straight = isCorr(i) && (horiz ? occ[i - W] !== 1 && occ[i + W] !== 1 : occ[i - 1] !== 1 && occ[i + 1] !== 1);
+            if (straight) run.push(i); else { if (run.length >= 4) runs.push(run); run = []; }
+          }
+          if (run.length >= 4) runs.push(run);
+        }
+        runs.forEach(run => {
+          for (let k = 0; k < run.length; k += 8) {
+            const stretch = run.slice(k, k + 8), order = stretch.map((_, j) => j).sort(() => rng() - 0.5), sides = horiz ? [0, 2] : [1, 3];
+            if (rng() < 0.5) sides.reverse();
+            let done = false;
+            for (const j of order) { const x = stretch[j] % W, y = (stretch[j] / W) | 0; if (doorInto(x, y, sides[0]) || doorInto(x, y, sides[1])) { done = true; break; } }
+            for (const j of order) { if (done) break; const x = stretch[j] % W, y = (stretch[j] / W) | 0; if (offCorridor(x, y, sides[0]) || offCorridor(x, y, sides[1])) done = true; }
+            // now and then a second door on the other side
+            if (done && rng() < 0.3) { const j = order[order.length - 1], x = stretch[j] % W, y = (stretch[j] / W) | 0; offCorridor(x, y, sides[1]); }
+          }
+        });
+      }
+      // blind ends finish in a room
+      for (let i = W; i < N - W; i++) {
+        if (!isCorr(i)) continue;
+        const nb = [0, 1, 2, 3].filter(d => occ[i + DX[d] + DY[d] * W] === 1);
+        if (nb.length !== 1) continue;
+        offCorridor(i % W, (i / W) | 0, (nb[0] + 2) & 3);
+      }
+    }
+
+    for (let i = 0; i < N; i++) pass[i] = occ[i] === 1 ? 1 : 0;
+    dist = bfs(null);
     if (doors.some(i => dist[i] < 0)) return { ok: false, error: 'a doorway is unreachable' };
     if (dist[goalRoom.cy * W + goalRoom.cx] < 0 && !goalRoom.cells.some(i => dist[i] >= 0)) return { ok: false, error: 'goal unreachable' };
     // progression: with the goal room closed, no way onward to the next stratum can be reached
@@ -628,8 +726,16 @@
     });
     const roomOf = new Int16Array(N).fill(-1);
     rooms.forEach((r, k) => r.cells.forEach(i => { if (pass[i]) roomOf[i] = k; }));
+    // halls: corridor floors (in no room, not a crossing) and the walls lining them that are not a room's own walls
+    const hall = new Uint8Array(N), roomWall = new Uint8Array(N);
+    rooms.forEach(r => { for (let y = r.y0 - 1; y <= r.y1 + 1; y++) for (let x = r.x0 - 1; x <= r.x1 + 1; x++) roomWall[y * W + x] = 1; });
+    for (let i = 0; i < N; i++) if (pass[i] && roomOf[i] < 0 && !passage[i] && !isDoor[i]) hall[i] = 1;
+    for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+      const i = y * W + x; if (pass[i] || roomWall[i] || passage[i]) continue;
+      for (let dy = -1; dy <= 1 && !hall[i]; dy++) for (let dx = -1; dx <= 1; dx++) if (hall[i + dy * W + dx] === 1) { hall[i] = 2; break; }
+    }
     return {
-      ok: true, pass, roomOf, mat, startSub, theme: { key: theme.key, name: theme.name }, stratumOf, distOf,
+      ok: true, pass, roomOf, mat, hall, startSub, theme: { key: theme.key, name: theme.name }, stratumOf, distOf,
       districts: districts.map(d => ({ name: d.theme.name, key: d.theme.key, stratum: d.stratum, borrowed: !!d.borrowed })),
       rooms: rooms.map(r => ({ type: r.type, name: r.name, gate: !!r.gate, district: r.district !== undefined ? r.district : 0, x0: r.x0, y0: r.y0, x1: r.x1, y1: r.y1, cx: r.cx, cy: r.cy, goal: !!r.goal, spine: !!r.spine, depth: r.depth, access: ROOM_TYPES[r.type].access, portal: r.portal ? r.portal.dir : undefined })),
       goal: { cx: goalRoom.cx, cy: goalRoom.cy, name: goalRoom.name },

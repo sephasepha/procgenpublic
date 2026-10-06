@@ -52,8 +52,14 @@ layout is still used by the Arsenal and Generic presets, and by the Underdark wi
    with its own children, from the district's grammar) pack the space, half of them grown off existing public
    rooms into building complexes. Near a seal, a district may belong to the neighbouring stratum, so the next
    stratum is felt a region before it is reached. Strata change every two sectors.
-6. **Corridors.** The space between is filled with a maze on the odd lattice, straightened per theme, joined to
-   public rooms by connector doors and trimmed back, so corridors link rooms rather than fill the sector.
+6. **Corridors.** The space between is filled with corridors on a lattice whose spacing the theme sets (2 for the
+   dense Glyph labyrinth, 6 for building-like themes, leaving room between hallways), straightened per theme,
+   joined to public rooms by connector doors and trimmed back. As in a real building, hallways have doors along
+   them: every stretch of about eight cells opens into a room already across the wall or into a small room built
+   off it from the district's theme (studies, vestries, tool stores, closets), and blind ends finish in a room.
+   `tests/world.js` measures this: long straight hallways need a door into a room every 10 cells.
+   Halls also look different from rooms: corridors and the walls lining them use a hall variant of the stratum's
+   tileset (darker, worn floors, another stone).
 7. **Crossings.** Every doorway into the next sector is a processional hall three cells wide through the border,
    opening into a gate room on each side, sized from the shared border key so the halves mirror each other. It
    is dressed with its own **Threshold** tiles (runner, banners, braziers, sigils), the same in every stratum.

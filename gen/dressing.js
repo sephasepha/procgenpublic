@@ -508,7 +508,7 @@
     });
     // per-spin character grids and materials, for the renderer's material pass
     variants.forEach(v => { let px = v.px; v.pxs = [px]; for (let r = 1; r < 4; r++) { px = rotPx(px); v.pxs.push(px); } });
-    const M = MATERIALS[ts.key], rgbOf = c => pal[c] || [255, 0, 255];
+    const M = MATERIALS[ts.materialsFrom || ts.key], rgbOf = c => pal[c] || [255, 0, 255];
     const materials = M ? {
       floor: M.floor.map(([name, f]) => ({ name, rgb: grid(f).join('').split('').map(rgbOf) })),
       wall: M.wall.map(([name, face, top]) => ({ name, face: grid(face).join('').split('').map(rgbOf), top: top ? grid(top).join('').split('').map(rgbOf) : null })),
@@ -535,6 +535,18 @@
     },
   });
 
+  // Halls: the corridors of each stratum use the stratum's own tiles in a different palette (darker, worn
+  // floors and another stone), so circulation reads apart from the rooms it links. Same tiles, same learned
+  // rules, same materials; only the colours of floor and masonry change.
+  const HALL_PALETTES = {
+    mazes: { '.': '#5d6584', ',': '#545b78', ':': '#6c7595', ';': '#3d4360', 'k': '#4a5170', 'K': '#3a4060', 'x': '#7d6f9c', 'w': '#6a5d88', 'W': '#3f3560', 'h': '#a898c8', 'H': '#231d38', 'd': '#2b2444' },
+    growth: { '.': '#6b5434', ',': '#5e492c', ':': '#7d6440', ';': '#4a3820', 'k': '#4f3d24', 'K': '#3d2f1b', 'x': '#6b6a4e', 'w': '#5a5940', 'W': '#3e3d2b', 'h': '#9a9870', 'H': '#25241a', 'd': '#2f2e21' },
+    shrines: { '.': '#8a8276', ',': '#7d766b', ':': '#9a9285', ';': '#605a51', 'k': '#6b655b', 'K': '#55504a', 'x': '#b39a7e', 'w': '#9d846a', 'W': '#6e5844', 'h': '#d9c3a5', 'H': '#3e3024', 'd': '#4a3b2e' },
+  };
+  Object.entries(HALL_PALETTES).forEach(([key, pal]) => {
+    const base = TILESETS.find(t => t.key === key);
+    TILESETS.push({ ...base, key: key + 'Hall', name: base.name + ' halls', palette: { ...base.palette, ...pal }, materialsFrom: key, hallOf: key });
+  });
   TILESETS.forEach(ts => { if (ts.examplesFrom) ts.examples = TILESETS.find(t => t.key === ts.examplesFrom).examples; });
 
   // ---------- materials: structured floor and wall surfaces laid per room and district ----------

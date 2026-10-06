@@ -226,6 +226,12 @@
     }
     // processional halls at the crossings take the Threshold tiles, with a runner and braziers pinned
     const pins = [];
+    // halls: corridors and the walls lining them take their stratum's hall tileset
+    if (extra && extra.hall) {
+      const hallSet = [0, 1, 2].map(t => DRESS_SETS.findIndex(d => d.key === ['mazes', 'growth', 'shrines'][t] + 'Hall'));
+      const stratumOfSet = new Map([[P.tilesets[0], 0], [P.tilesets[1], 1], [P.tilesets[4], 2]]);
+      for (let i = 0; i < SW * SH; i++) if (extra.hall[i] && stratumOfSet.has(setOf[i])) setOf[i] = hallSet[stratumOfSet.get(setOf[i])];
+    }
     if (extra && extra.passage) {
       const th = DRESS_SETS.findIndex(t => t.key === 'threshold');
       for (let i = 0; i < SW * SH; i++) if (extra.passage[i] === 1) setOf[i] = th; else if (extra.passage[i] === 2) setOf[i] = tsOf(col[i] < 5 ? col[i] : primOf(0));
@@ -266,7 +272,7 @@
       });
       const doors = portals.map(p => doorSub(p));
       timing.layout = now() - t0;
-      const { deco, dressStats } = dressSector(S, pass, col, c => STRATUM_STYLE[L.stratumOf[((c / COLS) | 0) * 3 * SW + 3 * (c % COLS) + SW + 1]], pinAt, portals, seed, timing, { passage: L.passage, runner: L.runner, braziers: L.braziers, wallOf: i => STRATUM_STYLE[L.stratumOf[i]] });
+      const { deco, dressStats } = dressSector(S, pass, col, c => STRATUM_STYLE[L.stratumOf[((c / COLS) | 0) * 3 * SW + 3 * (c % COLS) + SW + 1]], pinAt, portals, seed, timing, { passage: L.passage, runner: L.runner, braziers: L.braziers, hall: L.hall, wallOf: i => STRATUM_STYLE[L.stratumOf[i]] });
       timing.total = now() - t0;
       return { sx, sy, ox, oy, own, info, portals, doors, pass, col, deco, dressStats, hubs, doctrine: null, attempts: attempt + 1, ms: Math.round(timing.total), timing,
         entranceSub: L.startSub, ok: true, layout: 'rooms', theme: L.theme, rooms: L.rooms, roomOf: L.roomOf, mission: L.mission, doorWide: L.doorWide, halls: L.halls, districts: L.districts, distOf: L.distOf, mat: L.mat };

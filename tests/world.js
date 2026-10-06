@@ -26,7 +26,7 @@ for (const preset of ['underdark', 'arsenal', 'generic']) {
     check(s.ms < 3000, `${preset} sector ${x},${y} took ${s.ms} ms to generate (budget 3000)`);
     times.push(s.ms);
   }
-  let worksDoctrine = 0, worksSectors = 0, landmarks = 0, shown = 0, gated = 0, gateRooms = 0, crossings = 0;
+  let worksDoctrine = 0, worksSectors = 0, landmarks = 0, shown = 0, gated = 0, gateRooms = 0, crossings = 0, longRuns = 0, doored = 0;
   sec.forEach(s => {
     if (!s.ok) return;
     const { sx, sy, info } = s;
@@ -88,6 +88,19 @@ for (const preset of ['underdark', 'arsenal', 'generic']) {
         onward.forEach(k => check(!seen[s.doors[k]], `${preset} ${sx},${sy}: the way onward (dir ${s.portals[k].dir}) bypasses the goal room`));
         gated++;
       }
+      // long hallways have doors off them: straight corridor runs of 10+ cells need a door into a room per 10 cells
+      for (const horiz of [true, false]) {
+        const A = horiz ? C.SH : C.SW, B = horiz ? C.SW : C.SH, at = (a, b) => horiz ? a * C.SW + b : b * C.SW + a, side = horiz ? C.SW : 1;
+        for (let a = 1; a < A - 1; a++) {
+          let run = 0, branched = 0;
+          for (let b = 1; b < B; b++) {
+            const i = at(a, b), corr = b < B - 1 && s.pass[i] && s.roomOf[i] < 0 && !(s.pass[i - (horiz ? 1 : C.SW)] && false);
+            const straight = corr && (horiz ? s.pass[i - 1] || s.pass[i + 1] : s.pass[i - C.SW] || s.pass[i + C.SW]);
+            if (straight) { run++; for (const o of [-side, side]) if (s.pass[i + o] && (s.roomOf[i + o] >= 0 || (s.pass[i + 2 * o] && s.roomOf[i + 2 * o] >= 0))) branched++; }
+            else { if (run >= 10) { longRuns++; if (branched >= Math.floor(run / 10)) doored++; } run = 0; branched = 0; }
+          }
+        }
+      }
       // every crossing opens into a gate room
       check(s.halls.every(h => h), `${preset} ${sx},${sy}: a crossing without a processional hall`);
       gateRooms += s.halls.filter(h => h && !h.hallOnly).length; crossings += s.portals.length;
@@ -130,7 +143,7 @@ for (const preset of ['underdark', 'arsenal', 'generic']) {
     s.portals.forEach(p => { const k = key(p.to[0], p.to[1]); if (sec.has(k) && !seen.has(k)) { seen.add(k); q.push(p.to); } });
   }
   check(seen.size === sec.size, `${preset}: only ${seen.size}/${sec.size} sectors reachable from the start`);
-  if (preset === 'underdark') { console.log(`  ${shown}/${landmarks} landmarks show their centrepiece; ${gated} sectors gate the way onward through their goal room; ${gateRooms}/${crossings} crossings open into a gate room`); check(gateRooms >= crossings * 0.9, `underdark: only ${gateRooms}/${crossings} crossings have a gate room`); check(shown >= landmarks * 0.9, `underdark: only ${shown}/${landmarks} landmarks show their centrepiece`); }
+  if (preset === 'underdark') { console.log(`  ${shown}/${landmarks} landmarks show their centrepiece; ${gated} sectors gate the way onward through their goal room; ${gateRooms}/${crossings} crossings open into a gate room`); check(gateRooms >= crossings * 0.9, `underdark: only ${gateRooms}/${crossings} crossings have a gate room`); console.log(`  ${doored}/${longRuns} long hallways have a door into a room per 10 cells`); check(doored >= longRuns * 0.85, `underdark: only ${doored}/${longRuns} long hallways have doors off them`); check(shown >= landmarks * 0.9, `underdark: only ${shown}/${landmarks} landmarks show their centrepiece`); }
   if (preset === 'arsenal') console.log(`  Works doctrine fully satisfied in ${worksDoctrine}/${worksSectors} Works sectors`);
 
   // order independence: regenerate sectors in a scrambled order, interleaved with another preset
