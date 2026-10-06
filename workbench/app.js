@@ -551,6 +551,8 @@ bind('Esc', R, 'esc', v => ESC[v - 1], 3);
 });
 $('reseed').onclick = () => { P.seed = 1 + Math.floor(Math.random() * 99999); P.salt = 0; $('seedOut').textContent = P.seed; compute(1); updatePanel(true); };
 $('prev').onclick = () => go(stage - 1);
+// one tap: run the whole pipeline, including the full WFC collapse, then walk the result
+$('exploreNow').onclick = () => { go(S_CHECK); Explore.open(exploreOpts()); };
 $('next').onclick = () => go(stage === S_CHECK ? 1 : stage + 1);
 $('play').onclick = () => { if (S.wfc && !S.wfc.done) { playing = !playing; updatePanel(true); } };
 
