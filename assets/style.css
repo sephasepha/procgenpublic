@@ -177,3 +177,41 @@ html.xp-open, html.xp-open body { overflow: hidden; }
 .tool b { font-weight: 700; color: var(--brass); }
 .tool span { color: var(--dim); font-size: 0.84rem; }
 .tool:focus-visible { outline: 2px solid var(--gate); outline-offset: 2px; }
+
+/* ---------- Infinite: a full-screen game shell (landscape first, portrait works) ---------- */
+.xp.inf { display: block; padding: 0; background: #07080b; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.inf .xp-stage { position: absolute; inset: 0; }
+.inf .xp-stage canvas.main { touch-action: none; cursor: grab; image-rendering: pixelated; }
+.inf .hud { position: absolute; z-index: 2; pointer-events: none; }
+.inf .hud > * { pointer-events: auto; }
+.inf .hud-tl { top: calc(env(safe-area-inset-top, 0px) + 10px); left: calc(env(safe-area-inset-left, 0px) + 10px); display: flex; gap: 10px; align-items: flex-start; max-width: 55%; }
+.inf .xp-loc { pointer-events: none; min-width: 0; text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
+.inf .xp-title { font-family: var(--f-display); font-size: 1.15rem; line-height: 1.2; }
+.inf .xp-sub { font-family: var(--f-mono); font-size: 0.72rem; color: rgba(230,225,213,0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.inf .hud-tr { top: calc(env(safe-area-inset-top, 0px) + 10px); right: calc(env(safe-area-inset-right, 0px) + 10px); display: grid; gap: 6px; justify-items: end; }
+.inf .hud-tr canvas.mini { position: static; border: 1px solid rgba(255,255,255,0.14); border-radius: 10px; pointer-events: none; box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
+.inf .xp-meta { display: flex; gap: 8px; align-items: center; }
+.inf .xp-stats { display: flex; gap: 10px; font-family: var(--f-mono); font-size: 0.72rem; color: rgba(230,225,213,0.75); text-shadow: 0 1px 3px rgba(0,0,0,0.9); pointer-events: none; }
+.inf .xp-stats b { color: var(--text); font-weight: 500; }
+.inf .xp-round { appearance: none; width: 42px; height: 42px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.16); background: rgba(17,19,24,0.62); color: var(--text); font-size: 1.05rem; cursor: pointer; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); flex: none; }
+.inf .xp-round.small { width: 32px; height: 32px; font-size: 0.9rem; }
+.inf .hud-br { right: calc(env(safe-area-inset-right, 0px) + 12px); bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); display: grid; grid-template-columns: repeat(5, auto); gap: 8px; }
+.inf .xp-act { appearance: none; width: 54px; height: 54px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.16); background: rgba(17,19,24,0.6); color: rgba(230,225,213,0.85); display: grid; place-items: center; align-content: center; gap: 0; cursor: pointer; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: 0; }
+.inf .xp-act b { font-size: 1.1rem; font-weight: 400; line-height: 1; }
+.inf .xp-act span { font-family: var(--f-mono); font-size: 0.56rem; letter-spacing: 0.06em; text-transform: uppercase; margin-top: 3px; }
+.inf .xp-act.on { border-color: var(--brass); color: var(--brass); background: rgba(40,34,20,0.7); }
+.inf .stick { position: absolute; z-index: 1; width: 0; height: 0; pointer-events: none; }
+.inf .stick .base, .inf .stick .knob { position: absolute; left: 0; top: 0; border-radius: 50%; transform: translate(-50%, -50%); }
+.inf .stick .base { width: 112px; height: 112px; border: 2px solid rgba(255,255,255,0.22); background: rgba(255,255,255,0.05); }
+.inf .stick .knob { width: 48px; height: 48px; background: rgba(243,211,107,0.5); border: 1px solid rgba(255,255,255,0.4); }
+.inf .toast { top: calc(env(safe-area-inset-top, 0px) + 12px); z-index: 3; max-width: min(46%, 420px); }
+.inf .rules, .inf .perf { left: 50%; right: auto; top: 50%; bottom: auto; transform: translate(-50%, -50%); width: min(92vw, 440px); max-height: 80vh; overflow: auto; z-index: 4; }
+.inf .xp-hint { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 3; background: rgba(17,19,24,0.85); border: 1px solid var(--brass-dim); border-radius: 999px; padding: 8px 14px; font-size: 0.8rem; color: var(--text); pointer-events: none; white-space: nowrap; }
+@media (orientation: portrait) {
+  .inf .hud-br { grid-template-columns: repeat(5, auto); left: 50%; right: auto; transform: translateX(-50%); }
+  .inf .hud-tl { max-width: 60%; }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .inf .xp-act { width: 48px; height: 48px; }
+  .inf .xp-act span { font-size: 0.52rem; }
+}

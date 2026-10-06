@@ -84,61 +84,62 @@
     el = document.createElement('div');
     el.className = 'xp inf';
     el.hidden = true;
+    // a game shell: the view fills the screen, the HUD floats over it
     el.innerHTML = `
-      <div class="xp-top">
-        <button class="xp-btn" data-x="close" type="button" aria-label="Menu: world settings and tools">☰</button>
-        <div class="xp-title"></div>
-        <div class="xp-stats" aria-live="polite"></div>
+      <div class="xp-stage"><canvas class="main" aria-label="Explore view: drag anywhere to walk"></canvas></div>
+      <div class="hud hud-tl">
+        <button class="xp-round" data-x="close" type="button" aria-label="Menu: world settings and tools">☰</button>
+        <div class="xp-loc"><div class="xp-title"></div><div class="xp-sub"></div></div>
       </div>
-      <div class="xp-stage"><canvas class="main" aria-label="Explore view"></canvas>
+      <div class="hud hud-tr">
         <canvas class="mini" aria-label="Sector map"></canvas>
-        <div class="toast" role="status" aria-live="polite" hidden></div>
-        <div class="rules" hidden></div>
-        <div class="perf" hidden aria-live="off"></div>
+        <div class="xp-meta"><div class="xp-stats" aria-live="polite"></div><button class="xp-round small" data-x="full" type="button" aria-label="Full screen">⛶</button></div>
       </div>
-      <div class="xp-bottom">
-        <div class="xp-toggles">
-          <button class="xp-chip" data-x="fog" type="button">Light: on</button>
-          <button class="xp-chip" data-x="zoom" type="button">View: close</button>
-          <button class="xp-chip" data-x="tiles" type="button">Tiles: on</button>
-          <button class="xp-chip" data-x="rules" type="button">Rules</button>
-          <button class="xp-chip" data-x="perf" type="button">Perf</button>
-        </div>
-        <div class="xp-pad" role="group" aria-label="Move">
-          <button class="xp-key up" data-d="0" type="button" aria-label="Up">▲</button>
-          <button class="xp-key left" data-d="3" type="button" aria-label="Left">◀</button>
-          <button class="xp-key right" data-d="1" type="button" aria-label="Right">▶</button>
-          <button class="xp-key down" data-d="2" type="button" aria-label="Down">▼</button>
-        </div>
-      </div>`;
+      <div class="stick" hidden><i class="base"></i><i class="knob"></i></div>
+      <div class="hud hud-br" role="group" aria-label="View">
+        <button class="xp-act on" data-x="fog" type="button" aria-pressed="true"><b>☼</b><span>Light</span></button>
+        <button class="xp-act" data-x="zoom" type="button" aria-pressed="false"><b>▣</b><span>Map</span></button>
+        <button class="xp-act on" data-x="tiles" type="button" aria-pressed="true"><b>▦</b><span>Tiles</span></button>
+        <button class="xp-act" data-x="rules" type="button" aria-pressed="false"><b>✓</b><span>Rules</span></button>
+        <button class="xp-act" data-x="perf" type="button" aria-pressed="false"><b>⏱</b><span>Perf</span></button>
+      </div>
+      <div class="toast" role="status" aria-live="polite" hidden></div>
+      <div class="rules" hidden></div>
+      <div class="perf" hidden aria-live="off"></div>
+      <div class="xp-hint" hidden>Turn your phone sideways for the full view</div>`;
     document.body.appendChild(el);
     // input is state, read by the game loop: directions held down (latest first) and one buffered tap,
     // so a turn pressed just before reaching a junction is taken there
     const press = d => { if (!st) return; st.held = [d, ...st.held.filter(x => x !== d)]; st.buffer = { d, until: performance.now() + 250 }; };
     const release = d => { if (st) st.held = st.held.filter(x => x !== d); };
-    el.querySelectorAll('.xp-key').forEach(b => {
-      b.addEventListener('pointerdown', e => { e.preventDefault(); b.setPointerCapture?.(e.pointerId); press(+b.dataset.d); });
-      ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => b.addEventListener(t, () => release(+b.dataset.d)));
+    // a floating thumb-stick: put a thumb (or the mouse) down anywhere on the view and drag towards a direction
+    const cvs = el.querySelector('canvas.main'), stick = el.querySelector('.stick'), knob = stick.querySelector('.knob');
+    let sp = null;
+    cvs.addEventListener('pointerdown', e => {
+      e.preventDefault(); cvs.setPointerCapture?.(e.pointerId); goFull();
+      sp = { id: e.pointerId, x: e.clientX, y: e.clientY, d: -1 };
+      stick.hidden = false; stick.style.left = e.clientX + 'px'; stick.style.top = e.clientY + 'px'; knob.style.transform = 'translate(-50%, -50%)';
     });
+    cvs.addEventListener('pointermove', e => {
+      if (!sp || e.pointerId !== sp.id || !st) return;
+      const dx = e.clientX - sp.x, dy = e.clientY - sp.y, r = Math.hypot(dx, dy), k = Math.min(1, 44 / (r || 1));
+      knob.style.transform = `translate(calc(-50% + ${dx * k}px), calc(-50% + ${dy * k}px))`;
+      const d = r < 14 ? -1 : Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0);
+      if (d !== sp.d) { if (sp.d >= 0) release(sp.d); if (d >= 0) press(d); sp.d = d; }
+    });
+    const lift = e => { if (!sp || (e && e.pointerId !== sp.id)) return; if (sp.d >= 0) release(sp.d); sp = null; stick.hidden = true; };
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => cvs.addEventListener(t, lift));
     el.addEventListener('click', e => {
       const x = e.target.closest('[data-x]'); if (!x) return;
-      const k = x.dataset.x;
+      const k = x.dataset.x, on = v => { x.classList.toggle('on', v); x.setAttribute('aria-pressed', String(v)); };
       if (k === 'close') close();
-      if (k === 'fog') { st.fog = !st.fog; x.textContent = 'Light: ' + (st.fog ? 'on' : 'off'); st.sectors.forEach(s => s.dirty = true); }
-      if (k === 'zoom') { st.map = !st.map; x.textContent = 'View: ' + (st.map ? 'map' : 'close'); }
-      if (k === 'tiles') { st.tiles = !st.tiles; x.textContent = 'Tiles: ' + (st.tiles ? 'on' : 'off'); st.sectors.forEach(s => s.dirty = true); }
-      if (k === 'rules') { const r = el.querySelector('.rules'); r.hidden = !r.hidden; if (!r.hidden) rules(); }
-      if (k === 'perf') { const r = el.querySelector('.perf'); r.hidden = !r.hidden; }
+      if (k === 'fog') { st.fog = !st.fog; on(st.fog); st.sectors.forEach(s => s.dirty = true); }
+      if (k === 'zoom') { st.map = !st.map; on(st.map); }
+      if (k === 'tiles') { st.tiles = !st.tiles; on(st.tiles); st.sectors.forEach(s => s.dirty = true); }
+      if (k === 'rules') { const r = el.querySelector('.rules'); r.hidden = !r.hidden; on(!r.hidden); if (!r.hidden) rules(); }
+      if (k === 'perf') { const r = el.querySelector('.perf'); r.hidden = !r.hidden; on(!r.hidden); }
+      if (k === 'full') { if (document.fullscreenElement) document.exitFullscreen?.(); else goFull(true); }
       st.redraw = true; st.layerDirty = true;
-    });
-    const cv = el.querySelector('canvas.main');
-    let sx = 0, sy = 0, sw = false;
-    cv.addEventListener('pointerdown', e => { sx = e.clientX; sy = e.clientY; sw = true; });
-    cv.addEventListener('pointerup', e => {
-      if (!sw) return; sw = false;
-      const dx = e.clientX - sx, dy = e.clientY - sy;
-      if (Math.max(Math.abs(dx), Math.abs(dy)) < 24 || !st) return;
-      st.buffer = { d: Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0), until: performance.now() + 400 };
     });
     const KEYS = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3, w: 0, d: 1, s: 2, a: 3 };
     window.addEventListener('keydown', e => {
@@ -167,10 +168,10 @@
       perf: { frames: [], layer: [], gens: [], firstSector: 0, opened: performance.now(), drops: 0 },
     };
     queue = [];
-    el.querySelector('[data-x="fog"]').textContent = 'Light: on';
-    el.querySelector('[data-x="zoom"]').textContent = 'View: close';
-    el.querySelector('[data-x="tiles"]').textContent = 'Tiles: on';
-    el.querySelector('.rules').hidden = true;
+    [['fog', true], ['zoom', false], ['tiles', true], ['rules', false], ['perf', false]].forEach(([k, v]) => { const b = el.querySelector(`[data-x="${k}"]`); b.classList.toggle('on', v); b.setAttribute('aria-pressed', String(v)); });
+    el.querySelector('.rules').hidden = true; el.querySelector('.perf').hidden = true;
+    const portrait = window.matchMedia('(orientation: portrait) and (pointer: coarse)').matches, hint = el.querySelector('.xp-hint');
+    hint.hidden = !portrait; if (portrait) setTimeout(() => { hint.hidden = true; }, 4000);
     el.hidden = false;
     document.documentElement.classList.add('xp-open');
     size();
@@ -179,7 +180,14 @@
     hud();
     if (!st.raf) loop();
   }
-  function close() { el.hidden = true; document.documentElement.classList.remove('xp-open'); if (st) { cancelAnimationFrame(st.raf); st.raf = 0; } }
+  // full screen and landscape where the browser allows it (Android Chrome; the installed app opens full screen)
+  let askedFull = false;
+  function goFull(force) {
+    if ((askedFull && !force) || document.fullscreenElement || !document.documentElement.requestFullscreen) return;
+    askedFull = true;
+    document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => screen.orientation?.lock?.('landscape').catch(() => {})).catch(() => {});
+  }
+  function close() { if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); el.hidden = true; document.documentElement.classList.remove('xp-open'); if (st) { cancelAnimationFrame(st.raf); st.raf = 0; } }
   function place() {
     const s = st.sectors.get('0,0');
     st.gx = s.ox * 3 + s.entranceSub % SW; st.gy = s.oy * 3 + ((s.entranceSub / SW) | 0); st.from = [st.gx, st.gy];
@@ -268,10 +276,12 @@
   function size() {
     cv = el.querySelector('canvas.main'); g = cv.getContext('2d');
     mini = el.querySelector('canvas.mini'); mg = mini.getContext('2d');
-    dpr = Math.min(3, window.devicePixelRatio || 1);
     const r = cv.parentElement.getBoundingClientRect();
+    // render resolution: like a game's render scale, capped (at most 2x and about 1800 px wide) so a full-screen
+    // view fills at 60 fps on any phone; the browser upscales it, crisp for pixel art
+    dpr = Math.min(2, window.devicePixelRatio || 1, 1800 / Math.max(1, r.width));
     cv.width = Math.max(1, Math.floor(r.width * dpr)); cv.height = Math.max(1, Math.floor(r.height * dpr));
-    const m = Math.round(Math.min(132, r.width * 0.34));
+    const m = Math.round(Math.min(124, Math.min(r.width, r.height) * 0.3));
     mini.style.width = m + 'px'; mini.style.height = m + 'px'; mini.width = mini.height = Math.round(m * dpr);
     vignette = null; if (st) st.layerDirty = true;
   }
@@ -371,7 +381,7 @@
 
   // ---------- close view: a cached layer of tiles around the player, rebuilt when the light changes ----------
   const layer = { cv: null, g: null, x0: 0, y0: 0, w: 0, h: 0, glows: [] };
-  const closeScale = () => Math.max(4, cv.width / 27);
+  const closeScale = () => Math.max(4, Math.min(cv.width, cv.height) / 16); // about 16 tiles across the short side
   // The close view is drawn in a slight 3/4 perspective: walls rise E pixels above the floor, so their tops
   // sit higher and their front faces show below them, overlapping the floor behind; floors darken where they
   // meet walls (ambient occlusion). Rows are drawn top to bottom so nearer walls cover farther ones.
@@ -437,6 +447,17 @@
       }
       dark(1 - bright[c], x, y - E, SLOT, SLOT + (front ? E : 0));
     }
+    // the stratum's colour cast and your light, baked into this small layer instead of blended over the screen
+    const a = st.amb;
+    if (a) {
+      // source-atop: only over what is drawn, never over the unexplored void
+      L.globalCompositeOperation = 'source-atop'; L.globalAlpha = 0.12; L.fillStyle = css(a.tint); L.fillRect(0, 0, layer.cv.width, layer.cv.height);
+      L.globalAlpha = 1;
+      const px = (st.gx - x0 + 0.5) * SLOT, py = (st.gy - y0 + 0.5) * SLOT, lr = SLOT * 7, l = a.light, gr = L.createRadialGradient(px, py, 0, px, py, lr);
+      gr.addColorStop(0, `rgba(${l[0] | 0},${l[1] | 0},${l[2] | 0},0.14)`); gr.addColorStop(1, `rgba(${l[0] | 0},${l[1] | 0},${l[2] | 0},0)`);
+      L.fillStyle = gr; L.fillRect(px - lr, py - lr, lr * 2, lr * 2);
+      L.globalCompositeOperation = 'source-over';
+    }
     st.layerDirty = false;
   }
 
@@ -448,6 +469,8 @@
     const a = st.amb, k = 0.06;
     a.bg = mix(a.bg, hex(target.bg), k); a.light = mix(a.light, hex(target.light), k); a.tint = mix(a.tint, hex(target.tint), k);
     a.stars += (target.stars - a.stars) * k; a.fx = target.fx;
+    const tt = hex(target.tint), drift = Math.abs(a.tint[0] - tt[0]) + Math.abs(a.tint[1] - tt[1]) + Math.abs(a.tint[2] - tt[2]);
+    if (drift > 2 && (!a.bakedAt || performance.now() - a.bakedAt > 200)) { st.layerDirty = true; a.bakedAt = performance.now(); }
     // pilgrim fog: thickest at the seals and pits between strata, so the change is felt before it is seen
     let best = 1e9;
     if (st.placed) st.sectors.forEach(s => { if (s.failed) return; s.portals.forEach((p, n) => { if (!p.cross) return; const d = s.doors[n], dx = s.ox * 3 + d % SW - st.gx, dy = s.oy * 3 + ((d / SW) | 0) - st.gy; const dd = Math.hypot(dx, dy); if (dd < best) best = dd; }); });
@@ -563,12 +586,6 @@
     });
     const ppx = ox + (px + 0.5) * bs, ppy = oy + (py + 0.5) * bs;
     if (!st.map) {
-      // your light, coloured by the stratum
-      g.globalCompositeOperation = 'lighter';
-      const lr = bs * 7, gr = g.createRadialGradient(ppx, ppy, 0, ppx, ppy, lr), l = a.light;
-      gr.addColorStop(0, `rgba(${l[0] | 0},${l[1] | 0},${l[2] | 0},0.07)`); gr.addColorStop(1, `rgba(${l[0] | 0},${l[1] | 0},${l[2] | 0},0)`);
-      g.fillStyle = gr; g.fillRect(ppx - lr, ppy - lr, lr * 2, lr * 2);
-      g.globalCompositeOperation = 'source-over';
       // particles: gold motes among the mazes, spores in the growth, dust in the shrines
       const P = particles(70), fx = a.fx, span = [W / bs, H / bs];
       P.forEach(q => {
@@ -593,7 +610,7 @@
     // pilgrim fog drifting in near the seals
     if (st.fogAmt > 0.01 && !st.map) {
       const f = st.fogAmt, fs = glowSprite('#b9b2d8');
-      g.fillStyle = `rgba(${FOG[0]},${FOG[1]},${FOG[2]},${0.16 * f})`; g.fillRect(0, 0, W, H);
+      g.fillStyle = `rgba(${FOG[0]},${FOG[1]},${FOG[2]},${0.09 * f})`; g.fillRect(0, 0, W, H);
       for (let k = 0; k < 7; k++) {
         const r = Math.max(W, H) * (0.35 + 0.08 * (k % 3)), cx = ((k * 0.37 + time * 0.012 * (1 + k % 2)) % 1.4 - 0.2) * W - px * bs * 0.05 % W;
         const cy = (0.15 + (k * 0.29) % 0.8) * H + Math.sin(time * 0.2 + k) * H * 0.05;
@@ -605,11 +622,9 @@
     if (!vignette) {
       vignette = document.createElement('canvas'); vignette.width = W; vignette.height = H; const v = vignette.getContext('2d');
       const gr = v.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.25, W / 2, H / 2, Math.max(W, H) * 0.75);
-      gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.7)'); v.fillStyle = gr; v.fillRect(0, 0, W, H);
+      gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.78)'); v.fillStyle = gr; v.fillRect(0, 0, W, H);
     }
     g.drawImage(vignette, 0, 0);
-    g.globalCompositeOperation = 'soft-light'; g.fillStyle = css(a.tint); g.globalAlpha = 0.22; g.fillRect(0, 0, W, H);
-    g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
   }
 
   // the sector tree around you: tiers, open doorways, where you have been
@@ -651,8 +666,16 @@
   function hud() {
     const inf = sectorInfo(st.S, st.cs[0], st.cs[1]);
     el.querySelector('.xp-title').innerHTML = `<span style="color:${TIER_COL[inf.type]}">${inf.name}</span>`;
+    // where you are inside the sector: the district's theme and the room (rooms layout)
+    let sub = '';
+    const sc = st.placed && secAt(st.gx, st.gy);
+    if (sc && !sc.failed && sc.rooms) {
+      const i = (st.gy - sc.oy * 3) * SW + (st.gx - sc.ox * 3), r = sc.roomOf[i] >= 0 ? sc.rooms[sc.roomOf[i]] : null, d = sc.districts[sc.distOf[i]];
+      sub = `${d ? d.name : sc.theme.name} · ${r ? r.name : 'corridors'}`;
+    }
+    el.querySelector('.xp-sub').textContent = sub;
     const t = st.started ? performance.now() - st.started : 0, s = Math.floor(t / 1000);
-    el.querySelector('.xp-stats').innerHTML = `<span>sector <b>${st.cs[0]}, ${st.cs[1]}</b></span><span>depth <b>${inf.depth}</b></span><span><b>${st.visited.size}</b> visited</span><span><b>${st.steps}</b> steps</span><span><b>${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}</b></span>`;
+    el.querySelector('.xp-stats').innerHTML = `<span>depth <b>${inf.depth}</b></span><span><b>${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}</b></span>`;
     if (st.placed && !el.querySelector('.toast').hidden && el.querySelector('.toast').textContent.startsWith('Charting') && passAt(st.gx, st.gy) === 1) el.querySelector('.toast').hidden = true;
     if (!el.querySelector('.rules').hidden) rules();
   }

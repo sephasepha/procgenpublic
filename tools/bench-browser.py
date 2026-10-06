@@ -1,4 +1,4 @@
-# Real-time performance in the browser (headless Chromium, phone-sized viewport):
+# Real-time performance in the browser (headless Chromium, a phone held sideways: 844x390 at 3x):
 #   python3 tools/bench-browser.py [url]
 # Opens the infinite world, walks continuously for a while with a held direction, and reports frame rate,
 # per-frame work, view rebuilds, sector generation (WebAssembly or JS) and time to the first sector.
@@ -19,7 +19,7 @@ WALK = """async (ms) => { const st = Infinite.state(), K = (x,y)=>x+','+y, DX=[0
   st.held = []; return Infinite.perf(); }"""
 with sync_playwright() as p:
     b = p.chromium.launch(args=['--enable-gpu-rasterization'])
-    pg = b.new_page(viewport={'width': 390, 'height': 800}, device_scale_factor=2)
+    pg = b.new_page(viewport={'width': 844, 'height': 390}, device_scale_factor=3)  # a phone held sideways
     errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
     t0 = time.time(); pg.goto(url)
     pg.wait_for_function('Infinite.state() && Infinite.state().placed', timeout=60000)

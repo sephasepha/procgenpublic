@@ -8,7 +8,7 @@ Open it on your phone and use **Add to Home Screen** to install it as an app. It
 
 ## Pages
 
-- **Infinite** (`index.html`, the home page): an endless world of sectors that generates around you as you walk. It opens straight into the explorer; the menu button (☰) shows world settings and the other tools.
+- **Infinite** (`index.html`, the home page): an endless world of sectors that generates around you as you walk. It opens straight into a full-screen game view, landscape first: drag anywhere to walk (a thumb-stick appears under your thumb; arrow keys or WASD on a keyboard), round buttons for Light, Map, Tiles, Rules and Perf, the minimap top right, and where you are (stratum, district theme, room) top left. Installed to the home screen it opens full screen in landscape. The menu button (☰) shows world settings and the other tools.
 - **Workbench** (`workbench.html`): the full pipeline for one dungeon in seven stages: hubs → candidate links → progression rules → style field → corridors and maze → WFC → validation. Generic, Arsenal and Underdark presets.
 - **Maze Lab** (`lab.html`): nine classic maze algorithms on a plain grid, with carving replay, overlays and a comparison table.
 - **Tiles** (`tiles.html`): the hand-drawn tilesets and example rooms the dressing WFC learns from, the learned neighbour rules for each tile, and a freshly dressed patch.
@@ -93,7 +93,7 @@ The **Rules** panel in the explorer re-checks these live against every loaded se
 
 ## Real time and WebAssembly
 
-The explorer is a real-time game loop: input is state (held directions plus one buffered tap, so a turn pressed
+The explorer is a real-time game loop, rendered like a game: the view renders at a capped resolution (at most 2x, about 1800 px wide) and is upscaled crisply, and the stratum's tint and your light are baked into the small tile layer rather than blended over the whole screen each frame. Input: input is state (held directions plus one buffered tap, so a turn pressed
 just before a junction is taken there), movement is one tile per step at a constant speed, chained smoothly
 while a direction is held, and the view renders at the display's full rate. Sectors stream in from background
 workers that run the generator in **WebAssembly**:
@@ -110,7 +110,7 @@ workers that run the generator in **WebAssembly**:
 | Metric | Budget | Where |
 | --- | --- | --- |
 | Sector generation p95 (WebAssembly, after warm-up) | < 150 ms | `npm run bench` (Node), Perf panel, browser bench |
-| Frame interval p95 | < 25 ms (60 fps target) | Perf panel, `npm run bench:browser` |
+| Frame interval p95 | < 25 ms (60 fps target) | Perf panel, `npm run bench:browser` (a phone held sideways, 844x390 at 3x) |
 | Main-thread work per frame p95 | < 8 ms | Perf panel, browser bench |
 | First sector ready after opening | < 1.5 s | Perf panel, browser bench |
 | Any single sector (tests) | < 3 s | `tests/world.js` |
