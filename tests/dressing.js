@@ -11,9 +11,12 @@ const t0 = Date.now();
 
 console.log('Tilesets');
 D.DRESS_SETS.forEach(s => {
-  check(s.n <= 32, `${s.key}: ${s.n} variants`);
+  check(s.K <= 3, `${s.key}: ${s.n} variants exceed the 96 the engine supports`);
   ['F', 'E', 'R'].forEach(L => check(s.index[L + '0'] !== undefined, `${s.key}: missing base tile ${L}`));
-  s.variants.forEach((v, i) => { for (let d = 0; d < 4; d++) check(s.allow[d][i] !== 0, `${s.key}: tile ${v.letter}${v.r} has no learned neighbour ${d}`); });
+  // every variant that can actually be placed (it has a context) must have somewhere for its neighbours to go
+  s.variants.forEach((v, i) => { if (!s.classesOf[i].size) return; for (let d = 0; d < 4; d++) check(s.allow[d][i].some(w => w !== 0), `${s.key}: tile ${v.letter}${v.r} has no allowed neighbour ${d}`); });
+  check(s.unplaced.length === 0, `${s.key}: example tiles that do not fit their context: ${s.unplaced.join(' ')}`);
+  ['F', 'C', 'K', 'A', 'R'].forEach(L => check(s.classesOf[s.index[L + '0']].size > 0, `${s.key}: ${L} learned no context`));
 });
 
 console.log('Dressing random layouts');
@@ -30,6 +33,10 @@ D.DRESS_SETS.forEach((s, si) => {
     let bad = 0; for (let i = 0; i < Wd * Hd; i++) if (D.DRESS_TILES[out.tiles[i]].walk !== pass[i]) bad++;
     check(bad === 0, `${s.key} seed ${seed}: ${bad} tiles disagree with the floor/wall layout`);
     check(out.violations <= out.fallbacks * 4, `${s.key} seed ${seed}: ${out.violations} unlearned pairs from ${out.fallbacks} fallbacks`);
+    // structure follows context: every floor with a wall directly north gets a shadow-type tile, every wall facing a floor a face-type tile
+    let wrongFace = 0;
+    for (let y = 1; y < Hd - 1; y++) for (let x = 1; x < Wd - 1; x++) { const i = y * Wd + x, v = D.DRESS_TILES[out.tiles[i]]; if (!pass[i] && pass[i + Wd] && !pass[i - Wd] && !pass[i - 1] && !pass[i + 1] && v.cls !== 4) wrongFace++; }
+    check(wrongFace === 0, `${s.key} seed ${seed}: ${wrongFace} south-facing walls without a face tile`);
     const again = D.dress(pass, setOf, Wd, Hd, seed);
     check(again.tiles.every((t, i) => t === out.tiles[i]), `${s.key} seed ${seed}: not deterministic`);
     fallbacks += out.fallbacks; cells += Wd * Hd;

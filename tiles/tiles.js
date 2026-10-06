@@ -48,7 +48,7 @@
     const W = 33, H = 41, pass = layout(W, H), setOf = new Uint8Array(W * H).fill(cur);
     const t0 = performance.now(), r = dress(pass, setOf, W, H, seed * 131 + cur);
     const ms = performance.now() - t0;
-    drawTiles($('gen'), W, H, (x, y) => DRESS_TILES[r.tiles[y * W + x]]);
+    drawTiles($('gen'), W, H, (x, y) => { const v = DRESS_TILES[r.tiles[y * W + x]], h = cellHash(x, y); return v.spins ? { rgb: v.spins[h & 3] } : v; });
     $('gen').style.width = '100%';
     $('genNote').textContent = `${W}×${H} tiles · ${ms.toFixed(0)} ms · ${r.fallbacks} fallbacks`;
   }
@@ -56,7 +56,7 @@
   function render() {
     const s = DRESS_SETS[cur];
     $('sets').innerHTML = DRESS_SETS.map((t, i) => `<button type="button" data-i="${i}" class="${i === cur ? 'on' : ''}">${t.name}</button>`).join('');
-    $('tilesEyebrow').textContent = `${s.name}: ${Object.keys(s.tiles).length} drawn tiles → ${s.n} learned variants · tap one to see its neighbours`;
+    $('tilesEyebrow').textContent = `${s.name}: ${Object.keys(s.tiles).length} drawn tiles → ${s.n} variants in ${s.classMask.size} contexts · tap one to see its neighbours`;
     // one card per drawn tile (its first rotation)
     const first = {}; s.variants.forEach((v, i) => { if (first[v.letter] === undefined) first[v.letter] = i; });
     const grid = $('tiles'); grid.innerHTML = '';
@@ -65,7 +65,8 @@
       b.type = 'button'; b.className = 'tile' + (sel === i ? ' on' : '');
       const rots = s.variants.filter(x => x.letter === L).length;
       b.appendChild(tileCanvas(v));
-      b.insertAdjacentHTML('beforeend', `<b>${L}</b><span>${v.name}${rots > 1 ? ` · ${rots} rotations` : ''}${v.walk ? '' : ' · solid'}</span>`);
+      const kind = v.strict ? ' · strict' : v.cls !== null ? ' · oriented' : v.spin ? ' · spins' : '';
+      b.insertAdjacentHTML('beforeend', `<b>${L}</b><span>${v.name}${kind}${v.walk ? '' : ' · solid'}</span>`);
       b.onclick = () => { sel = sel === i ? null : i; render(); };
       grid.appendChild(b);
     });
@@ -75,19 +76,21 @@
       for (let d = 0; d < 4; d++) {
         const row = document.createElement('div'); row.className = 'nbr';
         row.innerHTML = `<span>${DIRS[d]}</span><div></div>`;
-        for (let t = 0; t < s.n; t++) if (s.allow[d][sel] >> t & 1) row.lastChild.appendChild(tileCanvas(s.variants[t]));
+        const m = s.allow[d][sel], all = s.variants.every((_, t) => (m[t >> 5] >>> (t & 31)) & 1);
+        if (all || !s.variants[sel].strict) row.lastChild.insertAdjacentHTML('beforeend', '<em class="note">anything (not a strict tile)</em>');
+        else for (let t = 0; t < s.n; t++) if ((m[t >> 5] >>> (t & 31)) & 1) row.lastChild.appendChild(tileCanvas(s.variants[t]));
         nb.appendChild(row);
       }
     }
     // example rooms
     const ex = $('examples'); ex.innerHTML = '';
-    s.examples.forEach(rows => {
+    s.examples.forEach((rows, ei) => {
       const wrap = document.createElement('div'); wrap.style.display = 'grid'; wrap.style.gap = '6px';
       const c = document.createElement('canvas'); c.className = 'pix';
       wrap.appendChild(c);
       const code = document.createElement('div'); code.className = 'code'; code.textContent = rows.join('\n');
       wrap.appendChild(code); ex.appendChild(wrap);
-      drawTiles(c, rows[0].length, rows.length, (x, y) => s.variants[s.index[rows[y][x] + '0']]);
+      drawTiles(c, rows[0].length, rows.length, (x, y) => s.variants[s.exampleIds[ei][y][x]]);
       c.style.width = Math.min(rows[0].length * 20, 340) + 'px';
     });
     generate();

@@ -17,15 +17,18 @@ The Workbench and Maze Lab also have a simple **Explore** mode. Every setting li
 
 ## Dressing: example-driven tile WFC
 
-Each biome has a small tileset of 4×4 pixel tiles and a few example rooms built from them (`gen/dressing.js`). From the examples the generator learns:
+Every cell of a finished layout has a **context** read from the floor/wall pattern around it: a wall with floor below is a south face, a floor with walls left and right is a corridor, and so on (wall faces, outer and inner corners, thin walls, wall ends, pillars, wall shadows, corner shadows, corridors, dead ends, room centres).
 
-- the tiles, with directional ones (a niche, a furnace, a banner) in all four rotations,
-- which tile may sit next to which, in each direction,
-- how often each tile appears.
+Each biome's tileset (`gen/dressing.js`) is a **shared structural kit** drawn in the biome's palette (faces, cracked and coursed faces, corners, thin walls, ends, pillars, floor shadows, corridor edges) plus the biome's own details (niches, sconces, furnaces, pipes, banners, moss, runners, rails, drains, carpets, and 2x2 centrepieces). From hand-drawn example rooms the generator learns, for every tile:
 
-After a sector's layout is finished, a second WFC pass fills every floor sub-cell with a walkable tile and every wall sub-cell with a solid one, so that each neighbouring pair is one that appeared side by side in an example. Plain floor, plain wall and deep rock can always meet, so any layout can be filled, while detail tiles keep the local arrangements of the examples (furnaces only above heat grates, banners only on walls facing a room, and so on).
+- which contexts it appears in, so faces only go on faces, runners in corridors, centrepieces in room centres,
+- its orientation, inferred from context: write a tile's letter anywhere and it turns to face the right way,
+- which tiles may sit next to it: **strict** tiles (centrepiece quarters, furnace and grate, runners) keep exactly their example neighbours, so they assemble and continue properly; other tiles may meet anything,
+- how often it appears.
 
-To add or change art, edit a tileset's `tiles` (4 rows of 4 palette characters each) and draw example rooms as grids of tile letters. In a 3D engine the same learned rules would place modular meshes instead of pixel tiles.
+A WFC pass with backtracking then fills each sector cell by cell. When drawn, plain floor tiles take a random quarter turn and every tile gets a slight brightness jitter, so repeats don't read as repeats.
+
+To add art: draw a tile as four rows of palette characters, give it an `anchor` if it faces a direction, then use its letter in an example room. `node tools/autotile.js` checks the example rooms and rewrites structural letters to match their geometry. In a 3D engine the same learned rules would place modular meshes.
 
 ## Infinite world
 
@@ -54,6 +57,7 @@ gen/world.js        infinite world: sector tree, tiers, border contracts, sector
 infinite/           streaming explorer, generation worker, home page
 gen/dressing.js     tilesets, example rooms, learning, dressing WFC
 tiles/              Tiles page
+tools/autotile.js   authoring helper for example rooms
 assets/           shared styles, icons, service worker registration
 tests/run.js      generator test suite
 ```

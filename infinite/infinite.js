@@ -228,7 +228,8 @@
     const m = Math.round(Math.min(132, r.width * 0.34));
     mini.style.width = m + 'px'; mini.style.height = m + 'px'; mini.width = mini.height = Math.round(m * dpr);
   }
-  const rgba = (c, a) => (255 << 24) | (Math.round(c[2] * a + DARK[2] * (1 - a)) << 16) | (Math.round(c[1] * a + DARK[1] * (1 - a)) << 8) | Math.round(c[0] * a + DARK[0] * (1 - a));
+  const cl = v => v < 0 ? 0 : v > 255 ? 255 : Math.round(v);
+  const rgba = (c, a) => (255 << 24) | (cl(c[2] * a + DARK[2] * (1 - a)) << 16) | (cl(c[1] * a + DARK[1] * (1 - a)) << 8) | cl(c[0] * a + DARK[0] * (1 - a));
   const BLACK = rgba(DARK, 1);
   // paint one sub-cell as a 4x4 tile: the dressing tile if dressing is on, else the flat layout colour
   function paintCell(s, i) {
@@ -237,7 +238,13 @@
     if (!seen) { for (let py = 0; py < TPX; py++) px.fill(BLACK, (y + py) * row + x, (y + py) * row + x + TPX); return; }
     const a = lit ? 1 : (s.pass[i] ? 0.4 : 0.5);
     const tile = st.tiles && s.deco ? DRESS_TILES[s.deco[i]] : null;
-    if (tile) { for (let k = 0; k < 16; k++) px[(y + (k >> 2)) * row + x + (k & 3)] = rgba(tile.rgb[k], a); return; }
+    if (tile) {
+      // render-time variety: plain floors take a random quarter turn, and every tile a slight brightness jitter
+      const h = cellHash(s.sx * SW + (i % SW), s.sy * SH + ((i / SW) | 0));
+      const rgb = tile.spins ? tile.spins[h & 3] : tile.rgb, j = a * (0.93 + ((h >>> 8) & 15) / 15 * 0.12);
+      for (let k = 0; k < 16; k++) px[(y + (k >> 2)) * row + x + (k & 3)] = rgba(rgb[k], j);
+      return;
+    }
     const c = rgba(s.pass[i] ? (s.col[i] < FLOOR.length ? FLOOR[s.col[i]] : OTHER) : WALL, a);
     for (let py = 0; py < TPX; py++) px.fill(c, (y + py) * row + x, (y + py) * row + x + TPX);
   }
