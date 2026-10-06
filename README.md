@@ -97,6 +97,33 @@ The grammar holds globally even though no sector ever sees the whole world:
 
 The **Rules** panel in the explorer re-checks these live against every loaded sector. `tests/world.js` checks them over every sector within a few steps of the start: doorways meet edge to edge, every cell belongs to exactly one sector, floors of two sectors only ever touch at a doorway, and sectors come out identical in any generation order.
 
+## Camp: fire and cooking
+
+The **Camp** button (♨) in the explorer switches to a second screen: a fixed first-person view down at a fire pit
+on the cavern floor. It is two mini-games run by a small simulation (`camp/sim.js`, no DOM, tested in
+`tests/camp.js`), and it is entirely diegetic: no bars or menus, only things in the scene.
+
+- **Making and keeping a fire.** Drag tinder, kindling and fuel from the kit cloth onto the floor and draw the
+  striker over the tinder. Every piece has a temperature and a remaining mass; its temperature relaxes towards
+  what the flames around it give, its own flame if it burns, less what cold mass beside it soaks up. Burning
+  needs air, and packing things together takes it away. So tinder lights kindling laid around it; a log on a
+  bed of burning kindling catches; a lone log dies; logs in pairs keep each other going; and heaping on kindling
+  or fuel, or dropping a log on a small flame, smothers the fire, which then has to be laid and struck again.
+  Burnt-out pieces leave embers that fade over a minute or so. A tended fire burns for as long as you feed it.
+- **Cooking.** Put out the pot, pan or skewer and drag ingredients onto it. A vessel's temperature follows the heat
+  where it stands: right over the flames a pan burns its contents in seconds, at the edge it fries them, too far
+  and nothing happens. A pot holds at the boil while it has water and scorches once it boils dry. Juggling the
+  vessels while feeding the fire is the game.
+- **Eating.** Draw a vessel to your hands at the bottom of the view. Raw food is dangerous, cooked food is barely
+  edible, burnt food hurts. 20 base ingredients across six themes (cosmic, growth, shrine, deep, pilgrim...) make
+  10 dishes, each a vessel and an exact set of ingredients, cooked and not burnt, for a bonus.
+- **The body.** Five charms hang at the edge of sight: a blood vial (health), the soul lantern (SOUL), a bowl
+  (hunger), a waterskin (thirst) and a candle stub (exhaustion). Hunger and thirst grow with time; resting by a
+  burning fire eases exhaustion and feeds the soul; the cold dark does the opposite.
+- **Everything else is in the scene too:** counts are tally notches on the cloths, cooking shows as browning,
+  steam, bubbles and smoke, the sack beside the pit is foraging, the tunnel in the wall is the way back, and
+  touching anything leaves a scrawled paper note about it.
+
 ## Real time and WebAssembly
 
 The explorer is a real-time game loop, rendered like a game: the view renders at a capped resolution (at most 2x, about 1800 px wide) and is upscaled crisply, and the stratum's tint and your light are baked into the small tile layer rather than blended over the whole screen each frame. Input: input is state (held directions plus one buffered tap, so a turn pressed
@@ -137,6 +164,7 @@ gen/world.js        infinite world: sector tree, tiers, border contracts, sector
 infinite/           streaming explorer, generation worker, home page
 gen/dressing.js     tilesets, example rooms, materials, learning, dressing WFC
 gen/rooms.js        room-based sector layout: themes, room grammar, suites, districts, crossings
+camp/               the camp screen: data (fire, vessels, 20 ingredients, dishes), simulation, view
 gen/wasm.js         loads wasm/gen.wasm and swaps in the WebAssembly kernels
 wasm/               C sources of the WebAssembly kernels and build.sh
 tools/bench.js, tools/bench-browser.py, tools/profile.js   performance tracking

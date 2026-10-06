@@ -215,3 +215,8 @@ html.xp-open, html.xp-open body { overflow: hidden; }
   .inf .xp-act { width: 48px; height: 48px; }
   .inf .xp-act span { font-size: 0.52rem; }
 }
+
+/* ---------- Camp: the fire and cooking screen (everything drawn in the scene; notes are scraps of paper) ---------- */
+.camp { position: fixed; inset: 0; z-index: 60; background: #050408; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.camp canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; touch-action: none; }
+.camp-note { position: absolute; width: 220px; padding: 10px 12px 12px; background: #d9ccae; color: #2a2018; font-family: var(--f-display); font-size: 0.95rem; line-height: 1.25; border-radius: 2px; transform: rotate(-1.5deg); box-shadow: 0 6px 18px rgba(0,0,0,0.6); pointer-events: none; background-image: linear-gradient(rgba(120,90,50,0.08) 1px, transparent 1px); background-size: 100% 1.25em; }

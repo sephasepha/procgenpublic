@@ -102,6 +102,7 @@
         <button class="xp-act on" data-x="tiles" type="button" aria-pressed="true"><b>▦</b><span>Tiles</span></button>
         <button class="xp-act" data-x="rules" type="button" aria-pressed="false"><b>✓</b><span>Rules</span></button>
         <button class="xp-act" data-x="perf" type="button" aria-pressed="false"><b>⏱</b><span>Perf</span></button>
+        <button class="xp-act camp-btn" data-x="camp" type="button"><b>♨</b><span>Camp</span></button>
       </div>
       <div class="toast" role="status" aria-live="polite" hidden></div>
       <div class="rules" hidden></div>
@@ -139,6 +140,7 @@
       if (k === 'rules') { const r = el.querySelector('.rules'); r.hidden = !r.hidden; on(!r.hidden); if (!r.hidden) rules(); }
       if (k === 'perf') { const r = el.querySelector('.perf'); r.hidden = !r.hidden; on(!r.hidden); }
       if (k === 'full') { if (document.fullscreenElement) document.exitFullscreen?.(); else goFull(true); }
+      if (k === 'camp' && root.Camp) { suspend(); Camp.open(resume); return; }
       st.redraw = true; st.layerDirty = true;
     });
     const KEYS = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3, w: 0, d: 1, s: 2, a: 3 };
@@ -187,6 +189,9 @@
     askedFull = true;
     document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => screen.orientation?.lock?.('landscape').catch(() => {})).catch(() => {});
   }
+  // another screen (the camp) takes over: keep the world as it is and pick it up again on return
+  function suspend() { el.hidden = true; if (st) { cancelAnimationFrame(st.raf); st.raf = 0; st.held = []; } }
+  function resume() { el.hidden = false; document.documentElement.classList.add('xp-open'); size(); if (st) { st.layerDirty = true; if (!st.raf) loop(); } }
   function close() { if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); el.hidden = true; document.documentElement.classList.remove('xp-open'); if (st) { cancelAnimationFrame(st.raf); st.raf = 0; } }
   function place() {
     const s = st.sectors.get('0,0');
@@ -740,5 +745,5 @@
       row('long frames (> 50 ms)', p.drops, p.drops < 5);
   }
 
-  root.Infinite = { open, close, state: () => st, perf: () => st && perfSummary(), move };
+  root.Infinite = { open, close, suspend, resume, state: () => st, perf: () => st && perfSummary(), move };
 })(window);

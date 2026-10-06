@@ -1,0 +1,201 @@
+// Camp simulation: the fire, the vessels on it, and the body eating from them. No DOM; tests/camp.js runs it.
+//
+// The floor is a plane in metres (x across, z away from you); the fire pit is a ring at PIT.
+// Fire: every piece of tinder, kindling or fuel has a temperature and a remaining mass. Burning pieces give off
+// heat that warms their neighbours (radiation falls off with distance, conduction only at touching range), and
+// a piece catches when it reaches its ignition temperature. Burning needs air: the more mass is packed around a
+// piece, the less oxygen it gets, so heaping on kindling or fuel smothers the fire, and a cold log dropped on a
+// small flame drains its heat away. A fire that goes out has to be laid and struck again.
+// Cooking: a vessel's temperature follows the heat at its spot on the floor; ingredients cook while it is hot
+// enough and scorch when it is too hot. A pot holds at a boil while it has water; dry, it climbs and scorches.
+(function (root) {
+  const isNode = typeof module !== 'undefined' && module.exports && typeof window === 'undefined';
+  const DATA = isNode ? require('./data.js') : root;
+  const FIRE = DATA.CAMP_FIRE, VESSELS = DATA.CAMP_VESSELS, ING = DATA.CAMP_INGREDIENTS, DISHES = DATA.CAMP_DISHES, STATS = DATA.CAMP_STATS;
+
+  const PIT = { x: 0, z: 2.0, r: 0.34 };
+  const AMBIENT = 12;
+  const P = { // fire tuning: temperatures relax towards targets set by the flames around each piece
+    reach: 0.07,        // a flame's heat halves at this distance (m)
+    sink: 360,          // degrees a kilogram of cold, unlit mass at touching range takes off a piece's target
+    sinkReach: 0.03,    // ...falling to half at this distance: a log laid on a flame drains it, one beside it hardly
+    crowdR: 0.085,      // packing radius (m)
+    airFor: 2.0,        // packed mass (kg) at which air is halved
+    catchAir: 0.4,      // needs at least this much air to catch
+    outAir: 0.16,       // goes out below this much air
+    outAt: 0.62,        // goes out when it cools below this share of its ignition temperature
+    vesselReach: 0.12,  // a vessel feels flames to this distance (half-heat)
+    ember: 0.6,         // a burnt-out piece glows at this share of its flame...
+    emberLife: { tinder: 8, kindling: 40, fuel: 90 }, // ...fading over this many seconds
+  };
+  const near = (a, b, r) => Math.hypot(a.x - b.x, a.z - b.z) / r;
+  function createCamp(seed) {
+    return {
+      t: 0, seed: seed || 1, pieces: [], vessels: [], sparks: [],
+      stats: { health: 82, soul: 64, hunger: 46, thirst: 42, exhaustion: 38 },
+      stock: { tinder: 6, kindling: 12, fuel: 6, ...Object.fromEntries(Object.keys(ING).map(k => [k, 2])) },
+      log: [], nextId: 1,
+    };
+  }
+
+  // ---------- fire ----------
+  function placePiece(c, kind, x, z) {
+    if (!FIRE[kind] || c.stock[kind] <= 0) return null;
+    c.stock[kind]--;
+    const k = FIRE[kind], p = { id: c.nextId++, kind, x, z, T: AMBIENT, m: k.mass, m0: k.mass, burning: false, ash: false, out: false, smoke: 0 };
+    c.pieces.push(p); return p;
+  }
+  function movePiece(c, id, x, z) { const p = c.pieces.find(q => q.id === id); if (p) { p.x = x; p.z = z; } return p; }
+  // an unburnt piece goes back in the kit; anything else is swept away
+  function removePiece(c, id) {
+    const k = c.pieces.findIndex(q => q.id === id); if (k < 0) return false;
+    const p = c.pieces[k]; c.pieces.splice(k, 1);
+    if (!p.burning && p.m > p.m0 * 0.9) c.stock[p.kind]++;
+    return true;
+  }
+  // strike over a point: sparks heat the tinder there a lot, anything else a little
+  function strike(c, x, z) {
+    let hit = 0;
+    c.pieces.forEach(p => {
+      const d = Math.hypot(p.x - x, p.z - z); if (d > 0.14 || p.ash) return;
+      const f = 1 - d / 0.14, k = p.kind === 'tinder' ? 260 : p.kind === 'kindling' ? 45 : 8;
+      p.T += k * f; hit++;
+    });
+    c.sparks.push({ x, z, t: c.t });
+    return hit;
+  }
+  // a burning piece's flame: its kind's flame heat, scaled by its vigour (air, and how hot it is running)
+  // what a burnt-out piece leaves behind keeps glowing for a while: an ember bed that feeds logs and cooks food
+  function output(p) { return p.burning ? FIRE[p.kind].flame * p.vigour : p.ash ? (p.ember || 0) : 0; }
+  function airAt(c, p) {
+    let packed = 0;
+    c.pieces.forEach(q => { if (q.ash) return; const u = near(p, q, P.crowdR); packed += q.m * Math.exp(-u * u); });
+    return 1 / (1 + Math.pow(packed / P.airFor, 3));
+  }
+  const g = (d, r) => 1 / (1 + (d / r) ** 2);
+  function stepFire(c, dt) {
+    const ps = c.pieces;
+    ps.forEach(p => { p.air = p.ash ? 1 : airAt(c, p); if (p.vigour === undefined) p.vigour = 0; });
+    const out = ps.map(output);
+    ps.forEach((p, i) => {
+      if (p.ash) { p.T += (AMBIENT - p.T) * Math.min(1, dt * 0.05); p.ember = (p.ember || 0) * Math.exp(-dt / P.emberLife[p.kind]); return; }
+      const k = FIRE[p.kind];
+      // target temperature: the flames around it, its own flame, less what the cold mass around it soaks up
+      let target = AMBIENT + out[i] * k.self;
+      ps.forEach((o, j) => {
+        if (i === j || (o.ash && !(out[j] > 0))) return;
+        const d = Math.hypot(p.x - o.x, p.z - o.z);
+        if (out[j] > 0) target += out[j] * g(d, P.reach);
+        else target -= P.sink * o.m * g(d, P.sinkReach) * Math.max(0, 1 - o.T / Math.max(1, p.T));
+      });
+      p.target = Math.max(AMBIENT, Math.min(950, target));
+      p.T += (p.target - p.T) * Math.min(1, dt / k.tau);
+    });
+    ps.forEach(p => {
+      if (p.ash) return;
+      const k = FIRE[p.kind];
+      if (!p.burning && p.T >= k.ignite && p.air >= P.catchAir && p.m > 0) { p.burning = true; p.out = false; }
+      if (p.burning && (p.T < k.ignite * (k.outAt || P.outAt) || p.air < P.outAir)) { p.burning = false; p.out = true; } // snuffed: it smoulders and smokes
+      p.vigour = p.burning ? p.air * Math.min(1.25, Math.max(0.5, p.T / k.ignite)) : 0;
+      p.m -= (p.burning ? k.burn * p.vigour : 0) * dt;
+      p.smoke = Math.max(0, p.smoke - dt * 0.4) + (p.T > k.ignite * 0.45 && (!p.burning || p.air < 0.45) ? dt * 0.8 : 0);
+      if (p.m <= 0.002) { p.m = 0; p.burning = false; p.ash = true; p.vigour = 0; p.ember = k.flame * P.ember; }
+    });
+    c.sparks = c.sparks.filter(s => c.t - s.t < 0.6);
+  }
+  // heat at a point on the floor (what a vessel feels), and the fire's total output
+  function heatAt(c, x, z) {
+    let h = 0; c.pieces.forEach(p => { const o = output(p); if (o > 0) h += o * g(Math.hypot(p.x - x, p.z - z), P.vesselReach); });
+    return h;
+  }
+  const fireOutput = c => c.pieces.reduce((a, p) => a + output(p), 0);
+  const burning = c => c.pieces.some(p => p.burning);
+
+  // ---------- vessels and cooking ----------
+  function placeVessel(c, type, x, z) {
+    if (!VESSELS[type] || c.vessels.some(v => v.type === type)) return null;
+    const v = { id: c.nextId++, type, x, z, T: AMBIENT, water: 0, items: [], scorch: 0 };
+    c.vessels.push(v); return v;
+  }
+  function moveVessel(c, id, x, z) { const v = c.vessels.find(q => q.id === id); if (v) { v.x = x; v.z = z; } return v; }
+  function addToVessel(c, id, ing) {
+    const v = c.vessels.find(q => q.id === id), I = ING[ing];
+    if (!v || !I || c.stock[ing] <= 0) return false;
+    if (I.only && !I.only.includes(v.type)) return false;
+    if (v.items.length >= VESSELS[v.type].cap) return false;
+    c.stock[ing]--;
+    if (I.water) v.water += 1;
+    v.items.push({ id: ing, progress: 0, scorch: 0 });
+    return true;
+  }
+  function stepVessels(c, dt) {
+    c.vessels.forEach(v => {
+      const V = VESSELS[v.type], h = heatAt(c, v.x, v.z);
+      v.T += (AMBIENT + h * V.gain - v.T) * Math.min(1, dt / V.tau);
+      if (V.boils && v.water > 0 && v.T > 100) { v.water = Math.max(0, v.water - (v.T - 100) * 0.0035 * dt); v.T = 100; } // at a boil: the water goes, not the heat
+      v.T = Math.max(AMBIENT, v.T);
+      const cookRate = Math.max(0, Math.min(1.5, (v.T - 68) / 55));
+      const scorch = Math.max(0, v.T - V.burnAt) / 90;
+      v.items.forEach(it => {
+        const I = ING[it.id];
+        it.progress += cookRate / I.cook * dt;
+        if (!I.water) it.scorch += scorch * 0.06 * dt;
+      });
+      v.scorch = v.items.length ? Math.max(...v.items.map(it => it.scorch)) : 0;
+    });
+  }
+  // how a vessel's contents stand: raw / underdone / cooked / burnt, and the dish they make if any
+  function judge(v) {
+    if (!v.items.length) return { state: 'empty' };
+    const minP = Math.min(...v.items.map(it => it.progress)), burnt = v.scorch >= 0.35;
+    const ids = v.items.map(it => it.id).sort().join(','), dish = DISHES.find(d => d.vessel === v.type && d.items.slice().sort().join(',') === ids);
+    return { state: burnt ? 'burnt' : minP >= 1 ? 'cooked' : minP >= 0.5 ? 'underdone' : 'raw', dish: dish && !burnt && minP >= 1 ? dish : null, possible: dish || null };
+  }
+  // eat everything in a vessel: raw effects fade into cooked effects as it cooks; burnt food hurts
+  function eat(c, id) {
+    const k = c.vessels.findIndex(q => q.id === id); if (k < 0) return null;
+    const v = c.vessels[k], j = judge(v); if (j.state === 'empty') return null;
+    const fx = Object.fromEntries(STATS.map(s => [s, 0]));
+    v.items.forEach(it => {
+      const I = ING[it.id], w = Math.max(0, Math.min(1, it.progress));
+      STATS.forEach(s => { fx[s] += (I.raw[s] || 0) * (1 - w) + (I.cooked[s] || 0) * w; });
+      if (it.scorch >= 0.35) { STATS.forEach(s => { fx[s] *= 0.75; }); fx.health -= 8 * Math.min(2, it.scorch); fx.thirst += 4; }
+    });
+    if (j.dish) STATS.forEach(s => { fx[s] += j.dish.bonus[s] || 0; });
+    applyStats(c, fx);
+    v.items = []; v.water = 0; v.scorch = 0;
+    c.log.push({ t: c.t, ate: j.dish ? j.dish.name : j.state, fx });
+    return { fx, judged: j };
+  }
+  function removeVessel(c, id) { const k = c.vessels.findIndex(q => q.id === id); if (k < 0) return false; c.vessels.splice(k, 1); return true; }
+
+  // ---------- the body ----------
+  function applyStats(c, fx) { STATS.forEach(s => { c.stats[s] = Math.max(0, Math.min(100, c.stats[s] + (fx[s] || 0))); }); }
+  function stepBody(c, dt) {
+    const m = dt / 60, warm = burning(c), S = c.stats;
+    S.hunger += 2.4 * m; S.thirst += 3.2 * m;
+    S.exhaustion += (warm ? -2.5 : 1.2) * m;   // resting by a fire restores you; the cold dark does not
+    S.soul += (warm ? 0.8 : -1.0) * m;
+    if (S.hunger > 85) S.health -= 1.5 * m;
+    if (S.thirst > 85) S.health -= 2.5 * m;
+    if (S.soul < 10) S.health -= 1 * m;
+    if (S.hunger < 50 && S.thirst < 50) S.health += 0.6 * m;
+    STATS.forEach(s => { S[s] = Math.max(0, Math.min(100, S[s])); });
+  }
+  // rummage in the sack: a few things turn up, and it tires you
+  function forage(c) {
+    let r = (c.seed * 9301 + c.nextId * 49297 + Math.floor(c.t * 7)) % 233280;
+    const rnd = () => { r = (r * 9301 + 49297) % 233280; return r / 233280; };
+    const keys = Object.keys(c.stock), got = [];
+    for (let k = 0; k < 4; k++) { const key = keys[Math.floor(rnd() * keys.length)]; c.stock[key]++; got.push(key); }
+    c.stock.tinder += 1; c.stock.kindling += 2; got.push('tinder', 'kindling');
+    applyStats(c, { exhaustion: 7, hunger: 2, thirst: 2 });
+    c.nextId++;
+    return got;
+  }
+
+  function step(c, dt) { c.t += dt; stepFire(c, dt); stepVessels(c, dt); stepBody(c, dt); }
+
+  const api = { CAMP_PIT: PIT, CAMP_TUNING: P, createCamp, placePiece, movePiece, removePiece, strike, step, heatAt, fireOutput, burning, placeVessel, moveVessel, addToVessel, removeVessel, judge, eat, forage, applyStats };
+  if (isNode) module.exports = api; else root.CampSim = api;
+})(typeof window !== 'undefined' ? window : globalThis);
