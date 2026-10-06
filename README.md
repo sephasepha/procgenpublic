@@ -124,6 +124,12 @@ on the cavern floor. It is two mini-games run by a small simulation (`camp/sim.j
   steam, bubbles and smoke, the sack beside the pit is foraging, the tunnel in the wall is the way back, and
   touching anything leaves a scrawled paper note about it.
 
+## Screens bar
+
+Along the bottom of every game screen is a bar for moving between the three screens at any time: **Delve** (the
+world), **Camp** and **Body**. Keys 1, 2 and 3 do the same. The Camp tab glows while the fire is alight, and the Body
+tab shows how many afflictions have taken hold. The world keeps its place while you are away.
+
 ## Body: afflictions and treatment
 
 The ✚ Body button opens the second screen beside the camp: a table by candlelight with **The Pilgrim's Body**, an

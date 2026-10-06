@@ -195,7 +195,7 @@ html.xp-open, html.xp-open body { overflow: hidden; }
 .inf .xp-stats b { color: var(--text); font-weight: 500; }
 .inf .xp-round { appearance: none; width: 42px; height: 42px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.16); background: rgba(17,19,24,0.62); color: var(--text); font-size: 1.05rem; cursor: pointer; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); flex: none; }
 .inf .xp-round.small { width: 32px; height: 32px; font-size: 0.9rem; }
-.inf .hud-br { right: calc(env(safe-area-inset-right, 0px) + 12px); bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); display: grid; grid-template-columns: repeat(7, auto); gap: 8px; }
+.inf .hud-br { right: calc(env(safe-area-inset-right, 0px) + 12px); bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); display: grid; grid-template-columns: repeat(5, auto); gap: 8px; }
 .inf .xp-act { appearance: none; width: 54px; height: 54px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.16); background: rgba(17,19,24,0.6); color: rgba(230,225,213,0.85); display: grid; place-items: center; align-content: center; gap: 0; cursor: pointer; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: 0; }
 .inf .xp-act b { font-size: 1.1rem; font-weight: 400; line-height: 1; }
 .inf .xp-act span { font-family: var(--f-mono); font-size: 0.56rem; letter-spacing: 0.06em; text-transform: uppercase; margin-top: 3px; }
@@ -215,6 +215,25 @@ html.xp-open, html.xp-open body { overflow: hidden; }
   .inf .xp-act { width: 48px; height: 48px; }
   .inf .xp-act span { font-size: 0.52rem; }
 }
+
+/* ---------- The screens bar: along the bottom of every game screen ---------- */
+:root { --navh: calc(44px + env(safe-area-inset-bottom, 0px)); }
+.screens { display: none; position: fixed; left: 0; right: 0; bottom: 0; height: var(--navh); padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); z-index: 80; justify-content: center; align-items: stretch; gap: 4px; background: linear-gradient(rgba(10,10,14,0.82), rgba(6,6,9,0.96)); border-top: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); user-select: none; -webkit-user-select: none; }
+html.xp-open .screens { display: flex; }
+.screens button { appearance: none; position: relative; display: flex; align-items: center; gap: 8px; min-width: 104px; justify-content: center; padding: 0 18px; border: 0; background: none; color: rgba(230,225,213,0.6); cursor: pointer; font: inherit; }
+.screens button b { font-size: 1.05rem; font-weight: 400; line-height: 1; }
+.screens button span { font-family: var(--f-mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; }
+.screens button::after { content: ''; position: absolute; left: 22%; right: 22%; top: 0; height: 2px; border-radius: 0 0 2px 2px; background: transparent; }
+.screens button.on { color: var(--brass); }
+.screens button.on::after { background: var(--brass); box-shadow: 0 0 10px rgba(243,211,107,0.6); }
+.screens button:hover:not(.on) { color: rgba(230,225,213,0.9); }
+.screens button.lit b { color: #ff9a40; text-shadow: 0 0 8px rgba(255,140,50,0.8); animation: ember 1.6s ease-in-out infinite alternate; }
+@keyframes ember { from { opacity: 0.75; } to { opacity: 1; } }
+.screens button i { margin-left: -2px; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 8px; background: #8a1424; color: #f0e0d0; font: 600 0.6rem/15px var(--f-mono); font-style: normal; text-align: center; }
+html.has-screens .inf .hud-br { bottom: calc(var(--navh) + 10px); }
+html.has-screens .inf .xp-hint { bottom: calc(var(--navh) + 84px); }
+html.has-screens .camp { bottom: var(--navh); }
+@media (orientation: landscape) and (max-height: 500px) { :root { --navh: calc(40px + env(safe-area-inset-bottom, 0px)); } }
 
 /* ---------- Camp: the fire and cooking screen (everything drawn in the scene; notes are scraps of paper) ---------- */
 .camp { position: fixed; inset: 0; z-index: 60; background: #050408; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }

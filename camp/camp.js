@@ -95,7 +95,7 @@
   }
   function size() {
     const r = el.getBoundingClientRect(), aspect = r.width / Math.max(1, r.height);
-    LH = 270; LW = Math.max(300, Math.min(640, Math.round(LH * aspect)));
+    LH = 270; LW = Math.max(300, Math.min(760, Math.round(LH * aspect)));
     if (aspect < 1) { LW = 360; LH = Math.round(LW / aspect); } // portrait: taller scene, same width
     cv.width = LW; cv.height = LH; g.imageSmoothingEnabled = false;
     // looking down at the pit: the horizon sits above the frame, the pit a little below the middle
@@ -118,9 +118,9 @@
     if (!raf) { last = performance.now(); raf = requestAnimationFrame(loop); }
     note('The fire pit. Lay tinder in the ring, kindling around it, then strike.', LW / 2, LH * 0.35, 4200);
   }
-  function leave() {
+  function leave(silent) { // silent: another screen is taking over, so don't hand back to the world
     el.hidden = true; cancelAnimationFrame(raf); raf = 0; if (st) save();
-    if (onLeave) onLeave();
+    if (onLeave && silent !== true) onLeave();
   }
 
   // ---------- notes: scraps of paper, the only words in the scene ----------

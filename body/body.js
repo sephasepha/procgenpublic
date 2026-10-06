@@ -28,7 +28,7 @@
   }
   function size() {
     const r = el.getBoundingClientRect(), aspect = r.width / Math.max(1, r.height);
-    LH = 270; LW = Math.max(300, Math.min(640, Math.round(LH * aspect)));
+    LH = 270; LW = Math.max(300, Math.min(760, Math.round(LH * aspect)));
     if (aspect < 1) { LW = 360; LH = Math.round(LW / aspect); }
     cv.width = LW; cv.height = LH; g.imageSmoothingEnabled = false;
     // the chart: a sheet of parchment in the middle of the table
@@ -56,7 +56,7 @@
     if (!raf) { last = performance.now(); raf = requestAnimationFrame(loop); }
     if (!st.b.afflictions.length) note('The Pilgrim\'s Body. Nothing has taken hold of you yet. The bones will tell you what does.', LW / 2, LH * 0.35, 4500);
   }
-  function leave() { el.hidden = true; cancelAnimationFrame(raf); raf = 0; save(); const c = camp(); if (c && root.Camp) Camp.save(); if (onLeave) onLeave(); }
+  function leave(silent) { el.hidden = true; cancelAnimationFrame(raf); raf = 0; save(); const c = camp(); if (c && root.Camp) Camp.save(); if (onLeave && silent !== true) onLeave(); }
 
   let noteTimer = null;
   function note(text, x, y, ms) {
