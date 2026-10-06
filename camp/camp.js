@@ -102,13 +102,17 @@
     H0 = -Math.round(LH * 0.6); F = (LH * 0.55 - H0) * PIT.z / H_CAM; CX = LW / 2;
     buildFloor(); st.L = layout();
   }
-  function open(leaveFn) {
-    ui(); onLeave = leaveFn;
+  // the camp's state exists whether or not the camp is open: the body screen reads and drains the same stats
+  function ensure() {
     if (!st) {
       const c = S.createCamp(1), saved = load();
       if (saved) { Object.assign(c.stats, saved.stats); Object.assign(c.stock, saved.stock); }
       st = { c, L: null, saveAt: 0 };
     }
+    return st.c;
+  }
+  function open(leaveFn) {
+    ui(); onLeave = leaveFn; ensure();
     el.hidden = false; document.documentElement.classList.add('xp-open');
     size();
     if (!raf) { last = performance.now(); raf = requestAnimationFrame(loop); }
@@ -238,6 +242,7 @@
       if (v.type === 'pot' && v.water > 0 && v.T >= 99 && Math.random() < dt * 10) emit('bubble', v.x + (Math.random() - 0.5) * 0.08, v.z, 0.1, 1);
       if (v.scorch > 0.1 && Math.random() < dt * 6) emit('smoke', v.x, v.z, 0.12, 1);
     });
+    if (root.Body && Body.tick) Body.tick(dt); // what is eating you keeps eating while you cook
     stepParts(dt);
     if (t - st.saveAt > 5000) { st.saveAt = t; save(); }
     draw(t / 1000);
@@ -281,7 +286,7 @@
     const dark = g.createRadialGradient(px, py - 10, 20 + 90 * glow, px, py, LW * 0.75);
     dark.addColorStop(0, 'rgba(4,3,8,0)'); dark.addColorStop(1, `rgba(4,3,8,${0.85 - 0.25 * glow})`);
     g.fillStyle = dark; g.fillRect(0, 0, LW, LH);
-    drawCloths(); drawHands(); drawCharms(time);
+    drawCloths(); drawHands(); drawCharms(g, st.L.charms, c.stats, time);
     // what is being dragged from a cloth
     if (drag && drag.from === 'slot' && drag.moved) {
       const k = drag.key, art = FIRE[k] || (k === 'striker' ? STRIKER : null) || VES[k] || ING[k];
@@ -347,8 +352,8 @@
     if (drag && drag.from === 'vessel' && drag.moved) { g.strokeStyle = 'rgba(243,211,107,0.5)'; g.strokeRect(b.x, b.y, b.w, b.h); }
   }
   // the five charms: a blood vial, the soul lantern, a bowl, a waterskin and a candle stub, hung from a cord
-  function drawCharms(time) {
-    const c = st.c, L = st.L;
+  function drawCharms(gg, charms, stats, time) {
+    const g = gg, L = { charms }, c = { stats };
     g.strokeStyle = '#4a4038'; g.beginPath(); g.moveTo(0, 6); L.charms.forEach(b => g.lineTo(b.x + b.w / 2, b.y - 2)); g.stroke();
     L.charms.forEach(b => {
       const v = c.stats[b.key], x = b.x, y = b.y, w = b.w, h = b.h, sway = Math.round(Math.sin(time * 1.1 + b.x) * 0.6);
@@ -362,5 +367,5 @@
     });
   }
 
-  root.Camp = { open, leave, state: () => st };
+  root.Camp = { open, leave, state: () => st, shared: ensure, save: () => { if (st) save(); }, drawCharms };
 })(window);

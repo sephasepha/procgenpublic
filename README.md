@@ -124,6 +124,25 @@ on the cavern floor. It is two mini-games run by a small simulation (`camp/sim.j
   steam, bubbles and smoke, the sack beside the pit is foraging, the tunnel in the wall is the way back, and
   touching anything leaves a scrawled paper note about it.
 
+## Body: afflictions and treatment
+
+The ✚ Body button opens the second screen beside the camp: a table by candlelight with **The Pilgrim's Body**, an
+anatomical chart on which whatever has taken hold of you shows as living ink. Like the camp, everything is diegetic:
+no meters or menus, only the chart, the surgeon's roll of tools, the omen bones, an hourglass and the same five charms.
+
+- **Ten afflictions** (`body/data.js`), each with three stages: Star-Rot, the Whispering Cyst, Glyph-Burn, the Lantern
+  Gaze (head only), Bloom, the Pale Leech (limbs), the Bone Choir (limbs), Tide-Lung (torso), the Hollow Hunger
+  (torso) and the Fade. Every stage has its own look on the chart, a drain on health, SOUL, hunger, thirst and
+  exhaustion, the minutes before it worsens, and a chance per minute to **spread to a neighbouring part**.
+- **Treatment** is an exact sequence of tools for the stage: drag a tool from the roll onto a part. Ink ticks mark
+  the steps done; the last step cures it. A wrong tool hurts (health and SOUL) and is wasted. If a stage advances
+  mid-treatment, the treatment starts over. The **cautery iron** only works while the camp fire is burning.
+- **Twelve tools**: knife, tweezers, cautery, hymnal and blindfold, plus limited spirits, salt, moss, thread, wax,
+  splint and gauze (tally notches show how many are left).
+- **The omen bones** roll on the ailment table. **The hourglass** lets five minutes pass for both the body and the camp.
+- The stats are shared with the camp, and both keep running: afflictions go on draining you while you cook, and the
+  fire goes on burning while you treat yourself. `tests/body.js` covers progression, spread, treatment and the table.
+
 ## Real time and WebAssembly
 
 The explorer is a real-time game loop, rendered like a game: the view renders at a capped resolution (at most 2x, about 1800 px wide) and is upscaled crisply, and the stratum's tint and your light are baked into the small tile layer rather than blended over the whole screen each frame. Input: input is state (held directions plus one buffered tap, so a turn pressed

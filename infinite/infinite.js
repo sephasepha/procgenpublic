@@ -103,6 +103,7 @@
         <button class="xp-act" data-x="rules" type="button" aria-pressed="false"><b>✓</b><span>Rules</span></button>
         <button class="xp-act" data-x="perf" type="button" aria-pressed="false"><b>⏱</b><span>Perf</span></button>
         <button class="xp-act camp-btn" data-x="camp" type="button"><b>♨</b><span>Camp</span></button>
+        <button class="xp-act body-btn" data-x="body" type="button"><b>✚</b><span>Body</span></button>
       </div>
       <div class="toast" role="status" aria-live="polite" hidden></div>
       <div class="rules" hidden></div>
@@ -141,6 +142,7 @@
       if (k === 'perf') { const r = el.querySelector('.perf'); r.hidden = !r.hidden; on(!r.hidden); }
       if (k === 'full') { if (document.fullscreenElement) document.exitFullscreen?.(); else goFull(true); }
       if (k === 'camp' && root.Camp) { suspend(); Camp.open(resume); return; }
+      if (k === 'body' && root.Body) { suspend(); Body.open(resume); return; }
       st.redraw = true; st.layerDirty = true;
     });
     const KEYS = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3, w: 0, d: 1, s: 2, a: 3 };

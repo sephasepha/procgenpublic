@@ -195,7 +195,7 @@ html.xp-open, html.xp-open body { overflow: hidden; }
 .inf .xp-stats b { color: var(--text); font-weight: 500; }
 .inf .xp-round { appearance: none; width: 42px; height: 42px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.16); background: rgba(17,19,24,0.62); color: var(--text); font-size: 1.05rem; cursor: pointer; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); flex: none; }
 .inf .xp-round.small { width: 32px; height: 32px; font-size: 0.9rem; }
-.inf .hud-br { right: calc(env(safe-area-inset-right, 0px) + 12px); bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); display: grid; grid-template-columns: repeat(5, auto); gap: 8px; }
+.inf .hud-br { right: calc(env(safe-area-inset-right, 0px) + 12px); bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); display: grid; grid-template-columns: repeat(7, auto); gap: 8px; }
 .inf .xp-act { appearance: none; width: 54px; height: 54px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.16); background: rgba(17,19,24,0.6); color: rgba(230,225,213,0.85); display: grid; place-items: center; align-content: center; gap: 0; cursor: pointer; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: 0; }
 .inf .xp-act b { font-size: 1.1rem; font-weight: 400; line-height: 1; }
 .inf .xp-act span { font-family: var(--f-mono); font-size: 0.56rem; letter-spacing: 0.06em; text-transform: uppercase; margin-top: 3px; }
