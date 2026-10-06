@@ -4,7 +4,7 @@
   const S = { ...WORLD_DEFAULTS };
   const TIER_COL = ['#a8d672', '#f0b34b', '#e05a5a'];
   const ALGOS = ['backtracker', 'growing', 'huntkill', 'prim', 'kruskal', 'wilson', 'aldous', 'binary', 'sidewinder'];
-  const NUM = { seed: [1, 1e9], band: [1, 6], loops: [0, 80], hubs: [5, 14], maze: [0, 100], ruin: [0, 40] };
+  const NUM = { seed: [1, 1e9], band: [1, 6], loops: [0, 100], doors: [0, 4], hubs: [5, 14], maze: [0, 100], ruin: [0, 40] };
 
   function readHash() {
     const p = new URLSearchParams(location.hash.slice(1));
@@ -62,6 +62,7 @@
   const bind = (id, key, fmt) => { const el = $('p' + id), out = $('v' + id); el.value = S[key]; out.textContent = fmt(S[key]); el.addEventListener('input', () => { S[key] = +el.value; out.textContent = fmt(S[key]); refresh(); }); };
   bind('Band', 'band', v => v);
   bind('Loops', 'loops', v => v + '%');
+  bind('Doors', 'doors', v => '+' + v);
   bind('Hubs', 'hubs', v => v);
   bind('Maze', 'maze', v => v + '%');
   bind('Ruin', 'ruin', v => v + '%');

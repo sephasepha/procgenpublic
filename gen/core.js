@@ -406,6 +406,7 @@ function genCorridors(reg, graph, field, seed) {
       for (let d = 0; d < 4; d++) {
         const nx = x + DX[d], ny = y + DY[d];
         if (nx < 1 || ny < 1 || nx >= COLS - 1 || ny >= ROWS - 1) continue;
+        if (field.excluded && field.excluded[ny * COLS + nx]) continue; // owned by a neighbouring sector
         const n = ny * COLS + nx;
         const pc = field.prim[c], pn = field.prim[n];
         if (pc !== pn && (!field.cross[pc][pn] || !(field.sec[c] === pn || field.sec[n] === pc))) continue;
@@ -436,8 +437,8 @@ function genCorridors(reg, graph, field, seed) {
   reg.pts.forEach(p => {
     const k = p.hub !== undefined ? p.hub : STYLES[p.style].hub, x0 = Math.max(1, Math.min(COLS - 1 - k, p.cx - (k >> 1))), y0 = Math.max(1, Math.min(ROWS - 1 - k, p.cy - (k >> 1)));
     for (let y = y0; y < y0 + k; y++) for (let x = x0; x < x0 + k; x++) {
-      const c = y * COLS + x; if (field.sec[c] >= 0) continue; stamp[c] = 1;
-      for (let d = 0; d < 4; d++) { const nx = x + DX[d], ny = y + DY[d]; if (nx >= x0 && nx < x0 + k && ny >= y0 && ny < y0 + k && field.sec[ny * COLS + nx] < 0) wide[c] |= 1 << d; }
+      const c = y * COLS + x; if (field.sec[c] >= 0 || (field.excluded && field.excluded[c])) continue; stamp[c] = 1;
+      for (let d = 0; d < 4; d++) { const nx = x + DX[d], ny = y + DY[d], nn = ny * COLS + nx; if (nx >= x0 && nx < x0 + k && ny >= y0 && ny < y0 + k && field.sec[nn] < 0 && !(field.excluded && field.excluded[nn])) wide[c] |= 1 << d; }
     }
   });
   let pinned = 0; for (let c = 0; c < NC; c++) if (onPath[c] || stamp[c]) pinned++;
@@ -454,6 +455,7 @@ function genMaze(field, cor, seed, algo) {
   for (let c = 0; c < NC; c++) if (cor.onPath[c] || cor.stamp[c]) roots.push(c);
   const mz = gm({
     W: COLS, H: ROWS, rng: mulberry32(seed * 7717 + 11), algo: algo || 'growing',
+    ok: c => !(field.excluded && field.excluded[c]),
     canLink: (a, b) => field.prim[a] === field.prim[b],
     roots,
     straight: c => STYLES[field.prim[c]].maze.straight,
@@ -493,6 +495,8 @@ class WFC {
     return m;
   }
   allowed(t, c) {
+    const ex = this.field.excluded;
+    if (ex && ex[c]) return t === 0;
     const f = this.field, tt = tiles[t], x = c % COLS, y = (c / COLS) | 0, rq = this.cor.req[c], set = this.styleSet(c);
     if (tt.style === -1) { if (rq || this.cor.stamp[c]) return false; }
     else if (tt.gate) {
@@ -504,7 +508,9 @@ class WFC {
     for (let d = 0; d < 4; d++) {
       const nx = x + DX[d], ny = y + DY[d], so = tSock[t * 4 + d];
       // the map edge is solid, except where a portal (a doorway into the next sector) is declared
-      if ((nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) && so !== 0 && !(this.cor.portalOut && (this.cor.portalOut[c] >> d & 1))) return false;
+      const edge = nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS || (ex && ex[ny * COLS + nx]);
+      if (edge && so !== 0 && !(this.cor.portalOut && (this.cor.portalOut[c] >> d & 1))) return false;
+      if (this.cor.portalOut && (this.cor.portalOut[c] >> d & 1) && so % 2 !== 1) return false; // doorways into the next sector are narrow
       if ((rq >> d & 1) && so === 0) return false;
       if ((this.cor.wide[c] >> d & 1) && !(so > 0 && so % 2 === 0)) return false;
     }
@@ -554,6 +560,8 @@ class WFC {
       for (let d = 0; d < 4; d++) {
         const nx = x + DX[d], ny = y + DY[d];
         if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) continue;
+        const ex = this.field.excluded;
+        if (ex && (ex[c] || ex[ny * COLS + nx])) continue; // no constraints across a sector border
         const n = ny * COLS + nx, m = this.sideMask(c, d), od = OPP(d), b = n * T;
         let changed = false;
         for (let t = 0; t < T; t++) if (this.dom[b + t] && !(m & (1 << tSock[t * 4 + od]))) { this.dom[b + t] = 0; changed = true; }

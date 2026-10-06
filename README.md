@@ -39,11 +39,11 @@ The grammar holds globally even though no sector ever sees the whole world:
 - **Connectivity:** every sector links to a parent one step closer to the start, chosen from its own coordinates. All sectors form one tree rooted at the start, so everything is reachable.
 - **Tiers:** a sector's tier comes from its distance to the start (`band` sectors per tier), cycling Outer → Works → Keep, then on into the next level. Neighbours differ by at most one tier, so nothing can skip one.
 - **Caps:** extra loop doorways only join sectors of the same tier, and the parent choice avoids axis sectors, so no sector has more than two cross-tier branches.
-- **Seams:** each shared border has one contract, computed from that border's coordinates, saying whether a doorway exists and where. Both neighbours compute it independently and pin their doorway to it, so generation order never matters.
+- **Seams you don't notice:** sector grids overlap their neighbours by a few cells, and each shared border has one contract, computed from that border's coordinates: a wobbly line (up to ±4 cells) that decides which sector owns each overlapping cell, whether the border is open, and where its doorways are. Same-tier borders usually open with several narrow doorways; borders between tiers keep a single designed seal. Both neighbours compute the contract independently, so generation order never matters, and the border reads as one more irregular wall of the labyrinth.
 - **Doctrine (Arsenal):** you enter the Keep only through Checkpoints, you leave it only through a Vault, which is the descent to the next level's Gatehouse, and Works sectors place foundries with power and cooling, away from magazines.
 - **Validation:** each sector is checked as it generates: every hub and doorway inside must connect, and otherwise it retries deterministically.
 
-The **Rules** panel in the explorer re-checks these live against every loaded sector. `tests/world.js` checks them over every sector within a few steps of the start, including that sectors come out identical in any generation order.
+The **Rules** panel in the explorer re-checks these live against every loaded sector. `tests/world.js` checks them over every sector within a few steps of the start: doorways meet edge to edge, every cell belongs to exactly one sector, floors of two sectors only ever touch at a doorway, and sectors come out identical in any generation order.
 
 ## Layout
 

@@ -49,7 +49,8 @@
         <div class="seg" role="group" aria-label="Preset" style="grid-template-columns:repeat(2,minmax(0,1fr))"><button type="button" data-preset="generic">Generic</button><button type="button" data-preset="arsenal">Arsenal</button></div>
         <div class="controls">
           <div class="ctl"><label for="pBand">Sectors per tier</label><output id="vBand"></output><input id="pBand" type="range" min="1" max="6" step="1"><small>How many sectors deep each tier band runs before the next</small></div>
-          <div class="ctl"><label for="pLoops">Loop doorways</label><output id="vLoops"></output><input id="pLoops" type="range" min="0" max="80" step="5"><small>Chance of an extra doorway between same-tier neighbours</small></div>
+          <div class="ctl"><label for="pLoops">Loop doorways</label><output id="vLoops"></output><input id="pLoops" type="range" min="0" max="100" step="5"><small>Chance of an extra doorway between same-tier neighbours</small></div>
+          <div class="ctl"><label for="pDoors">Extra doorways per border</label><output id="vDoors"></output><input id="pDoors" type="range" min="0" max="4" step="1"><small>Up to this many more doorways on borders between same-tier sectors, so borders read as ordinary walls</small></div>
           <div class="ctl"><label for="pHubs">Hubs per sector</label><output id="vHubs"></output><input id="pHubs" type="range" min="5" max="14" step="1"></div>
           <div class="ctl"><label for="pMaze">Labyrinth strength</label><output id="vMaze"></output><input id="pMaze" type="range" min="0" max="100" step="5"></div>
           <div class="ctl" id="ruinCtl"><label for="pRuin">Ruin</label><output id="vRuin"></output><input id="pRuin" type="range" min="0" max="40" step="5"><small>Interior regions collapsed into breaches</small></div>

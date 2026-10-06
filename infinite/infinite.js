@@ -56,10 +56,12 @@
   }
 
   // ---------- world lookups ----------
-  const secAt = (gx, gy) => st.sectors.get(K(Math.floor(gx / SW), Math.floor(gy / SH)));
+  // sectors overlap, so a global sub-cell belongs to whichever sector owns its cell (decided by the border lines)
+  const ownerSub = (gx, gy) => ownerOf(st.S, Math.floor(gx / 3), Math.floor(gy / 3));
+  const secAt = (gx, gy) => { const o = ownerSub(gx, gy); return st.sectors.get(K(o[0], o[1])); };
   function passAt(gx, gy) {
     const s = secAt(gx, gy); if (!s) return -1; if (s.failed) return 0;
-    const lx = gx - s.sx * SW, ly = gy - s.sy * SH;
+    const lx = gx - s.ox * 3, ly = gy - s.oy * 3;
     return s.pass[ly * SW + lx];
   }
 
@@ -156,7 +158,7 @@
   function close() { el.hidden = true; document.documentElement.classList.remove('xp-open'); if (st) { cancelAnimationFrame(st.raf); st.raf = 0; } }
   function place() {
     const s = st.sectors.get('0,0');
-    st.gx = s.entranceSub % SW; st.gy = (s.entranceSub / SW) | 0; st.from = [st.gx, st.gy];
+    st.gx = s.ox * 3 + s.entranceSub % SW; st.gy = s.oy * 3 + ((s.entranceSub / SW) | 0); st.from = [st.gx, st.gy];
     st.placed = true; toast(`${s.info.name}: find the way deeper`);
     light(); hud();
   }
@@ -165,13 +167,13 @@
   function canStep(gx, gy, d) { return passAt(gx + DX[d], gy + DY[d]); }
   function stepTo(d) {
     st.gx += DX[d]; st.gy += DY[d]; st.steps++;
-    const cs = [Math.floor(st.gx / SW), Math.floor(st.gy / SH)];
+    const cs = ownerSub(st.gx, st.gy);
     if (cs[0] !== st.cs[0] || cs[1] !== st.cs[1]) crossed(st.cs, cs);
   }
   function move(d) {
     if (!st || !st.placed || el.hidden) return;
     const p = canStep(st.gx, st.gy, d);
-    if (p === -1) { toast('Charting the next sector…', true); request(Math.floor((st.gx + DX[d]) / SW), Math.floor((st.gy + DY[d]) / SH)); return; }
+    if (p === -1) { toast('Charting the next sector…', true); const o = ownerSub(st.gx + DX[d], st.gy + DY[d]); request(o[0], o[1]); return; }
     if (p !== 1) { bump(); return; }
     if (!st.started) st.started = performance.now();
     st.from = [st.gx, st.gy]; st.t = 0;
@@ -199,7 +201,7 @@
     const R = 11, start = [st.gx, st.gy], q = [start], dist = new Map([[K(st.gx, st.gy), 0]]);
     const mark = (gx, gy) => {
       const s = secAt(gx, gy); if (!s || s.failed) return;
-      const i = (gy - s.sy * SH) * SW + (gx - s.sx * SW);
+      const i = (gy - s.oy * 3) * SW + (gx - s.ox * 3);
       if (!s.lit[i]) { s.lit[i] = 1; st.litList.push([s, i]); s.cells.push(i); }
       s.seen[i] = 1;
     };
@@ -235,12 +237,14 @@
   function paintCell(s, i) {
     const px = s.px, fog = st.fog, lit = !fog || s.lit[i], seen = !fog || s.seen[i];
     const x = (i % SW) * TPX, y = ((i / SW) | 0) * TPX, row = SW * TPX;
+    // cells another sector owns stay transparent, so that sector's own drawing shows through
+    if (!s.own[(((i / SW) | 0) / 3 | 0) * COLS + ((i % SW) / 3 | 0)]) { for (let py = 0; py < TPX; py++) px.fill(0, (y + py) * row + x, (y + py) * row + x + TPX); return; }
     if (!seen) { for (let py = 0; py < TPX; py++) px.fill(BLACK, (y + py) * row + x, (y + py) * row + x + TPX); return; }
     const a = lit ? 1 : (s.pass[i] ? 0.4 : 0.5);
     const tile = st.tiles && s.deco ? DRESS_TILES[s.deco[i]] : null;
     if (tile) {
       // render-time variety: plain floors take a random quarter turn, and every tile a slight brightness jitter
-      const h = cellHash(s.sx * SW + (i % SW), s.sy * SH + ((i / SW) | 0));
+      const h = cellHash(s.ox * 3 + (i % SW), s.oy * 3 + ((i / SW) | 0));
       const rgb = tile.spins ? tile.spins[h & 3] : tile.rgb, j = a * (0.93 + ((h >>> 8) & 15) / 15 * 0.12);
       for (let k = 0; k < 16; k++) px[(y + (k >> 2)) * row + x + (k & 3)] = rgba(rgb[k], j);
       return;
@@ -275,23 +279,23 @@
     const ox = W / 2 - (px + 0.5) * bs, oy = H / 2 - (py + 0.5) * bs;
     g.imageSmoothingEnabled = false;
     st.sectors.forEach(s => {
-      const x = ox + s.sx * SW * bs, y = oy + s.sy * SH * bs, w = SW * bs, h = SH * bs;
+      const x = ox + s.ox * 3 * bs, y = oy + s.oy * 3 * bs, w = SW * bs, h = SH * bs;
       if (x > W || y > H || x + w < 0 || y + h < 0) return;
       if (s.failed) { g.fillStyle = '#1a1010'; g.fillRect(x, y, w, h); return; }
       g.drawImage(s.cv, Math.floor(x), Math.floor(y), Math.ceil(w), Math.ceil(h));
     });
     // sectors still being charted
     st.pending.forEach(k => {
-      const [sx, sy] = k.split(',').map(Number), x = ox + sx * SW * bs, y = oy + sy * SH * bs;
-      if (x > W || y > H || x + SW * bs < 0 || y + SH * bs < 0) return;
-      g.strokeStyle = 'rgba(207,167,78,0.25)'; g.setLineDash([6 * dpr, 6 * dpr]); g.lineWidth = 1 * dpr; g.strokeRect(x + 4, y + 4, SW * bs - 8, SH * bs - 8); g.setLineDash([]);
+      const [sx, sy] = k.split(',').map(Number), cw = WORLD_CW * 3 * bs, ch = WORLD_CH * 3 * bs, x = ox + sx * cw, y = oy + sy * ch;
+      if (x > W || y > H || x + cw < 0 || y + ch < 0) return;
+      g.strokeStyle = 'rgba(207,167,78,0.25)'; g.setLineDash([6 * dpr, 6 * dpr]); g.lineWidth = 1 * dpr; g.strokeRect(x + 4, y + 4, cw - 8, ch - 8); g.setLineDash([]);
     });
     // landmarks
     st.sectors.forEach(s => {
       if (s.failed) return;
       s.hubs.forEach(hb => {
         if (!hb.label || (st.fog && !s.seen[hb.i])) return;
-        const x = ox + (s.sx * SW + hb.i % SW + 0.5) * bs, y = oy + (s.sy * SH + ((hb.i / SW) | 0) + 0.5) * bs;
+        const x = ox + (s.ox * 3 + hb.i % SW + 0.5) * bs, y = oy + (s.oy * 3 + ((hb.i / SW) | 0) + 0.5) * bs;
         if (x < -40 || y < -40 || x > W + 40 || y > H + 40) return;
         const r = Math.max(7 * dpr, bs * (st.map ? 2.2 : 1.1)), col = TIER_COL[hb.type];
         g.fillStyle = 'rgba(7,8,11,0.82)'; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
@@ -331,7 +335,7 @@
     // start sector marker and you
     const ox = (-cx + R + 0.5) * cell, oy = (-cy + R + 0.5) * cell;
     if (Math.abs(cx) <= R && Math.abs(cy) <= R) { mg.strokeStyle = '#f3d36b'; mg.lineWidth = Math.max(1, cell * 0.1); mg.strokeRect(ox - cell * 0.4, oy - cell * 0.4, cell * 0.8, cell * 0.8); }
-    const lx = st.placed ? (st.gx - cx * SW) / SW : 0.5, ly = st.placed ? (st.gy - cy * SH) / SH : 0.5;
+    const lx = st.placed ? Math.min(1, Math.max(0, (st.gx / 3 - cx * WORLD_CW) / WORLD_CW)) : 0.5, ly = st.placed ? Math.min(1, Math.max(0, (st.gy / 3 - cy * WORLD_CH) / WORLD_CH)) : 0.5;
     mg.fillStyle = '#ffffff'; mg.beginPath(); mg.arc((R + 0.18 + lx * 0.64) * cell, (R + 0.18 + ly * 0.64) * cell, Math.max(2, cell * 0.12), 0, 7); mg.fill();
   }
 
@@ -358,10 +362,10 @@
         const n = st.sectors.get(K(p.to[0], p.to[1]));
         if (Math.abs(s.info.tierIndex - p.toTier) > 1) skips++;
         if (!n || n.failed) return;
-        const back = n.portals.find(q => q.dir === ((p.dir + 2) & 3));
-        seams++; if (back && back.pos === p.pos) seamsOk++;
+        const back = n.portals.find(q => q.dir === ((p.dir + 2) & 3) && q.pos === p.pos);
+        seams++; if (back) seamsOk++;
       });
-      if (s.portals.filter(p => p.kind === 'child' && p.cross).length > 2) caps++;
+      if (new Set(s.portals.filter(p => p.kind === 'child' && p.cross).map(p => p.to.join())).size > 2) caps++;
       if (s.info.type === 2 && st.S.preset === 'arsenal') s.portals.forEach(p => { if (p.cross && p.kind === 'parent') { keep++; const hb = s.hubs.find(h => h.portal && h.fn === 'CP'); if (hb) keepOk++; } });
       if (s.doctrine) { works++; if (s.doctrine.power && s.doctrine.cooling && s.doctrine.blast) worksOk++; }
     });

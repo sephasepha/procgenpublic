@@ -25,22 +25,26 @@ for (const preset of ['arsenal', 'generic']) {
   sec.forEach(s => {
     if (!s.ok) return;
     const { sx, sy, info } = s;
-    // contracts match on both sides, and doorways meet edge to edge
+    // contracts match on both sides, and each doorway meets its partner edge to edge
     for (let d = 0; d < 4; d++) {
       const n = sec.get(key(sx + DX[d], sy + DY[d])); if (!n || !n.ok) continue;
-      const a = s.portals.find(p => p.dir === d), b = n.portals.find(p => p.dir === ((d + 2) & 3));
-      check(!!a === !!b, `${preset} ${sx},${sy} dir ${d}: doorway on one side only`);
-      if (a && b) {
-        check(a.pos === b.pos, `${preset} ${sx},${sy} dir ${d}: doorway positions differ`);
+      const mine = s.portals.filter(p => p.dir === d), theirs = n.portals.filter(p => p.dir === ((d + 2) & 3));
+      check(mine.map(p => p.pos).sort().join() === theirs.map(p => p.pos).sort().join(), `${preset} ${sx},${sy} dir ${d}: doorways differ between the two sides`);
+      mine.forEach(a => {
+        const b = theirs.find(q => q.pos === a.pos); if (!b) return;
         const ai = s.doors[s.portals.indexOf(a)], bi = n.doors[n.portals.indexOf(b)];
-        const ax = sx * C.SW + ai % C.SW, ay = sy * C.SH + ((ai / C.SW) | 0);
-        const bx = n.sx * C.SW + bi % C.SW, by = n.sy * C.SH + ((bi / C.SW) | 0);
+        const ax = s.ox * 3 + ai % C.SW, ay = s.oy * 3 + ((ai / C.SW) | 0);
+        const bx = n.ox * 3 + bi % C.SW, by = n.oy * 3 + ((bi / C.SW) | 0);
         check(Math.abs(ax - bx) + Math.abs(ay - by) === 1, `${preset} ${sx},${sy} dir ${d}: doorways do not touch (${ax},${ay} vs ${bx},${by})`);
         check(s.pass[ai] === 1 && n.pass[bi] === 1, `${preset} ${sx},${sy} dir ${d}: doorway not walkable`);
         check(Math.abs(info.tierIndex - n.info.tierIndex) <= 1, `${preset} ${sx},${sy} dir ${d}: link skips a tier`);
         if (a.kind === 'loop') check(info.tierIndex === n.info.tierIndex, `${preset} ${sx},${sy}: loop link between tiers`);
-      }
+        if (a.cross) check(mine.length === 1, `${preset} ${sx},${sy}: a border between tiers has ${mine.length} doorways`);
+      });
     }
+    // floor only where this sector owns the cell
+    let stray = 0; for (let i = 0; i < s.pass.length; i++) if (s.pass[i] && !s.own[(((i / C.SW) | 0) / 3 | 0) * C.COLS + ((i % C.SW) / 3 | 0)]) stray++;
+    check(stray === 0, `${preset} ${sx},${sy}: ${stray} floor sub-cells outside the cells it owns`);
     // tree: every sector except the start has a doorway to its parent
     if (sx || sy) {
       const p = info.parent, pd = p && s.portals.find(q => q.to[0] === p[0] && q.to[1] === p[1]);
@@ -59,6 +63,24 @@ for (const preset of ['arsenal', 'generic']) {
       if (info.type === 1 && s.doctrine) { worksSectors++; if (s.doctrine.power && s.doctrine.cooling && s.doctrine.blast) worksDoctrine++; }
     }
   });
+  // every global cell belongs to exactly one sector, and floors meet across a border only at doorways
+  {
+    const g = new Map(); // global sub-cell -> sector key, for walkable sub-cells
+    let overlap = 0;
+    sec.forEach((s, k) => { if (!s.ok) return; for (let i = 0; i < s.pass.length; i++) if (s.pass[i]) { const gk = (s.ox * 3 + i % C.SW) + ',' + (s.oy * 3 + ((i / C.SW) | 0)); if (g.has(gk)) overlap++; g.set(gk, k); } });
+    check(overlap === 0, `${preset}: ${overlap} sub-cells claimed by two sectors`);
+    const doorSet = new Set(); sec.forEach(s => { if (s.ok) s.doors.forEach(i => doorSet.add((s.ox * 3 + i % C.SW) + ',' + (s.oy * 3 + ((i / C.SW) | 0)))); });
+    let leaks = 0, crossings = 0;
+    g.forEach((k, gk) => {
+      const [x, y] = gk.split(',').map(Number);
+      for (const [nx, ny] of [[x + 1, y], [x, y + 1]]) {
+        const k2 = g.get(nx + ',' + ny); if (!k2 || k2 === k) continue;
+        crossings++; if (!(doorSet.has(gk) && doorSet.has(nx + ',' + ny))) leaks++;
+      }
+    });
+    check(leaks === 0, `${preset}: ${leaks} places where floors of two sectors touch outside a doorway`);
+    console.log(`  ${crossings} doorway crossings between sectors`);
+  }
   // global connectivity across the window via open doorways (parent chains stay inside the diamond)
   const seen = new Set([key(0, 0)]), q = [[0, 0]];
   while (q.length) {

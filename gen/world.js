@@ -7,14 +7,18 @@
 //   * A sector's tier comes from its distance to the start, so it never drops along the way out, and
 //     neighbouring sectors differ by at most one tier. Nothing can skip a tier.
 //   * Extra (loop) links only join sectors of the same tier, so branch caps between tiers are untouched.
-//   * Each shared border has one contract (whether a doorway exists, and where) computed from that border's
-//     coordinates. Both sides compute it independently and pin their doorway to it.
+//   * Each shared border has one contract computed from that border's coordinates: the wobbly line that
+//     divides the two sectors, whether it has doorways, and where. Both sides compute it independently.
+//   * Neighbouring sectors overlap by a few cells and the wobbly line decides who owns each cell, so borders
+//     are irregular walls with several doorways rather than long straight edges.
 //   * Each sector is validated as it is generated: every hub and doorway inside must connect.
 (function (root) {
   const isNode = typeof module !== 'undefined' && module.exports && typeof window === 'undefined' && typeof importScripts === 'undefined';
   if (isNode) Object.assign(globalThis, require('./mazes.js'), require('./core.js'), require('./dressing.js'));
 
-  const WORLD_DEFAULTS = { seed: 1, preset: 'arsenal', band: 3, loops: 30, hubs: 9, maze: 60, algo: 'growing', ruin: 10 };
+  const WORLD_DEFAULTS = { seed: 1, preset: 'arsenal', band: 3, loops: 70, doors: 3, hubs: 9, maze: 60, algo: 'growing', ruin: 10 };
+  // Sector grids are COLS x ROWS cells but sit CW x CH apart, so neighbours overlap by MARGIN cells each side.
+  const MARGIN = 5, CW = COLS - 2 * MARGIN, CH = ROWS - 2 * MARGIN;
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 
   function h32(a, b, c, d) {
@@ -43,38 +47,67 @@
     const P = PRESETS[S.preset] || PRESETS.generic;
     return `${P.tiers[type].name} ${ROMAN[level - 1] || level}`;
   }
-  // the contract for the border between two neighbouring sectors
+  // ---------- geometry: wobbly borders and cell ownership (all in global cell coordinates) ----------
+  // Offset of border line k (axis 0 = vertical lines, 1 = horizontal) at position t along it: -4..4 cells,
+  // smoothly varying, from the seed and the line's own index only.
+  function wobble(S, axis, k, t) {
+    const step = 5, t0 = Math.floor(t / step), f = (t - t0 * step) / step, sm = f * f * (3 - 2 * f);
+    const v = i => (h32(S.seed, axis * 7919 + k, i, 4421) % 9) - 4;
+    return Math.round(v(t0) + (v(t0 + 1) - v(t0)) * sm);
+  }
+  function colOf(S, cx, cy) { const k = Math.floor(cx / CW); if (cx < k * CW + wobble(S, 0, k, cy)) return k - 1; if (cx >= (k + 1) * CW + wobble(S, 0, k + 1, cy)) return k + 1; return k; }
+  function rowOf(S, cx, cy) { const j = Math.floor(cy / CH); if (cy < j * CH + wobble(S, 1, j, cx)) return j - 1; if (cy >= (j + 1) * CH + wobble(S, 1, j + 1, cx)) return j + 1; return j; }
+  // which sector owns a global cell
+  function ownerOf(S, cx, cy) { return [colOf(S, cx, cy), rowOf(S, cx, cy)]; }
+  const originOf = (sx, sy) => [sx * CW - MARGIN, sy * CH - MARGIN]; // global cell of a sector grid's (0,0)
+  function ownedMask(S, sx, sy) {
+    const [ox, oy] = originOf(sx, sy), own = new Uint8Array(NC);
+    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) { const o = ownerOf(S, ox + x, oy + y); own[y * COLS + x] = o[0] === sx && o[1] === sy ? 1 : 0; }
+    return own;
+  }
+
+  // the contract for the border between two neighbouring sectors: is it open, and where are its doorways
   function edgeContract(S, ax, ay, bx, by) {
     const A = sectorInfo(S, ax, ay), B = sectorInfo(S, bx, by);
     const child = A.depth > B.depth ? A : B, par = child === A ? B : A;
     const tree = !!child.parent && child.parent[0] === par.sx && child.parent[1] === par.sy;
     const cross = A.tierIndex !== B.tierIndex;
-    const vertical = ay === by; // neighbours side by side share a vertical border
-    const kx = Math.min(ax, bx), ky = Math.min(ay, by), h = h32(S.seed, kx * 2 + (vertical ? 0 : 1), ky, 913);
+    const vertical = ay === by; // neighbours side by side share a vertical border line
+    const line = vertical ? Math.max(ax, bx) : Math.max(ay, by), along = vertical ? ay : ax;
+    const h = h32(S.seed, line * 2 + (vertical ? 0 : 1), along, 913);
     const open = tree || (!cross && (h % 1000) / 1000 < S.loops / 100);
-    const span = vertical ? ROWS : COLS;
-    const pos = 6 + (h32(S.seed, kx, ky, vertical ? 211 : 307) % (span - 12));
-    return { open, tree, cross, pos, child: [child.sx, child.sy], parent: [par.sx, par.sy] };
+    // doorway positions along the line, kept clear of the corners where borders meet
+    const span = vertical ? CH : CW, base = along * span, positions = [];
+    if (open) {
+      const want = cross ? 1 : 1 + (h32(S.seed, line, along, vertical ? 17 : 29) % ((S.doors | 0) + 1));
+      for (let i = 0; positions.length < want && i < 40; i++) {
+        const p = base + 7 + (h32(S.seed, line * 3 + (vertical ? 0 : 1), along, 211 + i) % (span - 14));
+        if (positions.every(q => Math.abs(q - p) >= 6)) positions.push(p);
+      }
+    }
+    return { open, tree, cross, positions, vertical, line, child: [child.sx, child.sy], parent: [par.sx, par.sy] };
   }
+  // the doorways of one sector, each with its border cell (door) and the cell just inside it (hub), local coords
   function sectorPortals(S, sx, sy) {
-    const out = [];
+    const out = [], [ox, oy] = originOf(sx, sy);
     for (let d = 0; d < 4; d++) {
       const nx = sx + DX[d], ny = sy + DY[d], e = edgeContract(S, sx, sy, nx, ny);
       if (!e.open) continue;
       const n = sectorInfo(S, nx, ny);
       const kind = !e.tree ? 'loop' : (e.parent[0] === nx && e.parent[1] === ny ? 'parent' : 'child');
-      out.push({ dir: d, pos: e.pos, kind, cross: e.cross, to: [nx, ny], toType: n.type, toLevel: n.level, toTier: n.tierIndex });
+      e.positions.forEach((pos, idx) => {
+        let door, hub;
+        if (e.vertical) { const x0 = e.line * CW + wobble(S, 0, e.line, pos); door = d === 1 ? [x0 - 1, pos] : [x0, pos]; hub = [door[0] - DX[d], pos]; }
+        else { const y0 = e.line * CH + wobble(S, 1, e.line, pos); door = d === 2 ? [pos, y0 - 1] : [pos, y0]; hub = [pos, door[1] - DY[d]]; }
+        out.push({ dir: d, pos, idx, kind, cross: e.cross, to: [nx, ny], toType: n.type, toLevel: n.level, toTier: n.tierIndex,
+          door: [door[0] - ox, door[1] - oy], hub: [hub[0] - ox, hub[1] - oy], gdoor: door });
+      });
     }
+    // the parent link uses its first doorway as the sector's way in
+    let seen = false; out.forEach(p => { if (p.kind === 'parent') { if (seen) p.kind = 'parent-extra'; seen = true; } });
     return out;
   }
-  // where a portal's doorway (on the border) and its hub (one cell in) sit, in cell coordinates
-  function portalCells(p) {
-    const d = p.dir;
-    if (d === 0) return { door: [p.pos, 0], hub: [p.pos, 1] };
-    if (d === 1) return { door: [COLS - 1, p.pos], hub: [COLS - 2, p.pos] };
-    if (d === 2) return { door: [p.pos, ROWS - 1], hub: [p.pos, ROWS - 2] };
-    return { door: [0, p.pos], hub: [1, p.pos] };
-  }
+  function portalCells(p) { return { door: p.door, hub: p.hub }; }
 
   // ---------- functions inside a sector (Arsenal doctrine) ----------
   const PORTAL_FUNCS = { SE: { name: 'Seal', hub: 1 }, PS: { name: 'Passage', hub: 1 } };
@@ -98,13 +131,15 @@
       const seed = 1 + (h32(S.seed, sx, sy, 1000 + attempt) % 999983);
       const rng = mulberry32(seed);
       // hubs: the start (origin only), one per doorway, then interior hubs by Poisson sampling
+      const own = ownedMask(S, sx, sy);
       const pts = [];
       if (origin) pts.push({ x: COLS / 2, y: ROWS / 2, start: true });
       portals.forEach(p => { const c = portalCells(p); pts.push({ x: c.hub[0], y: c.hub[1], portal: p }); });
       const r = Math.sqrt((COLS - 8) * (ROWS - 8) / S.hubs) * 0.8;
       for (let tries = 0; pts.length < S.hubs + portals.length * 0.5 && tries < 4000; tries++) {
         const x = 4 + rng() * (COLS - 8), y = 4 + rng() * (ROWS - 8);
-        if (pts.every(p => (p.x - x) ** 2 + (p.y - y) ** 2 > r * r)) pts.push({ x, y });
+        const okHere = [[0, 0], [2, 0], [-2, 0], [0, 2], [0, -2]].every(([ax, ay]) => own[Math.round(y + ay) * COLS + Math.round(x + ax)]);
+        if (okHere && pts.every(p => (p.x - x) ** 2 + (p.y - y) ** 2 > r * r)) pts.push({ x, y });
       }
       pts.forEach(p => { p.cx = Math.max(1, Math.min(COLS - 2, Math.round(p.x))); p.cy = Math.max(1, Math.min(ROWS - 2, Math.round(p.y))); p.style = -1; p.tier = -1; });
       const entrance = origin ? 0 : pts.findIndex(p => p.portal && p.portal.kind === 'parent');
@@ -116,6 +151,7 @@
       if (g.tier.some(t => t < 0)) { last = 'disconnected regions'; continue; }
       const doctrine = assign(S, info, reg, g, cand, rng, arsenal);
       const field = genField(reg, seed, 2.5, { em: true, mh: true, eh: false });
+      field.excluded = own.map(v => 1 - v); // cells a neighbouring sector owns
       const cor = genCorridors(reg, g, field, seed);
       if (cor.unrouted) { last = 'unrouted corridor'; continue; }
       // pin each doorway: its border cell opens outward into the next sector and inward to its hub
@@ -150,7 +186,8 @@
         deco = d.tiles; dressStats = { fallbacks: d.fallbacks, violations: d.violations };
       }
       const hubs = pts.map((p, i) => ({ i: (p.cy * 3 + 1) * SW + p.cx * 3 + 1, label: p.label, type: info.type, fn: p.fn || null, portal: !!p.portal }));
-      return { sx, sy, info, portals, doors, pass, col, deco, dressStats, hubs, doctrine, attempts: attempt + 1, ms: Date.now() - t0, entranceSub: val.start, ok: true };
+      const [ox, oy] = originOf(sx, sy);
+      return { sx, sy, ox, oy, own, info, portals, doors, pass, col, deco, dressStats, hubs, doctrine, attempts: attempt + 1, ms: Date.now() - t0, entranceSub: val.start, ok: true };
     }
     return { sx, sy, info, portals, ok: false, error: last, ms: Date.now() - t0 };
   }
@@ -213,7 +250,7 @@
       if (arsenal) {
         const f = fn[i];
         p.fn = f;
-        p.label = f;
+        p.label = f === 'PS' ? null : f;
         p.style = p.ruined ? 1 : FUNCS[f] ? FUNCS[f].style : TIER_STYLE[type];
         p.hub = p.portal ? 1 : p.ruined ? 4 : FUNCS[f] ? FUNCS[f].hub : undefined;
       } else {
@@ -228,6 +265,6 @@
 
   function funcName(code) { return (FUNCS[code] && FUNCS[code].name) || (PORTAL_FUNCS[code] && PORTAL_FUNCS[code].name) || code; }
 
-  const api = { WORLD_DEFAULTS, sectorInfo, edgeContract, sectorPortals, genSector, tierName, funcName, PORTAL_FUNCS };
+  const api = { WORLD_DEFAULTS, sectorInfo, edgeContract, sectorPortals, genSector, tierName, funcName, PORTAL_FUNCS, ownerOf, originOf, ownedMask, WORLD_MARGIN: MARGIN, WORLD_CW: CW, WORLD_CH: CH };
   if (isNode) module.exports = api; else Object.assign(root, api);
 })(typeof window !== 'undefined' ? window : globalThis);
