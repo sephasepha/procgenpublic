@@ -31,6 +31,7 @@ Progression stays legible:
 - Near every seal and pit the next stratum's tiles **creep** in, in blobs that thicken towards the doorway, and the **Gray Pilgrims' lavender fog** rises. The pilgrims themselves keep vigil at each seal and camp at the start (**PG**).
 - Each stratum has its own **atmosphere**: void colour, light tint, particles (gold motes, spores, dust) and glowing tiles (eyes, bloom hearts, candles, pits).
 - Light falls off with walking distance from you; places you have seen stay dimly remembered.
+- The close view is drawn in a slight **3/4 perspective**: walls rise above the floor, so their tops sit higher and their front faces show; floors darken where they meet walls, and figures cast small shadows. It is a render-time extrusion of the same tiles, the 2D stand-in for meshes with height.
 
 ## Dressing: example-driven tile WFC
 

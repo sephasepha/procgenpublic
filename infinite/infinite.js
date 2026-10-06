@@ -318,35 +318,64 @@
   // ---------- close view: a cached layer of tiles around the player, rebuilt when the light changes ----------
   const layer = { cv: null, g: null, x0: 0, y0: 0, w: 0, h: 0, glows: [] };
   const closeScale = () => Math.max(4, cv.width / 27);
+  // The close view is drawn in a slight 3/4 perspective: walls rise E pixels above the floor, so their tops
+  // sit higher and their front faces show below them, overlapping the floor behind; floors darken where they
+  // meet walls (ambient occlusion). Rows are drawn top to bottom so nearer walls cover farther ones.
+  const E = 4; // wall height in atlas pixels (of 8)
   function buildLayer() {
     const bs = closeScale(), w = Math.ceil(cv.width / bs) + 8, h = Math.ceil(cv.height / bs) + 8;
     if (!layer.cv || layer.w !== w || layer.h !== h) { layer.cv = document.createElement('canvas'); layer.cv.width = w * SLOT; layer.cv.height = h * SLOT; layer.g = layer.cv.getContext('2d'); layer.w = w; layer.h = h; }
     const L = layer.g, x0 = st.gx - (w >> 1), y0 = st.gy - (h >> 1), R = 11, fog = st.fog, ld = st.ldist || new Map();
     layer.x0 = x0; layer.y0 = y0; layer.glows = [];
     L.clearRect(0, 0, layer.cv.width, layer.cv.height);
-    const shade = [];
+    // gather the window: kind 0 nothing (unseen or unloaded), 1 floor, 2 wall; atlas slot or flat colour; light
+    const n = w * h, kind = new Uint8Array(n), slot = new Int32Array(n).fill(-1), bright = new Float32Array(n), flat = new Array(n);
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-      const gx = x0 + x, gy = y0 + y, s = secAt(gx, gy);
+      const gx = x0 + x, gy = y0 + y, s = secAt(gx, gy), c = y * w + x;
       if (!s || s.failed) continue;
       const i = (gy - s.oy * 3) * SW + (gx - s.ox * 3);
       if (fog && !s.seen[i]) continue;
       const lit = !fog || s.lit[i];
+      kind[c] = s.pass[i] ? 1 : 2;
       if (st.tiles && s.deco) {
-        const t = s.deco[i], hsh = cellHash(gx, gy), k = slotBase[t] + ((hsh & 3) % slotSpins[t]) * 4 + ((hsh >>> 8) & 3);
-        L.drawImage(atlas, (k % atlas.cols) * SLOT, ((k / atlas.cols) | 0) * SLOT, SLOT, SLOT, x * SLOT, y * SLOT, SLOT, SLOT);
-        // a centrepiece glows once, from its middle
-        const v = DRESS_TILES[t]; if (v.glow && (!v.strict || v.letter === '1')) layer.glows.push(v.letter === '1' ? [gx + 0.5, gy + 0.5, v.glow, lit, 1] : [gx, gy, v.glow, lit, 0]);
-      } else {
-        L.fillStyle = css(s.pass[i] ? (s.col[i] < FLOOR.length ? FLOOR[s.col[i]] : OTHER) : WALL); L.fillRect(x * SLOT, y * SLOT, SLOT, SLOT);
-      }
+        const t = s.deco[i], hsh = cellHash(gx, gy);
+        slot[c] = slotBase[t] + ((hsh & 3) % slotSpins[t]) * 4 + ((hsh >>> 8) & 3);
+        const v = DRESS_TILES[t]; if (v.glow && (!v.strict || v.letter === '1')) layer.glows.push(v.letter === '1' ? [gx + 0.5, gy + 0.5, v.glow, lit, 1] : [gx, gy - (v.walk ? 0 : E / SLOT), v.glow, lit, 0]);
+      } else flat[c] = css(s.pass[i] ? (s.col[i] < FLOOR.length ? FLOOR[s.col[i]] : OTHER) : WALL);
       // light: bright near you, falling off with walking distance; remembered places stay dim
       let b = 1;
       if (fog) { const d = ld.get(K(gx, gy)); b = lit && d !== undefined ? 1 - 0.62 * Math.pow(Math.min(1, d / R), 1.5) : 0.3; }
-      if (b < 0.99) shade.push(x, y, b);
+      bright[c] = b;
     }
-    L.fillStyle = 'rgb(4,4,8)';
-    for (let k = 0; k < shade.length; k += 3) { L.globalAlpha = 1 - shade[k + 2]; L.fillRect(shade[k] * SLOT, shade[k + 1] * SLOT, SLOT, SLOT); }
-    L.globalAlpha = 1;
+    const tile = (c, dx, dy, sy, hh) => {
+      if (slot[c] >= 0) { const k = slot[c]; L.drawImage(atlas, (k % atlas.cols) * SLOT, ((k / atlas.cols) | 0) * SLOT + sy, SLOT, hh, dx, dy, SLOT, hh); }
+      else { L.fillStyle = flat[c]; L.fillRect(dx, dy, SLOT, hh); }
+    };
+    const dark = (a, x, y, ww, hh) => { if (a <= 0.01) return; L.globalAlpha = a; L.fillStyle = 'rgb(4,4,8)'; L.fillRect(x, y, ww, hh); L.globalAlpha = 1; };
+    const isWall = c => kind[c] === 2;
+    // pass 1: floors, with ambient occlusion along the walls around them
+    for (let c = 0; c < n; c++) {
+      if (kind[c] !== 1) continue;
+      const x = (c % w) * SLOT, y = ((c / w) | 0) * SLOT, cx = c % w;
+      tile(c, x, y, 0, SLOT);
+      if (c + w < n && isWall(c + w)) dark(0.32, x, y + SLOT - 2, SLOT, 2); // the foot of the wall in front
+      if (cx > 0 && isWall(c - 1)) dark(0.22, x, y, 2, SLOT);
+      if (cx < w - 1 && isWall(c + 1)) dark(0.16, x + SLOT - 2, y, 2, SLOT);
+      if (c >= w && isWall(c - w)) { dark(0.28, x, y, SLOT, 2); dark(0.12, x, y + 2, SLOT, 2); } // shadow under the wall behind
+      dark(1 - bright[c], x, y, SLOT, SLOT);
+    }
+    // pass 2: walls, row by row, raised by E with their front face extended below
+    for (let c = 0; c < n; c++) {
+      if (kind[c] !== 2) continue;
+      const x = (c % w) * SLOT, y = ((c / w) | 0) * SLOT, front = !(c + w < n && isWall(c + w));
+      tile(c, x, y - E, 0, SLOT);
+      if (front) {
+        tile(c, x, y + SLOT - E, SLOT - E - 1, E); // the face continues down to the floor
+        dark(0.18, x, y + SLOT - E, SLOT, E);
+        dark(0.45, x, y + SLOT - 1, SLOT, 1); // contact line
+      }
+      dark(1 - bright[c], x, y - E, SLOT, SLOT + (front ? E : 0));
+    }
     st.layerDirty = false;
   }
 
@@ -446,7 +475,8 @@
           const gx = s.ox * 3 + lx, gy = s.oy * 3 + ly; if (gx === st.gx && gy === st.gy) continue;
           const x = ox + gx * bs, y = oy + gy * bs - bs * 0.15 + Math.sin(time * 1.3 + spots[k + 2]) * bs * 0.04;
           if (x < -bs || y < -bs || x > W || y > H) continue;
-          g.globalAlpha = 0.8 * (st.fog && !s.lit[i] ? 0.5 : 1); g.drawImage(pil, x, y, bs, bs);
+          g.globalAlpha = 0.35 * (st.fog && !s.lit[i] ? 0.5 : 1); g.fillStyle = '#000'; g.beginPath(); g.ellipse(x + bs / 2, y + bs * 1.05, bs * 0.38, bs * 0.13, 0, 0, 7); g.fill();
+          g.globalAlpha = 0.85 * (st.fog && !s.lit[i] ? 0.5 : 1); g.drawImage(pil, x, y, bs, bs);
         }
       });
       g.globalAlpha = 1;
@@ -490,6 +520,7 @@
     }
     // the player
     const pr = Math.max(4 * dpr, bs * (st.map ? 0.6 : 0.32));
+    if (!st.map) { g.fillStyle = 'rgba(0,0,0,0.35)'; g.beginPath(); g.ellipse(ppx, ppy + pr * 1.1, pr * 1.1, pr * 0.4, 0, 0, 7); g.fill(); }
     g.fillStyle = 'rgba(243,211,107,0.22)'; g.beginPath(); g.arc(ppx, ppy, pr * 2, 0, 7); g.fill();
     g.fillStyle = '#ffffff'; g.beginPath(); g.arc(ppx, ppy, pr, 0, 7); g.fill();
     g.strokeStyle = 'rgb(7,8,11)'; g.lineWidth = 1.5 * dpr; g.stroke();
