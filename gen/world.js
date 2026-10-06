@@ -16,7 +16,7 @@
   const isNode = typeof module !== 'undefined' && module.exports && typeof window === 'undefined' && typeof importScripts === 'undefined';
   if (isNode) Object.assign(globalThis, require('./mazes.js'), require('./core.js'), require('./dressing.js'));
 
-  const WORLD_DEFAULTS = { seed: 1, preset: 'arsenal', band: 3, loops: 70, doors: 3, hubs: 9, maze: 60, algo: 'growing', ruin: 10 };
+  const WORLD_DEFAULTS = { seed: 1, preset: 'underdark', band: 3, loops: 70, doors: 3, hubs: 9, maze: 60, algo: 'growing', ruin: 10 };
   // Sector grids are COLS x ROWS cells but sit CW x CH apart, so neighbours overlap by MARGIN cells each side.
   const MARGIN = 5, CW = COLS - 2 * MARGIN, CH = ROWS - 2 * MARGIN;
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
@@ -45,6 +45,8 @@
   }
   function tierName(S, type, level) {
     const P = PRESETS[S.preset] || PRESETS.generic;
+    // the underdark's strata carry their own names; a numeral only once they recur deeper down
+    if (S.preset === 'underdark') return level > 1 ? `${P.tiers[type].name} ${ROMAN[level - 1] || level}` : P.tiers[type].name;
     return `${P.tiers[type].name} ${ROMAN[level - 1] || level}`;
   }
   // ---------- geometry: wobbly borders and cell ownership (all in global cell coordinates) ----------
@@ -110,7 +112,10 @@
   function portalCells(p) { return { door: p.door, hub: p.hub }; }
 
   // ---------- functions inside a sector (Arsenal doctrine) ----------
-  const PORTAL_FUNCS = { SE: { name: 'Seal', hub: 1 }, PS: { name: 'Passage', hub: 1 } };
+  const PORTAL_FUNCS = { SE: { name: 'Seal', hub: 1 }, PS: { name: 'Passage', hub: 1 },
+    // underdark landmarks
+    PG: { name: 'Pilgrim camp' }, PT: { name: 'Unsealed pit' }, EY: { name: 'Watching eye' }, BL: { name: 'Bloom heart' }, SH: { name: 'Shrine' } };
+  const UD_LANDMARK = ['EY', 'BL', 'SH'];
   const TIER_STYLE = [0, 3, 4]; // default architecture for doorways in each ring: crypts, ducts, keep
   function portalFunction(info, p) {
     const inward = p.kind === 'parent';
@@ -149,7 +154,7 @@
       let cand = genCandidates(reg, seed), g = genGrammar(reg, cand, seed, same, 30);
       if (g.tier.some(t => t < 0)) { cand = genCandidates(reg, seed, 1); g = genGrammar(reg, cand, seed, same, 30); }
       if (g.tier.some(t => t < 0)) { last = 'disconnected regions'; continue; }
-      const doctrine = assign(S, info, reg, g, cand, rng, arsenal);
+      const doctrine = assign(S, info, reg, g, cand, rng, arsenal, g.depth);
       const field = genField(reg, seed, 2.5, { em: true, mh: true, eh: false });
       field.excluded = own.map(v => 1 - v); // cells a neighbouring sector owns
       const cor = genCorridors(reg, g, field, seed);
@@ -177,12 +182,31 @@
       // dressing: example-driven tile WFC over the finished layout (walls take their region's tileset)
       let deco = null, dressStats = null;
       if (typeof dress === 'function' && S.dress !== false) {
+        const P = PRESETS[S.preset], tsOf = st => P.tilesets ? P.tilesets[st] : st;
         const setOf = new Uint8Array(SW * SH);
         for (let i = 0; i < SW * SH; i++) {
           const c = (((i / SW) | 0) / 3 | 0) * COLS + ((i % SW) / 3 | 0);
-          setOf[i] = pass[i] && col[i] < 5 ? col[i] : field.prim[c];
+          setOf[i] = tsOf(pass[i] && col[i] < 5 ? col[i] : field.prim[c]);
         }
-        const d = dress(pass, setOf, SW, SH, seed * 31 + 7);
+        // strata bleed into each other around the seals between them, so a change of stratum is
+        // announced before you reach it: blobs of the neighbouring stratum's tiles, denser near the seal
+        if (P.tilesets) {
+          const strata = [P.tilesets[0], P.tilesets[1], P.tilesets[4]], R = 10;
+          const src = portals.filter(p => p.cross).map(p => ({ x: p.door[0], y: p.door[1], set: strata[p.toType] }));
+          if (src.length) {
+            const nz = makeNoise(seed ^ 0x5bd1);
+            for (let i = 0; i < SW * SH; i++) {
+              const cx = (i % SW) / 3, cy = ((i / SW) | 0) / 3;
+              let best = null, bd = R;
+              src.forEach(q => { const d = Math.hypot(q.x + 0.5 - cx, q.y + 0.5 - cy); if (d < bd) { bd = d; best = q; } });
+              if (best && nz(cx * 0.8, cy * 0.8) < 1.25 * Math.pow(1 - bd / R, 1.3)) setOf[i] = best.set;
+            }
+          }
+        }
+        // landmarks show their stratum's centrepiece (star chart, bloom heart, unsealed pit)
+        const pins = [];
+        if (P.tilesets) pts.forEach(p => { if (!p.fn || p.fn === 'SE') return; const c = centrepieceAt(pass, setOf, SW, SH, p.cx * 3, p.cy * 3, 5); if (c) pins.push(...c); });
+        const d = dress(pass, setOf, SW, SH, seed * 31 + 7, pins);
         deco = d.tiles; dressStats = { fallbacks: d.fallbacks, violations: d.violations };
       }
       const hubs = pts.map((p, i) => ({ i: (p.cy * 3 + 1) * SW + p.cx * 3 + 1, label: p.label, type: info.type, fn: p.fn || null, portal: !!p.portal }));
@@ -198,7 +222,8 @@
     return (y * 3 + ((k / 3) | 0)) * SW + x * 3 + (k % 3);
   }
 
-  function assign(S, info, reg, g, cand, rng, arsenal) {
+  function assign(S, info, reg, g, cand, rng, arsenal, depth) {
+    if (S.preset === 'underdark') return assignUnderdark(S, info, reg, depth);
     const pts = reg.pts, type = info.type, n = pts.length;
     const border = pts.map(() => new Set()); cand.del.forEach(e => { border[e.a].add(e.b); border[e.b].add(e.a); });
     const fn = new Array(n).fill(null);
@@ -261,6 +286,25 @@
       }
     });
     return report;
+  }
+
+  // underdark: one landmark per sector deep inside it, pits where the strata begin again, seals between strata
+  function assignUnderdark(S, info, reg, depth) {
+    const pts = reg.pts, type = info.type;
+    const interior = pts.map((_, i) => i).filter(i => !pts[i].start && !pts[i].portal);
+    const mark = interior.length ? interior.reduce((a, b) => depth[b] > depth[a] ? b : a) : -1;
+    pts.forEach((p, i) => {
+      p.tier = type; p.ruined = false;
+      let fn = null;
+      if (p.start) fn = 'PG';
+      else if (p.portal && p.portal.cross) fn = (type === 2 && p.portal.toType === 0) || (type === 0 && p.portal.toType === 2) ? 'PT' : 'SE';
+      else if (i === mark) fn = UD_LANDMARK[type];
+      p.fn = fn; p.label = fn;
+      const h = h32(S.seed, Math.round(p.x * 7), Math.round(p.y * 7), 5);
+      p.style = type === 0 ? (h % 3 ? 0 : 3) : type === 1 ? (h % 4 ? 1 : 2) : 4;
+      p.hub = fn === 'PT' ? 1 : p.portal ? 1 : fn ? 4 : undefined;
+    });
+    return null;
   }
 
   function funcName(code) { return (FUNCS[code] && FUNCS[code].name) || (PORTAL_FUNCS[code] && PORTAL_FUNCS[code].name) || code; }

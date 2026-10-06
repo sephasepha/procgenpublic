@@ -18,15 +18,15 @@
   <header>
     <div>
       <h1>Infinite Undercroft</h1>
-      <p class="sub">An endless arsenal that generates around you as you walk, with every rule still enforced</p>
+      <p class="sub">An endless labyrinth that generates around you as you walk, with every rule still enforced</p>
     </div>
     <nav class="topnav" aria-label="Pages"><a href="./" aria-current="page">Infinite</a><a href="workbench.html">Workbench</a><a href="lab.html">Maze Lab</a><a href="tiles.html">Tiles</a></nav>
   </header>
 
   <section class="hero card">
     <div class="eyebrow">Now generating</div>
-    <h2 id="heroWorld">World 1 · Arsenal</h2>
-    <p class="desc">Start at the Gatehouse and go deeper. Sectors are built around you as you walk: progression rules, a maze layer, then wave function collapse for the architecture and the dressing.</p>
+    <h2 id="heroWorld">World 1 · Underdark</h2>
+    <p class="desc" id="heroDesc">Start at the Gatehouse and go deeper. Sectors are built around you as you walk: progression rules, a maze layer, then wave function collapse for the architecture and the dressing.</p>
     <div class="row"><button class="btn primary descend" id="descend" type="button">Enter the Undercroft ▸</button><button class="btn" id="reseedTop" type="button">New world</button></div>
   </section>
 
@@ -46,9 +46,9 @@
       <section class="card">
         <div class="eyebrow">World</div>
         <div class="row"><span class="seed">world seed <b id="seedOut">1</b></span><button class="btn" id="reseed" type="button">New world</button></div>
-        <div class="seg" role="group" aria-label="Preset" style="grid-template-columns:repeat(2,minmax(0,1fr))"><button type="button" data-preset="generic">Generic</button><button type="button" data-preset="arsenal">Arsenal</button></div>
+        <div class="seg" role="group" aria-label="Preset" style="grid-template-columns:repeat(3,minmax(0,1fr))"><button type="button" data-preset="underdark">Underdark</button><button type="button" data-preset="arsenal">Arsenal</button><button type="button" data-preset="generic">Generic</button></div>
         <div class="controls">
-          <div class="ctl"><label for="pBand">Sectors per tier</label><output id="vBand"></output><input id="pBand" type="range" min="1" max="6" step="1"><small>How many sectors deep each tier band runs before the next</small></div>
+          <div class="ctl"><label for="pBand">Sectors per tier</label><output id="vBand"></output><input id="pBand" type="range" min="3" max="6" step="1"><small>How many sectors deep each tier band runs before the next (3 or more keeps cross-tier branches to two)</small></div>
           <div class="ctl"><label for="pLoops">Loop doorways</label><output id="vLoops"></output><input id="pLoops" type="range" min="0" max="100" step="5"><small>Chance of an extra doorway between same-tier neighbours</small></div>
           <div class="ctl"><label for="pDoors">Extra doorways per border</label><output id="vDoors"></output><input id="pDoors" type="range" min="0" max="4" step="1"><small>Up to this many more doorways on borders between same-tier sectors, so borders read as ordinary walls</small></div>
           <div class="ctl"><label for="pHubs">Hubs per sector</label><output id="vHubs"></output><input id="pHubs" type="range" min="5" max="14" step="1"></div>

@@ -51,7 +51,7 @@ const sizes = quick ? [10, 18] : [8, 14, 24];
 const algos = quick ? ['growing', 'kruskal'] : ['growing', 'backtracker', 'prim', 'wilson', 'binary'];
 const seeds = quick ? 2 : 4;
 let runs = 0, breaches = 0;
-for (const preset of ['generic', 'arsenal']) {
+for (const preset of ['generic', 'arsenal', 'underdark']) {
   C.setPreset(preset);
   for (const rules of ruleSets) {
     if (preset === 'generic' && rules.ruin) continue;

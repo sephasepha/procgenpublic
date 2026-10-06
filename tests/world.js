@@ -4,24 +4,29 @@
 // branch caps hold, the Keep is entered only through Checkpoints, and order of generation is irrelevant.
 const W = require('../gen/world.js');
 const C = require('../gen/core.js');
+const DR = require('../gen/dressing.js');
 const quick = !!process.env.QUICK;
 let checks = 0, failures = 0;
 const check = (c, m) => { checks++; if (!c) { failures++; console.log('  FAIL ' + m); } };
 const t0 = Date.now();
 const DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
 
-for (const preset of ['arsenal', 'generic']) {
-  const S = { ...W.WORLD_DEFAULTS, preset, seed: preset === 'arsenal' ? 7 : 3 };
-  const R = quick ? 2 : preset === 'arsenal' ? 5 : 3;
+for (const preset of ['underdark', 'arsenal', 'generic']) {
+  // small bands so the window reaches the Keep (Arsenal) and the pits into the next level (Underdark)
+  const S = { ...W.WORLD_DEFAULTS, preset, seed: preset === 'arsenal' ? 7 : preset === 'underdark' ? 5 : 3, band: preset === 'underdark' ? 1 : 3 };
+  const R = quick ? 2 : preset === 'generic' ? 3 : preset === 'arsenal' ? 7 : 5;
   console.log(`${preset}: sectors within ${R} of the start`);
-  const sec = new Map(), key = (x, y) => x + ',' + y;
+  const sec = new Map(), key = (x, y) => x + ',' + y, times = [];
   for (let x = -R; x <= R; x++) for (let y = -R; y <= R; y++) {
     if (Math.abs(x) + Math.abs(y) > R) continue;
     const s = W.genSector(S, x, y);
     sec.set(key(x, y), s);
     check(s.ok, `${preset} sector ${x},${y} failed to generate: ${s.error}`);
+    // real-time budget: a sector must stream in well under the time it takes to walk across one
+    check(s.ms < 3000, `${preset} sector ${x},${y} took ${s.ms} ms to generate (budget 3000)`);
+    times.push(s.ms);
   }
-  let worksDoctrine = 0, worksSectors = 0;
+  let worksDoctrine = 0, worksSectors = 0, landmarks = 0, shown = 0;
   sec.forEach(s => {
     if (!s.ok) return;
     const { sx, sy, info } = s;
@@ -52,7 +57,24 @@ for (const preset of ['arsenal', 'generic']) {
     }
     // cross-tier children at most 2
     const kids = s.portals.filter(p => p.kind === 'child' && p.cross).length;
-    check(kids <= 2, `${preset} ${sx},${sy}: ${kids} cross-tier children`);
+    if (S.band >= 3) check(kids <= 2, `${preset} ${sx},${sy}: ${kids} cross-tier children`); // the cap needs tiers at least 3 sectors deep
+    // underdark: pits only where the strata begin again (a new level), seals between the other strata,
+    // and every landmark shows its stratum's centrepiece in the dressing
+    if (preset === 'underdark') {
+      s.portals.forEach(p => {
+        if (!p.cross) return;
+        const lvl = Math.max(info.tierIndex, p.toTier) % 3 === 0, hub = s.hubs.find(h => h.portal && h.i === hubIndexOf(p));
+        check(hub && hub.fn === (lvl ? 'PT' : 'SE'), `${preset} ${sx},${sy}: border between strata labelled ${hub && hub.fn}, expected ${lvl ? 'PT' : 'SE'}`);
+      });
+      s.hubs.filter(h => h.fn && h.fn !== 'SE').forEach(h => {
+        landmarks++;
+        const hx = h.i % C.SW, hy = (h.i / C.SW) | 0;
+        for (let y = hy - 7; y <= hy + 7; y++) for (let x = hx - 7; x <= hx + 7; x++) {
+          const t = s.deco && s.deco[y * C.SW + x], v = t && DR.DRESS_TILES[t];
+          if (v && v.letter === '1') { shown++; return; }
+        }
+      });
+    }
     // the Keep is entered only through Checkpoints, and left only through Vaults
     if (preset === 'arsenal') {
       s.portals.forEach((p, k) => {
@@ -81,6 +103,8 @@ for (const preset of ['arsenal', 'generic']) {
     check(leaks === 0, `${preset}: ${leaks} places where floors of two sectors touch outside a doorway`);
     console.log(`  ${crossings} doorway crossings between sectors`);
   }
+  times.sort((p, q) => p - q);
+  console.log(`  sector generation: median ${times[times.length >> 1]} ms, p95 ${times[Math.floor(times.length * 0.95)]} ms, max ${times[times.length - 1]} ms`);
   // global connectivity across the window via open doorways (parent chains stay inside the diamond)
   const seen = new Set([key(0, 0)]), q = [[0, 0]];
   while (q.length) {
@@ -88,6 +112,7 @@ for (const preset of ['arsenal', 'generic']) {
     s.portals.forEach(p => { const k = key(p.to[0], p.to[1]); if (sec.has(k) && !seen.has(k)) { seen.add(k); q.push(p.to); } });
   }
   check(seen.size === sec.size, `${preset}: only ${seen.size}/${sec.size} sectors reachable from the start`);
+  if (preset === 'underdark') { console.log(`  ${shown}/${landmarks} landmarks show their centrepiece`); check(shown >= landmarks * 0.9, `underdark: only ${shown}/${landmarks} landmarks show their centrepiece`); }
   if (preset === 'arsenal') console.log(`  Works doctrine fully satisfied in ${worksDoctrine}/${worksSectors} Works sectors`);
 
   // order independence: regenerate sectors in a scrambled order, interleaved with another preset
@@ -100,7 +125,7 @@ for (const preset of ['arsenal', 'generic']) {
   });
 }
 function hubIndexOf(p) {
-  const d = p.dir, cx = d === 0 || d === 2 ? p.pos : d === 1 ? C.COLS - 2 : 1, cy = d === 1 || d === 3 ? p.pos : d === 0 ? 1 : C.ROWS - 2;
+  const cx = Math.max(1, Math.min(C.COLS - 2, p.hub[0])), cy = Math.max(1, Math.min(C.ROWS - 2, p.hub[1]));
   return (cy * 3 + 1) * C.SW + cx * 3 + 1;
 }
 console.log(`\n${checks} checks, ${((Date.now() - t0) / 1000).toFixed(1)}s`);

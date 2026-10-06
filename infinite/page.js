@@ -2,9 +2,15 @@
 (() => {
   const $ = id => document.getElementById(id);
   const S = { ...WORLD_DEFAULTS };
-  const TIER_COL = ['#a8d672', '#f0b34b', '#e05a5a'];
+  const BASE_COL = ['#a8d672', '#f0b34b', '#e05a5a'];
+  let TIER_COL = BASE_COL;
+  const LOOK = {
+    underdark: { name: 'Underdark', desc: 'Begin among the Gray Pilgrims and go deeper. Three strata of unknown making, Constellation of Mazes, Uncontrollable Growth and Unsealed Shrines, each its own architecture and tiles. Seals divide them; opened pits lead down to where they begin again.' },
+    arsenal: { name: 'Arsenal', desc: 'Start at the Gatehouse and go deeper. Sectors are built around you as you walk: progression rules, a maze layer, then wave function collapse for the architecture and the dressing.' },
+    generic: { name: 'Generic', desc: 'Easy, medium and hard tiers in rings around the start. Sectors are built around you as you walk: progression rules, a maze layer, then wave function collapse for the architecture and the dressing.' },
+  };
   const ALGOS = ['backtracker', 'growing', 'huntkill', 'prim', 'kruskal', 'wilson', 'aldous', 'binary', 'sidewinder'];
-  const NUM = { seed: [1, 1e9], band: [1, 6], loops: [0, 100], doors: [0, 4], hubs: [5, 14], maze: [0, 100], ruin: [0, 40] };
+  const NUM = { seed: [1, 1e9], band: [3, 6], loops: [0, 100], doors: [0, 4], hubs: [5, 14], maze: [0, 100], ruin: [0, 40] };
 
   function readHash() {
     const p = new URLSearchParams(location.hash.slice(1));
@@ -21,6 +27,7 @@
   const cv = $('preview'), g = cv.getContext('2d');
   function preview() {
     setPreset(S.preset);
+    TIER_COL = PRESETS[S.preset].colors || BASE_COL;
     const R = 6, n = 2 * R + 1, w = cv.parentElement.clientWidth || 360, dpr = Math.min(3, window.devicePixelRatio || 1);
     cv.width = Math.round(w * dpr); cv.height = cv.width;
     const cell = cv.width / n;
@@ -52,7 +59,8 @@
 
   function refresh() {
     $('seedOut').textContent = S.seed;
-    $('heroWorld').textContent = `World ${S.seed} · ${S.preset === 'arsenal' ? 'Arsenal' : 'Generic'}`;
+    $('heroWorld').textContent = `World ${S.seed} · ${LOOK[S.preset].name}`;
+    $('heroDesc').textContent = LOOK[S.preset].desc;
     document.querySelectorAll('[data-preset]').forEach(b => b.classList.toggle('on', b.dataset.preset === S.preset));
     $('ruinCtl').hidden = S.preset !== 'arsenal';
     $('algos').innerHTML = ALGOS.map(k => `<button type="button" data-algo="${k}" class="${k === S.algo ? 'on' : ''}">${MAZE_ALGOS[k].short}</button>`).join('');

@@ -37,6 +37,11 @@ D.DRESS_SETS.forEach((s, si) => {
     let wrongFace = 0;
     for (let y = 1; y < Hd - 1; y++) for (let x = 1; x < Wd - 1; x++) { const i = y * Wd + x, v = D.DRESS_TILES[out.tiles[i]]; if (!pass[i] && pass[i + Wd] && !pass[i - Wd] && !pass[i - 1] && !pass[i + 1] && v.cls !== 4) wrongFace++; }
     check(wrongFace === 0, `${s.key} seed ${seed}: ${wrongFace} south-facing walls without a face tile`);
+    // centrepieces (tiles 1-4) only ever appear as whole 2x2 assemblies
+    let broken = 0;
+    const L = j => { const v = D.DRESS_TILES[out.tiles[j]]; return v.strict && /[1-4]/.test(v.letter) ? v.letter : ''; };
+    for (let i = 0; i < Wd * Hd; i++) { const l = L(i); if (!l) continue; const tl = l === '1' ? i : l === '2' ? i - 1 : l === '3' ? i - Wd : i - Wd - 1; if (L(tl) !== '1' || L(tl + 1) !== '2' || L(tl + Wd) !== '3' || L(tl + Wd + 1) !== '4') broken++; }
+    check(broken === 0, `${s.key} seed ${seed}: ${broken} centrepiece quarters outside a whole 2x2`);
     const again = D.dress(pass, setOf, Wd, Hd, seed);
     check(again.tiles.every((t, i) => t === out.tiles[i]), `${s.key} seed ${seed}: not deterministic`);
     fallbacks += out.fallbacks; cells += Wd * Hd;

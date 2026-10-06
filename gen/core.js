@@ -55,6 +55,16 @@ const PRESETS = {
     blurbs: ['Barracks and archives: straight galleries, small cells', 'Collapse and overgrowth: open, irregular, ignores clearance', 'Smelters and foundries: halls on straight haul roads', 'Magazines, cisterns, duct hubs: twisting service tunnels', 'Checkpoints and vaults: symmetric halls, switchbacks'],
     used: [0, 2, 3, 4, 1],
   },
+  // the labyrinthine underdark: strata of unknown making, each its own architecture and tileset
+  underdark: {
+    tiers: [{ name: 'Constellation of Mazes', short: 'M' }, { name: 'Uncontrollable Growth', short: 'G' }, { name: 'Unsealed Shrines', short: 'S' }],
+    tierOfStyle: [0, 1, 1, 0, 2],
+    names: ['Maze Galleries', 'Overgrowth', 'Grown Halls', 'Star Warrens', 'Shrine Halls'],
+    blurbs: ['Engraved galleries under a sky of stars', 'Open caverns swallowed by vines and bloom', 'Old halls the growth has broken into', 'Tight twisting passages, eyes in the walls', 'Candlelit halls around opened pits'],
+    used: [0, 3, 1, 4],
+    colors: ['#aab8ff', '#8fdc6e', '#eaa65a'],
+    tilesets: [5, 6, 6, 5, 7], // dressing tileset for each architecture style
+  },
 };
 let PRESET = 'generic';
 let TIERS = PRESETS.generic.tiers;
@@ -338,7 +348,9 @@ function genGrammar(reg, cand, seed, rules, loopPct) {
     const s1 = { x: rng() * COLS, y: rng() * ROWS }, s2 = { x: rng() * COLS, y: rng() * ROWS };
     pts.forEach((p, i) => {
       p.tier = tier[i]; p.fn = null; p.ruined = false; p.hub = undefined;
-      p.style = tier[i] === 0 ? 0 : tier[i] === 2 ? 2 : (Math.hypot(p.x - s1.x, p.y - s1.y) < Math.hypot(p.x - s2.x, p.y - s2.y) ? 1 : 3);
+      const near1 = Math.hypot(p.x - s1.x, p.y - s1.y) < Math.hypot(p.x - s2.x, p.y - s2.y);
+      if (PRESET === 'underdark') p.style = tier[i] === 0 ? (near1 ? 0 : 3) : tier[i] === 1 ? 1 : 4; // mazes split into galleries and warrens
+      else p.style = tier[i] === 0 ? 0 : tier[i] === 2 ? 2 : (near1 ? 1 : 3);
     });
   }
   return { del: cand.del, edges, forbidden, mstCount: treeCount, loopCount: edges.length - treeCount, tier, nb, depth, counts, doctrine };

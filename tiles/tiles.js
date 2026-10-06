@@ -4,23 +4,23 @@
   const DIRS = ['Above', 'Right', 'Below', 'Left'];
   let cur = 0, sel = null, seed = 1, layoutKind = 'maze';
 
+  // tiles are 4x4 or 8x8 pixels (v.size)
   function tileCanvas(v, scale) {
-    const c = document.createElement('canvas'); c.width = 4; c.height = 4;
-    const g = c.getContext('2d'), img = g.createImageData(4, 4);
+    const N = v.size || 4, c = document.createElement('canvas'); c.width = N; c.height = N;
+    const g = c.getContext('2d'), img = g.createImageData(N, N);
     v.rgb.forEach((p, k) => { img.data.set([p[0], p[1], p[2], 255], k * 4); });
     g.putImageData(img, 0, 0);
     if (scale) { c.style.width = c.style.height = scale + 'px'; }
     return c;
   }
-  function drawTiles(canvas, W, H, idAt, scale) {
-    canvas.width = W * 4; canvas.height = H * 4;
-    const g = canvas.getContext('2d'), img = g.createImageData(W * 4, H * 4);
+  function drawTiles(canvas, W, H, idAt, N) {
+    canvas.width = W * N; canvas.height = H * N;
+    const g = canvas.getContext('2d'), img = g.createImageData(W * N, H * N);
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const v = idAt(x, y); if (!v) continue;
-      v.rgb.forEach((p, k) => { const o = ((y * 4 + (k >> 2)) * W * 4 + x * 4 + (k & 3)) * 4; img.data[o] = p[0]; img.data[o + 1] = p[1]; img.data[o + 2] = p[2]; img.data[o + 3] = 255; });
+      v.rgb.forEach((p, k) => { const o = ((y * N + ((k / N) | 0)) * W * N + x * N + (k % N)) * 4; img.data[o] = p[0]; img.data[o + 1] = p[1]; img.data[o + 2] = p[2]; img.data[o + 3] = 255; });
     }
     g.putImageData(img, 0, 0);
-    if (scale) canvas.style.width = Math.min(W * 4 * scale, canvas.parentElement ? canvas.parentElement.clientWidth : 9999) + 'px';
   }
 
   // a fresh layout to dress: a braided maze turned into floor/wall blocks, or open rooms joined by corridors
@@ -48,7 +48,7 @@
     const W = 33, H = 41, pass = layout(W, H), setOf = new Uint8Array(W * H).fill(cur);
     const t0 = performance.now(), r = dress(pass, setOf, W, H, seed * 131 + cur);
     const ms = performance.now() - t0;
-    drawTiles($('gen'), W, H, (x, y) => { const v = DRESS_TILES[r.tiles[y * W + x]], h = cellHash(x, y); return v.spins ? { rgb: v.spins[h & 3] } : v; });
+    drawTiles($('gen'), W, H, (x, y) => { const v = DRESS_TILES[r.tiles[y * W + x]], h = cellHash(x, y); return v.spins ? { rgb: v.spins[h & 3] } : v; }, DRESS_SETS[cur].size);
     $('gen').style.width = '100%';
     $('genNote').textContent = `${W}×${H} tiles · ${ms.toFixed(0)} ms · ${r.fallbacks} fallbacks`;
   }
@@ -56,7 +56,7 @@
   function render() {
     const s = DRESS_SETS[cur];
     $('sets').innerHTML = DRESS_SETS.map((t, i) => `<button type="button" data-i="${i}" class="${i === cur ? 'on' : ''}">${t.name}</button>`).join('');
-    $('tilesEyebrow').textContent = `${s.name}: ${Object.keys(s.tiles).length} drawn tiles → ${s.n} variants in ${s.classMask.size} contexts · tap one to see its neighbours`;
+    $('tilesEyebrow').textContent = `${s.name} (${s.size}×${s.size} px): ${Object.keys(s.tiles).length} drawn tiles → ${s.n} variants in ${s.classMask.size} contexts · tap one to see its neighbours`;
     // one card per drawn tile (its first rotation)
     const first = {}; s.variants.forEach((v, i) => { if (first[v.letter] === undefined) first[v.letter] = i; });
     const grid = $('tiles'); grid.innerHTML = '';
@@ -90,7 +90,7 @@
       wrap.appendChild(c);
       const code = document.createElement('div'); code.className = 'code'; code.textContent = rows.join('\n');
       wrap.appendChild(code); ex.appendChild(wrap);
-      drawTiles(c, rows[0].length, rows.length, (x, y) => s.variants[s.exampleIds[ei][y][x]]);
+      drawTiles(c, rows[0].length, rows.length, (x, y) => s.variants[s.exampleIds[ei][y][x]], s.size);
       c.style.width = Math.min(rows[0].length * 20, 340) + 'px';
     });
     generate();

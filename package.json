@@ -3,6 +3,7 @@
   "private": true,
   "description": "Procedural dungeon and maze generation workbench",
   "scripts": {
-    "test": "node tests/run.js && node tests/world.js && node tests/dressing.js"
+    "test": "QUICK=1 node tests/run.js && QUICK=1 node tests/world.js && node tests/dressing.js",
+    "test:full": "node tests/run.js && node tests/world.js && node tests/dressing.js"
   }
 }

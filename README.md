@@ -9,17 +9,34 @@ Open it on your phone and use **Add to Home Screen** to install it as an app. It
 ## Pages
 
 - **Infinite** (`index.html`, the home page): an endless world of sectors that generates around you as you walk. It opens straight into the explorer; the menu button (☰) shows world settings and the other tools.
-- **Workbench** (`workbench.html`): the full pipeline for one dungeon in seven stages: hubs → candidate links → progression rules → style field → corridors and maze → WFC → validation. Generic and Arsenal presets.
+- **Workbench** (`workbench.html`): the full pipeline for one dungeon in seven stages: hubs → candidate links → progression rules → style field → corridors and maze → WFC → validation. Generic, Arsenal and Underdark presets.
 - **Maze Lab** (`lab.html`): nine classic maze algorithms on a plain grid, with carving replay, overlays and a comparison table.
 - **Tiles** (`tiles.html`): the hand-drawn tilesets and example rooms the dressing WFC learns from, the learned neighbour rules for each tile, and a freshly dressed patch.
 
 The Workbench and Maze Lab also have a simple **Explore** mode. Every setting lives in the page URL, so any generation can be bookmarked, shared or replayed exactly.
 
+## The Underdark (default preset)
+
+The labyrinthine underdark is a cosmic space of unknown making, built in strata that repeat as you go deeper:
+
+| Stratum | Architecture | Tiles (8×8) | Landmark |
+| --- | --- | --- | --- |
+| Constellation of Mazes | engraved galleries and twisting star warrens; the unexplored dark is a field of stars | maze reliefs, watching eyes, gold leaves, engraved paths | **EY** watching eye, under a star chart |
+| Uncontrollable Growth | open caverns, with old halls the growth broke into | vines, tall grass, flowers, root runs, overgrown pillars | **BL** bloom heart |
+| Unsealed Shrines | candlelit symmetric halls | candle alcoves, heather, stepping stones, shrine pillars | **SH** shrine around an opened pit |
+
+Progression stays legible:
+
+- **Seals (SE)** divide one stratum from the next; **pits (PT)** lead from the Shrines down to where the strata begin again, one level deeper (Constellation of Mazes II, …).
+- Near every seal and pit the next stratum's tiles **creep** in, in blobs that thicken towards the doorway, and the **Gray Pilgrims' lavender fog** rises. The pilgrims themselves keep vigil at each seal and camp at the start (**PG**).
+- Each stratum has its own **atmosphere**: void colour, light tint, particles (gold motes, spores, dust) and glowing tiles (eyes, bloom hearts, candles, pits).
+- Light falls off with walking distance from you; places you have seen stay dimly remembered.
+
 ## Dressing: example-driven tile WFC
 
 Every cell of a finished layout has a **context** read from the floor/wall pattern around it: a wall with floor below is a south face, a floor with walls left and right is a corridor, and so on (wall faces, outer and inner corners, thin walls, wall ends, pillars, wall shadows, corner shadows, corridors, dead ends, room centres).
 
-Each biome's tileset (`gen/dressing.js`) is a **shared structural kit** drawn in the biome's palette (faces, cracked and coursed faces, corners, thin walls, ends, pillars, floor shadows, corridor edges) plus the biome's own details (niches, sconces, furnaces, pipes, banners, moss, runners, rails, drains, carpets, and 2x2 centrepieces). From hand-drawn example rooms the generator learns, for every tile:
+Each biome's tileset (`gen/dressing.js`) is a **shared structural kit** drawn in the biome's palette (faces, cracked and coursed faces, corners, thin walls, ends, pillars, floor shadows, corridor edges) plus the biome's own details (niches, sconces, furnaces, pipes, banners, moss, runners, rails, drains, carpets, and 2x2 centrepieces). Tiles are 4×4 pixels, or 8×8 for the Underdark strata, which share an 8×8 structural kit. From hand-drawn example rooms the generator learns, for every tile:
 
 - which contexts it appears in, so faces only go on faces, runners in corridors, centrepieces in room centres,
 - its orientation, inferred from context: write a tile's letter anywhere and it turns to face the right way,
@@ -37,7 +54,7 @@ The world is an endless grid of sectors, each a full dungeon from the Workbench 
 The grammar holds globally even though no sector ever sees the whole world:
 
 - **Connectivity:** every sector links to a parent one step closer to the start, chosen from its own coordinates. All sectors form one tree rooted at the start, so everything is reachable.
-- **Tiers:** a sector's tier comes from its distance to the start (`band` sectors per tier), cycling Outer → Works → Keep, then on into the next level. Neighbours differ by at most one tier, so nothing can skip one.
+- **Tiers:** a sector's tier comes from its distance to the start (`band` sectors per tier, at least 3), cycling through the preset's three tiers (Mazes → Growth → Shrines, or Outer → Works → Keep), then on into the next level. Neighbours differ by at most one tier, so nothing can skip one.
 - **Caps:** extra loop doorways only join sectors of the same tier, and the parent choice avoids axis sectors, so no sector has more than two cross-tier branches.
 - **Seams you don't notice:** sector grids overlap their neighbours by a few cells, and each shared border has one contract, computed from that border's coordinates: a wobbly line (up to ±4 cells) that decides which sector owns each overlapping cell, whether the border is open, and where its doorways are. Same-tier borders usually open with several narrow doorways; borders between tiers keep a single designed seal. Both neighbours compute the contract independently, so generation order never matters, and the border reads as one more irregular wall of the labyrinth.
 - **Doctrine (Arsenal):** you enter the Keep only through Checkpoints, you leave it only through a Vault, which is the descent to the next level's Gatehouse, and Works sectors place foundries with power and cooling, away from magazines.
@@ -67,11 +84,11 @@ No build step: the files are served as-is, so pushing to `main` is the deploy.
 ## Tests
 
 ```
-npm test          # pipeline, infinite world and dressing suites, about a minute and a half
-QUICK=1 npm test  # short run
+npm test            # fast tier: every suite on a small window, about 30 seconds
+npm run test:full   # full tier: wider windows, more seeds, a few minutes (run it in the background)
 ```
 
-The suite checks that every maze algorithm yields a perfect maze (also on masked grids), and that every full generation, across both presets, several rule sets and maze algorithms, has every hub reachable, no illegal links between tiers, no branch-cap breaches, no socket mismatches, and is deterministic for a given seed.
+Each world run also reports sector generation time (median, p95, max) and fails any sector over a 3 second budget, so real-time streaming stays fast. The suite checks that every maze algorithm yields a perfect maze (also on masked grids), and that every full generation, across both presets, several rule sets and maze algorithms, has every hub reachable, no illegal links between tiers, no branch-cap breaches, no socket mismatches, and is deterministic for a given seed.
 
 ## Maze algorithms
 

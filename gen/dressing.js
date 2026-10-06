@@ -66,14 +66,39 @@
     D: { px: ['####', '####', '###w', '##wh'], walk: 0, anchor: 32, name: 'Inner corner' },
   };
 
-  // split an 8x8 drawing into four 4x4 tiles: 1 top-left, 2 top-right, 3 bottom-left, 4 bottom-right
-  function quad(rows8, names, extra) {
-    const out = {};
-    [[0, 0], [4, 0], [0, 4], [4, 4]].forEach(([ox, oy], k) => {
-      out[String(k + 1)] = { px: [0, 1, 2, 3].map(y => rows8[oy + y].slice(ox, ox + 4)), walk: 1, strict: 1, name: names, ...extra };
+  // split a 2N x 2N drawing into four N x N tiles: 1 top-left, 2 top-right, 3 bottom-left, 4 bottom-right
+  function quad(rows, names, extra) {
+    const out = {}, N = rows.length / 2;
+    [[0, 0], [N, 0], [0, N], [N, N]].forEach(([ox, oy], k) => {
+      out[String(k + 1)] = { px: rows.slice(oy, oy + N).map(r => r.slice(ox, ox + N)), walk: 1, strict: 1, name: names, ...extra };
     });
     return out;
   }
+
+  // ---------- the 8x8 structural kit (palette roles: . , : floor tones, ; floor crack, k K floor shadow,
+  // x wall top, w wall top joints, W wall face, h lit edge, H contact shadow, d crack,
+  // # rock or void, + and * faint and bright specks in the void) ----------
+  const KIT8 = {
+    F: { px: ['........', '.,......', '......:.', '...,....', '........', '.:....,.', '........', '....,...'], walk: 1, spin: 1, name: 'Floor' },
+    G: { px: ['..,,....', '.,......', '........', '.....::.', '........', ',.......', '.......,', '...,....'], walk: 1, spin: 1, name: 'Floor, worn' },
+    X: { px: ['...;....', '...;;...', '....;...', '...;.;..', '..;...;.', '........', '.,......', '......,.'], walk: 1, spin: 1, w: 0.6, name: 'Floor, cracked' },
+    K: { px: ['KKKKKKKK', 'kkkkkkkk', '.k.k.k.k', '........', '.,......', '......:.', '........', '...,....'], walk: 1, anchor: FLOOR | 1, name: 'Wall shadow' },
+    L: { px: ['KKKKKKKK', 'Kkkkkkkk', 'Kk.k.k.k', 'Kk......', 'Kk.,....', 'Kk....:.', 'Kk......', 'Kk..,...'], walk: 1, anchor: FLOOR | 9, name: 'Corner shadow' },
+    C: { px: ['Kk....kK', 'Kk.,..kK', 'Kk....kK', 'Kk..:.kK', 'Kk....kK', 'Kk.,..kK', 'Kk....kK', 'Kk...,kK'], walk: 1, anchor: FLOOR | 10, name: 'Corridor' },
+    Z: { px: ['Kk....kK', 'Kk.,..kK', 'Kk....kK', 'Kk..:.kK', 'Kk....kK', 'Kk.,..kK', 'Kkkkkkkk', 'KKKKKKKK'], walk: 1, anchor: FLOOR | 14, name: 'Dead end' },
+    I: { px: ['Kk......', 'k.......', '........', '...,....', '........', '.:....,.', '........', '....,...'], walk: 1, anchor: FLOOR | 128, name: 'Inner corner' },
+    R: { px: ['########', '#+######', '#####*##', '########', '###+####', '########', '######+#', '#*######'], walk: 0, spin: 1, name: 'Void' },
+    E: { px: ['xxwxxxwx', 'xwxxwxxx', 'wxxxxxwx', 'xxxwxxxx', 'xwxxxwxx', 'xxxxwxxx', 'wxwxxxxw', 'xxxxxwxx'], walk: 0, name: 'Masonry' },
+    A: { px: ['xwxxxwxx', 'xxwxxxwx', 'wxxwxxxw', 'hhhhhhhh', 'WWdWWWWW', 'WWWWWdWW', 'WdWWWWWW', 'HHHHHHHH'], walk: 0, anchor: 4, name: 'Wall face' },
+    Y: { px: ['xxxxxxxx', 'xxwxxxxx', 'xxxxxwxx', 'hhhhhhhh', 'WWWWWWWW', 'WWWWWWWW', 'WWWWWWWW', 'HHHHHHHH'], walk: 0, anchor: 4, name: 'Wall face, plain' },
+    S: { px: ['xwxxwxxw', 'xxxxxxxx', 'wxxwxxwx', 'hhhhhhhh', 'WdWWdWWd', 'WWWWWWWW', 'dWWdWWdW', 'HHHHHHHH'], walk: 0, anchor: 4, w: 0.7, name: 'Wall face, coursed' },
+    B: { px: ['xwxxxwxx', 'xxwxdxwx', 'wxxddxxw', 'hhhdhhhh', 'WWWdWWWW', 'WWdWdWWW', 'WdWWWdWW', 'HHHHHHHH'], walk: 0, anchor: 4, w: 0.5, name: 'Wall face, cracked' },
+    Q: { px: ['xxxxxhWH', 'xwxxxhWH', 'xxxwxhWH', 'xxxxxhWH', 'xwxxxhWH', 'hhhhhhWH', 'WWWWWWWH', 'HHHHHHHH'], walk: 0, anchor: 6, name: 'Outer corner' },
+    H: { px: ['hhhhhhhh', 'xxwxxxwx', 'xwxxwxxx', 'hhhhhhhh', 'WWWWWWWW', 'WdWWWWdW', 'WWWWWWWW', 'HHHHHHHH'], walk: 0, anchor: 5, name: 'Thin wall' },
+    J: { px: ['hhhhhhhH', 'xxwxxxhW', 'xwxxxxhW', 'hhhhhhhW', 'WWWWWWWW', 'WWdWWWWW', 'WWWWWWWW', 'HHHHHHHH'], walk: 0, anchor: 7, name: 'Wall end' },
+    P: { px: ['KhhhhhhK', 'hxxwxxxh', 'hxwxxwxh', 'hxxxxxxh', 'hhhhhhhh', 'WWWdWWWW', 'WWWWWWWW', 'KHHHHHHK'], walk: 0, anchor: 15, name: 'Pillar' },
+    D: { px: ['########', '########', '########', '########', '####xxxx', '####xwxx', '####xxhh', '####xxhW'], walk: 0, anchor: 32, name: 'Inner corner' },
+  };
 
   // ---------- biome tilesets: palette, details, example rooms ----------
   // Example rooms are grids of tile letters. Orientation is inferred, so a face letter on any wall
@@ -221,15 +246,123 @@
          'RRRRDAAAAAAAAAAAAAQZ'],
       ],
     },
+    // ---------- the Labyrinthine Underdark: 8x8 strata ----------
+    { key: 'mazes', name: 'Constellation of Mazes', size: 8,
+      palette: { '.': '#8c93a8', ',': '#7e859b', ':': '#a3aabd', ';': '#5f6680', 'k': '#6d7389', 'K': '#565c72', 'w': '#6b7894', 'x': '#8a97b3', 'W': '#4a5571', 'h': '#b4c0da', 'H': '#2c3349', 'd': '#353d56', '#': '#10142a', '+': '#3a4470', '*': '#cfd8ff', 'g': '#6fe0a0', 'G': '#2f8f5f', 'o': '#d9a441', 'O': '#a8742a', 'm': '#a9b2cb', 'n': '#5c6684' },
+      tiles: {
+        r: { px: ['xwxxxwxx', 'xxwxxxwx', 'wxxwxxxw', 'hhhhhhhh', 'WnnnWnnW', 'WnWnnnWW', 'WnnWWnnW', 'HHHHHHHH'], walk: 0, anchor: 4, w: 3, name: 'Maze relief' },
+        e: { px: ['xwxxxwxx', 'xxWWWWxx', 'xWnggnWx', 'hWgGGgWh', 'WWnggnWW', 'WWWWWWWW', 'WdWWWWWW', 'HHHHHHHH'], walk: 0, anchor: 4, w: 0.6, glow: '#6fe0a0', name: 'Watching eye' },
+        u: { px: ['Kk.mm.kK', 'Kk.n..kK', 'Kk.mm.kK', 'Kk..n.kK', 'Kk.mm.kK', 'Kk.n..kK', 'Kk.mm.kK', 'Kk..n.kK'], walk: 1, anchor: FLOOR | 10, strict: 1, w: 0.3, name: 'Engraved path' },
+        l: { px: ['........', '..o.....', '.oO.....', '......o.', '.....Oo.', '........', '..o.....', '........'], walk: 1, spin: 1, name: 'Gold leaves' },
+        c: { px: ['..mmmm..', '.m....m.', 'm..nn..m', 'm.n..n.m', 'm.n..n.m', 'm..nn..m', '.m....m.', '..mmmm..'], walk: 1, name: 'Engraved ring' },
+        ...quad(['....mmmmmmmm....', '..mm..*.....mm..', '.m..........*.m.', '.m..mmmmmmmm..m.', 'm..m........m..m', 'm.m...nnnn...m.m', 'm.m..n....n..m.m', 'm.m.n..gg..n.m.m', 'm.m.n..gg..n.m.m', 'm.m..n....n..m.m', 'm.m...nnnn...m.m', 'm..m........m..m', '.m..mmmmmmmm..m.', '.m.*..........m.', '..mm.....*..mm..', '....mmmmmmmm....'], 'Star chart', { glow: '#9fb4ff' }),
+      },
+      examples: [
+        ['RRRRRRRRRRRRRRRRRRRR',
+         'DAArrYArArrYAAADRRRR',
+         'ALKKKKKKKKKKKKLARRRR',
+         'AKFFlFFGFFFlFFKARRRR',
+         'AKFKPKFFFFKPKFKQAAAA',
+         'AKFlKFFFFFFKFFFuuuuL',
+         'AKFGFFF12FFFFFKQAAQC',
+         'AKFFKFF34FFlFFKARRAC',
+         'AKFKPKFcFFKPKGKARRAC',
+         'AKFFKlFFFFGKFFKARRAC',
+         'ALKKKKKFKKKKKKLARRAC',
+         'DAAAAHJCJHHHHHHAAAQC',
+         'RRRRAZCKCCCCCCCCCCCK',
+         'RRRRDAAAAAAAAAAAAAQZ'],
+        ['RRRRRRRRRRRRR',
+         'DrYArArAYAEeD',
+         'ALuuuuuKCZHZA',
+         'ACJHHHJCJHACA',
+         'AKuuuuuKuLHCA',
+         'ACQAAAAAQCJCA',
+         'AZARRRRRALCLA',
+         'DADRRRRRDAAAD'],
+      ],
+    },
+    { key: 'growth', name: 'Uncontrollable Growth', size: 8,
+      palette: { '.': '#3f7a3a', ',': '#346a33', ':': '#5f9a45', ';': '#2a5229', 'k': '#2b5530', 'K': '#1f4026', 'x': '#5b6b4e', 'w': '#4a5940', 'W': '#34412f', 'h': '#8fb86a', 'H': '#1b2a1c', 'd': '#263322', '#': '#0f1d16', '+': '#16301f', '*': '#1d3d29', 'f': '#f4f0d0', 'y': '#f2d35b', 'v': '#8fd14f', 'V': '#c8f07a', 'r': '#6b4e2e', 'p': '#d77fa1' },
+      tiles: {
+        v: { px: ['xvxxwxvx', 'xVvxxvVx', 'wvxwvxvw', 'hvhhvhvh', 'WvWWvWvW', 'WVWWWWvW', 'WvWWWWVW', 'HvHHHHvH'], walk: 0, anchor: 4, w: 1.6, name: 'Vines' },
+        t: { px: ['..v.....', '.vV..v..', '.v..vV..', '....v...', '.v......', 'vV...v..', '.v..vV..', '......v.'], walk: 1, spin: 1, w: 1.4, name: 'Tall grass' },
+        f: { px: ['........', '..f.....', '.fyf..v.', '..f..vV.', '.....f..', '..v.fyf.', '.vV..f..', '........'], walk: 1, spin: 1, name: 'Flowers' },
+        o: { px: ['KvhhhhvK', 'vxVxwxxh', 'hxwvxwxh', 'hxxxvxxv', 'hvhhhhvh', 'WWvWWWvW', 'WvWWWWWW', 'KHvHHHHK'], walk: 0, anchor: 15, name: 'Overgrown pillar' },
+        u: { px: ['Kk.rr.kK', 'Kk..r.kK', 'Kk.rr.kK', 'Kkr...kK', 'Kk.rr.kK', 'Kk..rrkK', 'Kk.r..kK', 'Kk.rr.kK'], walk: 1, anchor: FLOOR | 10, strict: 1, w: 0.3, name: 'Root run' },
+        ...quad(['......vv........', '....vVvvv.......', '...vv.pppp.vv...', '..v..pppppp.Vv..', '.vV.pppffppp..v.', '.v.ppffyyffpp.v.', 'v..ppfyyyyfpp..v', 'v.pppfyyyyfppp.v', 'v.pppfyyyyfppp.v', 'v..ppfyyyyfpp..v', '.v.ppffyyffpp.v.', '.v..pppffppp.Vv.', '..vV.pppppp..v..', '...vv.pppp.vv...', '.......vvvVv....', '........vv......'], 'Bloom heart', { glow: '#ffd36a' }),
+      },
+      examples: [
+        ['RRRRRRRRRRRRRRRRRRRR',
+         'DAAvvYAvAvvYAAADRRRR',
+         'ALKKKKKKKKKKKKLARRRR',
+         'AKFFtFFtFFFfFFKARRRR',
+         'AKFKoKFFFFKoKFKQAAAA',
+         'AKFfKFFFFFFKFFFuuuuL',
+         'AKFtFFF12FFFFFKQAAQC',
+         'AKFFKFF34FFfFFKARRAC',
+         'AKFKoKFfFFKoKtKARRAC',
+         'AKFFKfFFFFtKFFKARRAC',
+         'ALKKKKKFKKKKKKLARRAC',
+         'DAAAAHJCJHHHHHHAAAQC',
+         'RRRRAZCKCCCCCCCCCCCK',
+         'RRRRDAAAAAAAAAAAAAQZ'],
+        ['RRRRRRRRRRRRR',
+         'DvYAvAvAYAEvD',
+         'ALuuuuuKCZHZA',
+         'ACJHHHJCJHACA',
+         'AKuuuuuKuLHCA',
+         'ACQAAAAAQCJCA',
+         'AZARRRRRALCLA',
+         'DADRRRRRDAAAD'],
+      ],
+    },
+    { key: 'shrines', name: 'Unsealed Shrines', size: 8,
+      palette: { '.': '#b07a3a', ',': '#9e6c33', ':': '#c48a42', ';': '#7f5428', 'k': '#8c5f2c', 'K': '#6e4a24', 'x': '#b8ae98', 'w': '#9a917d', 'W': '#6f675a', 'h': '#ddd3bc', 'H': '#3e3830', 'd': '#4e473d', '#': '#2a1d14', '+': '#33241a', '*': '#3d2b1f', 'p': '#8a7aa8', 'P': '#6e5a8c', 'g': '#7f9a3f', 's': '#c9c2b0', 'S': '#a39c8a', 'c': '#f0d080', 'v': '#1a1620', 'm': '#8c8476' },
+      tiles: {
+        a: { px: ['xwxxxwxx', 'xxWWWWxx', 'xWHccHWx', 'hWHcHHWh', 'WWHHHHWW', 'WWWWWWWW', 'WdWWWWWW', 'HHHHHHHH'], walk: 0, anchor: 4, glow: '#ffc457', name: 'Candle alcove' },
+        u: { px: ['Kk.ss.kK', 'Kk.SS.kK', 'Kk....kK', 'Kk.ss.kK', 'Kk.SS.kK', 'Kk....kK', 'Kk.ss.kK', 'Kk.SS.kK'], walk: 1, anchor: FLOOR | 10, strict: 1, w: 0.35, name: 'Stepping stones' },
+        p: { px: ['........', '..p.....', '.pPp..g.', '..p.....', '.....g..', '..g..pP.', '....pPp.', '........'], walk: 1, spin: 1, w: 2.6, name: 'Heather' },
+        g: { px: ['..g.....', '.g......', '......g.', '.....g..', '..g.....', '.g......', '......g.', '...g....'], walk: 1, spin: 1, w: 2.2, name: 'Grass tufts' },
+        z: { px: ['........', '.sss....', '.sSs.ss.', '.sss.sSs', '.....ss.', '..ss....', '..sS....', '........'], walk: 1, spin: 1, w: 1.6, name: 'Path stones' },
+        o: { px: ['KhhhhhhK', 'hxcxxwxh', 'hxwxxxxh', 'hxxxwxxh', 'hhhhhhhh', 'WWWdWWWW', 'WWWWWWWW', 'KHHHHHHK'], walk: 0, anchor: 15, name: 'Shrine pillar' },
+        ...quad(['....mmmmmmmm....', '..mmhhhhhhhhmm..', '.mhhmmmmmmmmhhm.', '.mhmWWWWWWWWmhm.', 'mhmWWvvvvvvWWmhm', 'mhmWvvvvvvvvWmhm', 'mhWvvvvvvvvvvWhm', 'mhWvvvvvvvvvvWhm', 'mhWvvvvvvvvvvWhm', 'mhWvvvvvvvvvvWhm', 'mhmWvvvvvvvvWmhm', 'mhmWWvvvvvvWWmhm', '.mhmWWWWWWWWmhm.', '.mhhmmmmmmmmhhm.', '..mmhhhhhhhhmm..', '....mmmmmmmm....'], 'Unsealed pit', { glow: '#a77cff' }),
+      },
+      examples: [
+        ['RRRRRRRRRRRRRRRRRRRR',
+         'DAAaaYAaASaYAAADRRRR',
+         'ALKKKKKKKKKKKKLARRRR',
+         'AKFFpFFzFFFgFFKARRRR',
+         'AKFKoKFFFFKoKFKQAAAA',
+         'AKFgKFFFFFFKFFFuuuuL',
+         'AKFzFFF12FFFFFKQAAQC',
+         'AKFFKFF34FFgFFKARRAC',
+         'AKFKoKFzFFKoKzKARRAC',
+         'AKFFKgFFFFzKFFKARRAC',
+         'ALKKKKKFKKKKKKLARRAC',
+         'DAAAAHJCJHHHHHHAAAQC',
+         'RRRRAZCKCCCCCCCCCCCK',
+         'RRRRDAAAAAAAAAAAAAQZ'],
+        ['RRRRRRRRRRRRR',
+         'DaYAaAaAYAESD',
+         'ALuuuuuKCZHZA',
+         'ACJHHHJCJHACA',
+         'AKuuuuuKuLHCA',
+         'ACQAAAAAQCJCA',
+         'AZARRRRRALCLA',
+         'DADRRRRRDAAAD'],
+      ],
+    },
   ];
 
-  const rotPx = px => [0, 1, 2, 3].map(y => [0, 1, 2, 3].map(x => px[3 - x][y]).join(''));
+  const rotPx = px => { const N = px.length; return px.map((_, y) => px.map((__, x) => px[N - 1 - x][y]).join('')); };
   const rotGrid = g => { const H = g.length, W = g[0].length, out = []; for (let y = 0; y < W; y++) { const row = []; for (let x = 0; x < H; x++) row.push(g[H - 1 - x][y]); out.push(row); } return out; };
   const hexRgb = h => { const n = parseInt(h.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; };
 
   // ---------- learning from the examples ----------
   function learn(ts, tsIndex) {
-    const tiles = { ...KIT, ...ts.tiles };
+    const size = ts.size || 4;
+    const tiles = { ...(size === 8 ? KIT8 : KIT), ...ts.tiles };
     const variants = [], index = {};
     Object.entries(tiles).forEach(([L, t]) => {
       let px = t.px; const seen = {};
@@ -238,7 +371,7 @@
         const cls = t.anchor !== undefined ? rotCls(t.anchor, r) : null;
         const key = px.join('') + '|' + cls;
         if (seen[key] !== undefined) index[L + r] = seen[key];
-        else { seen[key] = index[L + r] = variants.length; variants.push({ letter: L, r, px, walk: t.walk, cls, strict: !!t.strict, spin: !!t.spin, name: t.name, ts: tsIndex, bias: t.w || 1 }); }
+        else { seen[key] = index[L + r] = variants.length; variants.push({ letter: L, r, px, walk: t.walk, cls, strict: !!t.strict, spin: !!t.spin, name: t.name, ts: tsIndex, bias: t.w || 1, size, glow: t.glow || null }); }
         px = rotPx(px);
       }
     });
@@ -262,11 +395,14 @@
           return index[L + 0];
         }));
         if (k === 0) exampleIds.push(ids.slice(1, -1).map(r => r.slice(1, -1)));
+        // a strict tile without an anchor (a centrepiece quarter) does not turn with the example, so its
+        // neighbours are learned from the example as drawn only, or rotated copies would teach broken assemblies
+        const fixed = id => k > 0 && variants[id].strict && tiles[variants[id].letter].anchor === undefined;
         for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
           const a = ids[y][x]; weight[a]++;
           if (x > 0 && y > 0 && x < W - 1 && y < H - 1) classesOf[a].add(classAt(walk, W, H, x, y));
-          if (x + 1 < W) { const b = ids[y][x + 1]; learned[1][a].add(b); learned[3][b].add(a); }
-          if (y + 1 < H) { const b = ids[y + 1][x]; learned[2][a].add(b); learned[0][b].add(a); }
+          if (x + 1 < W) { const b = ids[y][x + 1]; if (!fixed(a) && !fixed(b)) { learned[1][a].add(b); learned[3][b].add(a); } }
+          if (y + 1 < H) { const b = ids[y + 1][x]; if (!fixed(a) && !fixed(b)) { learned[2][a].add(b); learned[0][b].add(a); } }
         }
         grid = rotGrid(grid);
       }
@@ -274,9 +410,12 @@
     const mask = list => { const m = new Uint32Array(K); list.forEach(t => m[t >> 5] |= 1 << (t & 31)); return m; };
     // adjacency: strict tiles keep exactly their example neighbours; everything else is free to meet
     const loose = variants.map((v, i) => i).filter(i => !variants[i].strict);
+    // a centrepiece quarter is strict only towards its other quarters: its outer edges meet any loose tile
+    const quarter = i => variants[i].strict && tiles[variants[i].letter].anchor === undefined;
+    const outer = (i, d) => quarter(i) && ![...learned[d][i]].some(j => variants[j].strict);
     const allow = [0, 1, 2, 3].map(d => variants.map((v, a) => {
-      if (v.strict) return mask([...learned[d][a]]);
-      const strictOk = variants.map((s, i) => i).filter(i => variants[i].strict && learned[(d + 2) & 3][i].has(a));
+      if (v.strict) return outer(a, d) ? mask(loose.concat([...learned[d][a]])) : mask([...learned[d][a]]);
+      const strictOk = variants.map((s, i) => i).filter(i => variants[i].strict && (learned[(d + 2) & 3][i].has(a) || outer(i, (d + 2) & 3)));
       return mask(loose.concat(strictOk));
     }));
     // structural kit tiles are always allowed in the context they are drawn for, so no context is ever
@@ -294,7 +433,7 @@
       if (v.spin) { v.spins = [v.rgb]; let p = v.px; for (let r = 1; r < 4; r++) { p = rotPx(p); v.spins.push(p.join('').split('').map(c => pal[c] || [255, 0, 255])); } }
     });
     const fallback = { floor: index.F0, wall: index.E0, rock: index.R0 };
-    return { ...ts, tiles, variants, n, K, allow, weight, classMask, fallback, index, exampleIds, unplaced, learned, classesOf };
+    return { ...ts, size, tiles, variants, n, K, allow, weight, classMask, fallback, index, exampleIds, unplaced, learned, classesOf };
   }
   const SETS = TILESETS.map(learn);
   const KMAX = Math.max(...SETS.map(s => s.K));
@@ -302,8 +441,9 @@
   SETS.forEach(s => { OFFSET.push(GTILES.length); s.variants.forEach(v => GTILES.push(v)); });
 
   // ---------- the dressing WFC ----------
-  // pass[i]: 1 floor / 0 wall; setOf[i]: tileset per cell. Returns global tile ids.
-  function dress(pass, setOf, W, H, seed) {
+  // pass[i]: 1 floor / 0 wall; setOf[i]: tileset per cell; pins: optional [[cell, letter], ...] tiles that
+  // must go in a cell (landmarks), honoured when the tile fits that cell's context. Returns global tile ids.
+  function dress(pass, setOf, W, H, seed, pins) {
     const N = W * H, KW = KMAX, dom = new Uint32Array(N * KW), rng = mulberry(seed);
     const walk = (x, y) => pass[y * W + x];
     const cls = new Uint16Array(N);
@@ -314,6 +454,7 @@
       const m = SETS[setOf[i]].classMask.get(c);
       if (m) dom.set(m, i * KW); else setSingle(i, fallbackOf(i));
     }
+    (pins || []).forEach(([i, L]) => { const t = SETS[setOf[i]].index[L + '0']; if (t !== undefined && (dom[i * KW + (t >> 5)] >>> (t & 31)) & 1) setSingle(i, t); });
     const count = i => { let n = 0; for (let w = 0; w < KW; w++) { let b = dom[i * KW + w]; while (b) { b &= b - 1; n++; } } return n; };
     const bits = (i, fn) => { for (let w = 0; w < KW; w++) { let b = dom[i * KW + w]; while (b) { const low = b & -b; fn(w * 32 + 31 - Math.clz32(low)); b ^= low; } } };
     const cache = SETS.map(() => [0, 1, 2, 3].map(() => new Map()));
@@ -364,11 +505,17 @@
       return -1;
     };
     // first pass: make every cell agree with its neighbours; anything impossible falls back to a plain tile
+    const fell = new Uint8Array(N);
     for (let guard = 0; guard < N; guard++) {
       const all = []; for (let i = 0; i < N; i++) all.push(i);
       const bad = propagate(all);
       if (bad < 0) break;
-      setSingle(bad, fallbackOf(bad)); fallbacks++; fallbackCells.push(bad);
+      if (fell[bad]) { // already a plain tile: the conflict comes from a neighbour (a pin), so free those too
+        const x = bad % W, y = (bad / W) | 0;
+        for (let d = 0; d < 4; d++) { const nx = x + DX[d], ny = y + DY[d]; if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue; const n = ny * W + nx; if (!fell[n]) { fell[n] = 1; setSingle(n, fallbackOf(n)); fallbacks++; fallbackCells.push(n); } }
+        continue;
+      }
+      fell[bad] = 1; setSingle(bad, fallbackOf(bad)); fallbacks++; fallbackCells.push(bad);
     }
     for (let i = 0; i < N; i++) push(i);
     while (heap.length) {
@@ -414,7 +561,33 @@
   // cheap per-cell hash for render-time variety (spin of plain floors, slight brightness jitter)
   function cellHash(x, y) { let h = Math.imul(x | 0, 0x27d4eb2d) ^ Math.imul(y | 0, 0x165667b1); h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12; return h >>> 0; }
 
-  const api = { DRESS_SETS: SETS, DRESS_TILES: GTILES, DRESS_OFFSET: OFFSET, dress, classAt, rotCls, cellHash, DRESS_TILE_PX: 4 };
+    // where a 2x2 centrepiece (tiles 1-4) can go near a cell: every quarter must fit its context and share one tileset
+  function centrepieceAt(pass, setOf, W, H, cx, cy, rad) {
+    const walk = (x, y) => pass[y * W + x];
+    for (let r = 0; r <= rad; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+      const x = cx + dx, y = cy + dy; if (x < 1 || y < 1 || x + 2 >= W || y + 2 >= H) continue;
+      const cells = [y * W + x, y * W + x + 1, (y + 1) * W + x, (y + 1) * W + x + 1], set = SETS[setOf[cells[0]]];
+      if (set.index['10'] === undefined || cells.some(i => setOf[i] !== setOf[cells[0]] || !pass[i])) continue;
+      const ok = cells.every((i, k) => {
+        const m = set.classMask.get(classAt(walk, W, H, i % W, (i / W) | 0)), t = set.index[(k + 1) + '0'];
+        if (!m || !((m[t >> 5] >>> (t & 31)) & 1)) return false;
+        // every outside neighbour must have some tile its context allows that this quarter accepts
+        for (let d = 0; d < 4; d++) {
+          const nx = i % W + DX[d], ny = ((i / W) | 0) + DY[d], n = ny * W + nx;
+          if (cells.includes(n)) continue;
+          if (nx < 0 || ny < 0 || nx >= W || ny >= H || setOf[n] !== setOf[i]) return false;
+          const nm = set.classMask.get(classAt(walk, W, H, nx, ny)), A = set.allow[d][t];
+          if (!nm || !nm.some((w, j) => (w & A[j]) !== 0)) return false;
+        }
+        return true;
+      });
+      if (ok) return cells.map((i, k) => [i, String(k + 1)]);
+    }
+    return null;
+  }
+
+  const api = { centrepieceAt, DRESS_SETS: SETS, DRESS_TILES: GTILES, DRESS_OFFSET: OFFSET, dress, classAt, rotCls, cellHash, DRESS_TILE_PX: 4 };
   if (typeof module !== 'undefined' && module.exports && typeof window === 'undefined' && typeof importScripts === 'undefined') module.exports = api;
   else Object.assign(root, api);
 })(typeof window !== 'undefined' ? window : globalThis);
