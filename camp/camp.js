@@ -129,6 +129,7 @@
       if (el.hidden) return;
       const st = V.st;
       if (e.key === 'Escape') { if (st.sel || st.vsel) { select(null); st.vsel = null; UI.ctx(); } else if (UI.larderOpen()) UI.larder(false); else if (st.mode === 'cook') setMode('fire'); else leave(); }
+      if (e.key === 'f' && !e.repeat && st.mode === 'cook') { const v = st.c.vessels.find(q => q.id === st.vsel); if (v) tendVessel(v); }
       if ((e.key === 'b' || e.key === ' ') && !e.repeat && !(e.target && e.target.closest && e.target.closest('button'))) { e.preventDefault(); blow(); }
     });
   }
@@ -144,7 +145,9 @@
     if (hit && hit.type === 'vessel' && st.mode === 'fire') setMode('cook');
     if (hit) { // take hold of it where you touched it
       const f = V.toFloor(p.x, p.y + 3);
-      V.drag = { from: hit.type, obj: hit.obj, p, start: p, moved: false, gx: f ? hit.obj.x - f.x : 0, gz: f ? hit.obj.z - f.z : 0 };
+      // what has burnt down (embers, coals, ash) stays where it lies: touching it is only ever a tap
+      const fixed = hit.type === 'piece' && !!(hit.obj.ash || hit.obj.coal);
+      V.drag = { from: hit.type, obj: hit.obj, p, start: p, moved: false, fixed, gx: f ? hit.obj.x - f.x : 0, gz: f ? hit.obj.z - f.z : 0 };
       return;
     }
     V.drag = { from: 'tap', p, start: p, moved: false };
@@ -153,7 +156,7 @@
     const p = V.P(e), d = V.drag; V.st.hover = p;
     if (!d || d.btn) return;
     d.p = p;
-    if (Math.hypot(p.x - d.start.x, p.y - d.start.y) > 3) d.moved = true;
+    if (Math.hypot(p.x - d.start.x, p.y - d.start.y) > 3 && !d.fixed) d.moved = true;
     // the piece stays where you took hold of it, under your finger
     if ((d.from === 'vessel' || d.from === 'piece') && d.moved) { const f = V.toFloor(p.x, p.y + 3); if (f && f.z < 4.5) { d.obj.x = f.x + d.gx; d.obj.z = Math.max(1.2, f.z + d.gz); } }
   }
@@ -193,6 +196,7 @@
     const a = e.target.closest('[data-a]'); if (!a) return;
     const st = V.st, v = st.c.vessels.find(q => q.id === st.vsel), p = { x: V.LW / 2, y: V.LH * 0.6 };
     if (a.dataset.a === 'close' || !v) { st.vsel = null; return UI.ctx(); }
+    if (a.dataset.a === 'tend') tendVessel(v);
     if (a.dataset.a === 'eat') eatFrom(v, p);
     if (a.dataset.a === 'away') putAway(v, p);
   }
@@ -252,12 +256,18 @@
       st.vsel = v.id; UI.refresh(); UI.ctx();
     }
   }
+  // flip the pan, turn the skewer, stir the pot: frees what is sticking (and earns a little cooking, if it was)
+  function tendVessel(v) {
+    const r = S.tend(V.st.c, v.id); if (!r) return;
+    if (XP && r.freed > 0.4) earn('cooking', XP.tend);
+    D.tendFx(v); UI.ctx();
+  }
   function eatFrom(v, p) {
     const L = V.st.L, r = S.eat(V.st.c, v.id);
     if (!r) return UI.note('Nothing in it to eat.', p.x, p.y);
     const j = r.judged;
     if (XP) { if (j.dish) earn('cooking', XP.dish); else if (j.stew) earn('cooking', XP.stew); }
-    const how = j.dish ? `${j.dish.name}. ${j.dish.note}` : j.state === 'raw' ? 'Raw. It fights you all the way down.' : j.state === 'underdone' ? 'Half-cooked. Something in it is still moving.' : j.state === 'burnt' ? 'Burnt to bitterness. It hurts going down.' : 'Cooked. Barely edible. It will keep you alive.';
+    const how = j.dish ? `${j.dish.name}. ${j.dish.note}` : j.state === 'raw' ? 'Raw. It fights you all the way down.' : j.state === 'underdone' ? 'Half-cooked. Something in it is still moving.' : j.state === 'burnt' ? 'Burnt to bitterness. It hurts going down.' : j.state === 'overdone' ? 'Overdone. Dry and tough, but it goes down.' : 'Cooked. Barely edible. It will keep you alive.';
     UI.note(how, L.hands.x + 30, L.hands.y - 20, 4200); save(); UI.ctx();
   }
   function putAway(v, p) {

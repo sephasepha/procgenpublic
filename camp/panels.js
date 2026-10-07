@@ -117,6 +117,7 @@
   }
 
   // ---------- the selected vessel: what is in it, how hot, and what you can do with it ----------
+  const BAR = 1.9, STUCK = 0.5; // an item's bar runs to this much cooking; stuck past this, it says so
   const heatWord = T => T >= 99 ? (T > 160 ? 'searing' : 'boiling hot') : T > 68 ? 'cooking' : T > 40 ? 'warming' : 'cold';
   function ctx() {
     const { el, st } = V, box = el.querySelector('.cf-ctx'), v = st.vsel && st.c.vessels.find(q => q.id === st.vsel);
@@ -133,15 +134,24 @@
     const key = [v.id, water, dish, ...v.items.map(it => it.id + stateOf(it))].join('|');
     if (box.dataset.key !== key) {
       box.dataset.key = key;
-      const items = v.items.map(it => `<li class="${stateOf(it)}"><span>${ING[it.id].name}</span><i></i><em>${stateOf(it)}</em></li>`).join('');
+      // each item's bar runs from raw to past its window: the fill is how cooked it is, the green band its window
+      // (done to good), and it darkens as it scorches
+      const items = v.items.map(it => { const w = S.windowOf(it), wet = ING[it.id].water;
+        return `<li class="${stateOf(it)}"><span>${ING[it.id].name}</span><i${wet ? '' : ` style="--a:${(w.from / BAR).toFixed(3)};--b:${(w.to / BAR).toFixed(3)}"`}></i><em>${stateOf(it)}</em></li>`; }).join('');
       box.innerHTML = `<div class="hd"><b>${Vt.name}</b><span class="T"></span>${water ? `<span class="w">${water}</span>` : ''}${dish}</div>${items ? `<ul>${items}</ul>` : `<p>Empty. Open the larder, pick something, and tap the ${Vt.name.toLowerCase()}.</p>`}
-        <div class="acts"><button type="button" data-a="eat" ${v.items.length ? '' : 'disabled'}>Eat</button><button type="button" data-a="away" ${v.items.length ? 'disabled' : ''} aria-label="Put away">Away</button><button type="button" data-a="close" aria-label="Close">✕</button></div>`;
+        <div class="acts"><button type="button" data-a="tend" ${v.items.some(it => !ING[it.id].water) ? '' : 'disabled'}>${Vt.tend}</button><button type="button" data-a="eat" ${v.items.length ? '' : 'disabled'}>Eat</button><button type="button" data-a="away" ${v.items.length ? 'disabled' : ''} aria-label="Put away">Away</button><button type="button" data-a="close" aria-label="Close">✕</button></div>`;
     }
     // what changes every moment: stew forming, water left, temperature, each item's cooking and scorching
     const sf = box.querySelector('.stew'); if (sf) sf.textContent = `stew forming ${Math.round(j.stewing * 100)}%`;
     const wb = box.querySelector('.wbar i'); if (wb) { const f = Math.max(0, Math.min(1, v.water / Math.max(1, j.waters))); wb.style.width = Math.round(f * 100) + '%'; wb.parentNode.classList.toggle('low', f < 0.3); }
     const T = box.querySelector('.T'); T.textContent = `${Math.round(v.T)}° · ${heatWord(v.T)}`; T.className = 'T ' + (v.T > Vt.burnAt ? 'hot' : v.T > 68 ? 'warm' : '');
-    box.querySelectorAll('li i').forEach((i, n) => { const it = v.items[n]; if (it) { i.style.setProperty('--p', Math.min(1, it.progress).toFixed(3)); i.style.setProperty('--s', Math.min(1, it.scorch / COOK.burnt).toFixed(3)); } });
+    box.querySelectorAll('li').forEach((li, n) => {
+      const it = v.items[n]; if (!it) return; const i = li.querySelector('i');
+      i.style.setProperty('--p', Math.min(1, it.progress / BAR).toFixed(3)); i.style.setProperty('--s', Math.min(1, it.scorch / COOK.burnt).toFixed(3));
+      li.classList.toggle('stuck', (it.stick || 0) > STUCK && v.T > COOK.stickBurnFrom); // stuck to hot metal: it is starting to catch
+    });
+    // the tend button asks for it when something is stuck
+    const tb = box.querySelector('[data-a="tend"]'); if (tb) tb.classList.toggle('want', v.items.some(it => (it.stick || 0) > STUCK) && v.T > COOK.stickBurnFrom);
   }
 
   // show one mode's controls: the tray's groups, the gauge's detail and the dock follow the screen's class

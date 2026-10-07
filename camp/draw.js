@@ -57,7 +57,12 @@
     c.vessels.forEach(v => {
       if (v.T > 80 && Math.random() < dt * (v.T - 70) / 20) emit('steam', v.x, v.z, 0.12, 1);
       if (v.type === 'pot' && v.water > 0 && v.T >= 99 && Math.random() < dt * 10) emit('bubble', v.x + (Math.random() - 0.5) * 0.08, v.z, 0.1, 1);
-      if (v.scorch > 0.1 && Math.random() < dt * 6) emit('smoke', v.x, v.z, 0.12, 1);
+      // food starting to catch, as warnings that build: wisps where it sticks, then smoke darkening as it scorches,
+      // then flames licking up from what is burning
+      const stuck = Math.max(0, ...v.items.map(it => it.stick || 0));
+      if (stuck > 0.5 && v.T > COOK.stickBurnFrom && Math.random() < dt * 3 * stuck) emit('smoke', v.x, v.z, 0.1, 1, 0, 0.05);
+      if (v.scorch > COOK.overdone * 0.6 && Math.random() < dt * (3 + 12 * v.scorch)) emit('smoke', v.x, v.z, 0.12, 1, 0, Math.min(1, v.scorch * 1.8));
+      if (v.scorch > COOK.burnt * 0.85 && v.T > 170 && Math.random() < dt * 2.5) emit('flame', v.x + (Math.random() - 0.5) * 0.05, v.z, 0.1, 1, 0.45);
     });
   }
   function stepParts(dt) {
@@ -210,11 +215,17 @@
   // food changes as it cooks: raw colours, browning, then black
   function itemSprite(it) {
     const I = ING[it.id];
-    if (it.scorch >= 0.2) return tinted(it.id, I, '#14100e', Math.min(0.9, 0.3 + it.scorch));
+    if (it.scorch >= COOK.overdone) return tinted(it.id, I, '#14100e', Math.min(0.9, 0.25 + it.scorch * 1.2));
+    if (S.foodState(it) === 'overdone') return tinted(it.id, I, '#3a2210', 0.6); // dried out: dark brown
     if (it.progress > COOK.warming) return tinted(it.id, I, '#7a4a22', Math.min(0.6, it.progress * 0.5));
     return sprite(it.id, I);
   }
+  // a flip, turn or stir: what is in the vessel jumps, and a puff of steam goes up
+  const hops = new WeakMap(); let now = 0;
+  function tendFx(v) { hops.set(v, now + 0.22); emit('steam', v.x, v.z, 0.1, 3); }
+  const hopOf = v => { const u = (hops.get(v) || 0) - now; return u > 0 ? Math.round(Math.sin(u / 0.22 * Math.PI) * 3) : 0; };
   function drawVessel(g, v, time) {
+    now = time; const hop = hopOf(v);
     const Vt = VES[v.type], s = sc(v.z), size = (v.type === 'pot' ? 0.2 : v.type === 'pan' ? 0.22 : 0.24) * s, x = sx(v.x, v.z), y = sy(v.z) - s * 0.04;
     const w = Math.round(size), h = Math.round(size * (v.type === 'skewer' ? 0.5 : 0.8));
     g.drawImage(sprite(v.type, Vt), Math.round(x - w / 2), Math.round(y - h), w, h);
@@ -225,9 +236,9 @@
       if (v.water > 0) { const a = [v.T >= 99 ? 42 : 20, v.T >= 99 ? 42 : 20, v.T >= 99 ? 60 : 30], b = [104, 64, 34]; g.fillStyle = `rgb(${a.map((q, i) => Math.round(q + (b[i] - q) * k2)).join(',')})`; g.fillRect(sx0, sy0, sw0, sh0); }
       else if (v.items.length && v.T > 110) { g.fillStyle = `rgba(255,${v.T > 140 ? 90 : 140},40,${Math.min(0.6, (v.T - 110) / 80)})`; g.fillRect(sx0, sy0 + sh0 - 1, sw0, 1); }
       if (v.stewed && v.water > 0) { if (v.T >= 99) { g.fillStyle = '#c08a50'; g.fillRect(Math.round(x - w * 0.15 + Math.sin(time * 3) * w * 0.15), sy0, 1, 1); } }
-      else v.items.filter(it => !ING[it.id].water).forEach((it, k) => g.drawImage(itemSprite(it), Math.round(x - w * 0.3 + k * iw * 0.8 + Math.sin(time * 2 + k) * (v.T >= 99 ? 1 : 0)), Math.round(y - h * 0.98), iw, iw));
-    } else if (v.type === 'pan') v.items.forEach((it, k) => g.drawImage(itemSprite(it), Math.round(x - w * 0.36 + k * iw * 0.9), Math.round(y - h * 0.82), iw, iw));
-    else v.items.forEach((it, k) => g.drawImage(itemSprite(it), Math.round(x - w * 0.2 + k * iw * 1.1), Math.round(y - h * 0.9), iw, iw));
+      else v.items.filter(it => !ING[it.id].water).forEach((it, k) => g.drawImage(itemSprite(it), Math.round(x - w * 0.3 + k * iw * 0.8 + Math.sin(time * 2 + k) * (v.T >= 99 ? 1 : 0)), Math.round(y - h * 0.98) - hop, iw, iw));
+    } else if (v.type === 'pan') v.items.forEach((it, k) => g.drawImage(itemSprite(it), Math.round(x - w * 0.36 + k * iw * 0.9), Math.round(y - h * 0.82) - hop, iw, iw));
+    else v.items.forEach((it, k) => g.drawImage(itemSprite(it), Math.round(x - w * 0.2 + k * iw * 1.1), Math.round(y - h * 0.9) - hop, iw, iw));
     v.box = { x: x - w / 2 - 2, y: y - h - iw / 2 - 2, w: w + 4, h: sy(v.z) + 8 - (y - h - iw / 2 - 2) }; // down to the floor it stands on
     if (v.items.length && S.judge(v).dish) { g.fillStyle = `rgba(243,211,107,${0.25 + 0.2 * Math.sin(time * 3)})`; g.fillRect(Math.round(x - 1), Math.round(y - h - iw), 2, 2); }
   }
@@ -256,5 +267,5 @@
     });
   }
 
-  root.CampDraw = { buildFloor, draw, drawCharms, emit, breathe, emitFrom, stepParts };
+  root.CampDraw = { buildFloor, draw, drawCharms, emit, breathe, emitFrom, stepParts, tendFx };
 })(window);

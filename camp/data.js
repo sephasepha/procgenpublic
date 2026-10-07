@@ -14,11 +14,11 @@
   const STRIKER = { name: 'Striker', note: 'Flint on iron. Strike it over tinder.', pal: { a: '#6a6a72', b: '#9a9aa6', c: '#3a3a42', d: '#ffd060' }, px: ['......d.', '.....dbd', '....abb.', '...abb..', '..abb...', '.ccb....', 'cc......', 'c.......'] };
 
   const VESSELS = {
-    pot: { name: 'Pot', note: 'Iron pot. Dry, it is an oven and scorches what is in it. With water it boils; simmer cooked food long enough and it comes together as a stew.', cap: 4, gain: 0.17, tau: 10, coolTau: 60, burnAt: 150, dryBurnAt: 118, boils: true, boilOff: 0.00015,
+    pot: { name: 'Pot', note: 'Iron pot. Dry, it is an oven and scorches what is in it. With water it boils; simmer cooked food long enough and it comes together as a stew.', cap: 4, gain: 0.17, tau: 10, coolTau: 60, burnAt: 150, dryBurnAt: 118, boils: true, boilOff: 0.00015, stickTime: 12, tend: 'Stir', tendLoss: 0,
       pal: { a: '#2a2a30', b: '#4a4a56', c: '#14141a', d: '#6a6a7a' }, px: ['........', '.d....d.', 'dbbbbbbd', 'abbbbbba', 'aaaaaaaa', 'aaaaaaaa', '.aaaaaa.', '..c..c..'] },
-    pan: { name: 'Pan', note: 'Blackened pan. Fries fast and burns faster.', cap: 3, gain: 0.25, tau: 3, coolTau: 20, speed: 2, burnAt: 190,
+    pan: { name: 'Pan', note: 'Blackened pan. Fries fast and burns faster.', cap: 3, gain: 0.25, tau: 3, coolTau: 20, speed: 2, burnAt: 190, stickTime: 10, tend: 'Flip', tendLoss: 3, greases: true,
       pal: { a: '#2a2a30', b: '#4a4a56', c: '#6a4a3a' }, px: ['........', '........', '.bbbbb..', 'abbbbba.', 'aaaaaacc', '.aaaaa..', '........', '........'] },
-    skewer: { name: 'Skewer', note: 'A spit of sharpened bone. Holds two things over open flame.', cap: 2, gain: 0.3, tau: 3, burnAt: 230,
+    skewer: { name: 'Skewer', note: 'A spit of sharpened bone. Holds two things over open flame.', cap: 2, gain: 0.3, tau: 3, burnAt: 230, stickTime: 10, tend: 'Turn', tendLoss: 1,
       pal: { a: '#e8e0c8', b: '#a89c80' }, px: ['........', '........', '........', 'abbbbbbb', 'aaaaaaaa', '........', '........', '........'] },
   };
 
@@ -87,6 +87,17 @@
       { a: '#8c8476', b: '#9fb4ff', c: '#e9e2ff' }, ['..aaaa..', '...aa...', '.abbbba.', 'abbcbbba', 'abbbbcba', 'abcbbbba', 'abbbbbba', '.aaaaaa.'], { tags: ['sweet'], glow: '#9fb4ff' }),
   };
 
+  // how each ingredient takes the heat, by its texture: burn (how fast it scorches, 1 = usual) and window (how far
+  // past done it stays good, in cooking progress). Fat greases a pan: food in it sticks and scorches less.
+  const TEXTURES = {
+    delicate: { name: 'delicate', burn: 1.5, window: 0.3 },
+    usual: { name: 'usual', burn: 1, window: 0.5 },
+    tough: { name: 'tough', burn: 0.6, window: 0.8 },
+    fat: { name: 'fatty', burn: 0.6, window: 99, greases: true }, // it melts into the pan: it does not dry out,
+  };
+  const TEXTURE_OF_TAG = { egg: 'delicate', green: 'delicate', sweet: 'delicate', fruit: 'delicate', fish: 'delicate', root: 'tough', bone: 'tough', salt: 'tough', fat: 'fat' };
+  Object.values(INGREDIENTS).forEach(i => { if (!i.texture) i.texture = (i.tags || []).map(t => TEXTURE_OF_TAG[t]).find(Boolean) || 'usual'; });
+
   // dishes: a vessel and exactly these ingredients, all cooked and not burnt, earn the dish's bonus on top
   const D = (name, vessel, items, bonus, note) => ({ name, vessel, items, bonus, note });
   const DISHES = [
@@ -110,6 +121,6 @@
     char: { name: 'Char', note: 'A lump of charcoal from a log that burnt down to coals and went cold. Light, black, and it burns hot again.',
       px: ['........', '...cC...', '..cCsc..', '.ccccCc.', '.cCcccs.', '..cccC..', '...cc...', '........'], pal: { c: '#2a272e', C: '#7a7484', s: '#c8c2d0' } },
   };
-  const api = { CAMP_FIRE: FIRE, CAMP_RESIDUE: RESIDUE, CAMP_STRIKER: STRIKER, CAMP_VESSELS: VESSELS, CAMP_INGREDIENTS: INGREDIENTS, CAMP_DISHES: DISHES, CAMP_STATS: STATS };
+  const api = { CAMP_FIRE: FIRE, CAMP_RESIDUE: RESIDUE, CAMP_STRIKER: STRIKER, CAMP_VESSELS: VESSELS, CAMP_INGREDIENTS: INGREDIENTS, CAMP_TEXTURES: TEXTURES, CAMP_DISHES: DISHES, CAMP_STATS: STATS };
   if (typeof module !== 'undefined' && module.exports && typeof window === 'undefined') module.exports = api; else Object.assign(root, api);
 })(typeof window !== 'undefined' ? window : globalThis);

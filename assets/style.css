@@ -365,9 +365,16 @@ html.has-screens .camp { bottom: var(--navh); }
 .cf-ctx .w { font-size: 0.62rem; color: #8ab8d8; }
 .cf-ctx .dish { color: var(--brass); font-size: 0.68rem; } .cf-ctx .stew { color: #d8a060; font: 0.64rem var(--f-mono, monospace); } .cf-ctx .dish.maybe { color: rgba(207,167,78,0.6); font-style: italic; }
 .cf-ctx ul { grid-column: 1; list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; }
-.cf-ctx li { display: grid; grid-template-columns: auto 40px auto; gap: 5px; align-items: center; }
+.cf-ctx li { display: grid; grid-template-columns: auto 56px auto; gap: 5px; align-items: center; }
 .cf-ctx li span { white-space: nowrap; max-width: 92px; overflow: hidden; text-overflow: ellipsis; }
-.cf-ctx li i { --p: 0; --s: 0; height: 5px; border-radius: 3px; background: linear-gradient(90deg, #c08040 calc(var(--p) * 100%), rgba(255,255,255,0.1) 0); box-shadow: inset calc(var(--s) * 40px) 0 0 rgba(20,14,12,0.85); }
+/* an item's bar: the green band is its window (done to good); the fill is how cooked it is, darkening as it scorches */
+.cf-ctx li i { --p: 0; --s: 0; --a: 2; --b: 2; position: relative; height: 6px; border-radius: 3px; overflow: hidden; background: linear-gradient(90deg, rgba(255,255,255,0.1) calc(var(--a) * 100%), rgba(130,210,110,0.45) calc(var(--a) * 100%) calc(var(--b) * 100%), rgba(240,110,70,0.18) calc(var(--b) * 100%)); }
+.cf-ctx li i::before { content: ''; position: absolute; left: 0; top: 1px; bottom: 1px; width: calc(var(--p) * 100%); border-radius: 2px; background: #d08a44; box-shadow: inset 0 0 0 99px rgba(20,12,10,calc(var(--s) * 0.9)); }
+.cf-ctx li.stuck i { animation: stuck 0.6s ease-in-out infinite alternate; }
+@keyframes stuck { from { box-shadow: 0 0 0 rgba(240,90,60,0); } to { box-shadow: 0 0 6px rgba(240,90,60,0.9); } }
+.cf-ctx li.overdone em { color: #e0a050; }
+.cf-ctx .acts button[data-a="tend"]:not([disabled]) { border-color: rgba(240,170,90,0.6); color: #f0c890; }
+.cf-ctx .acts button[data-a="tend"].want { animation: want 0.9s ease-in-out infinite; border-color: #ffb060; color: #fff0d8; }
 .cf-ctx li em { font-style: normal; font-size: 0.6rem; color: rgba(232,225,210,0.6); }
 .cf-ctx li.done em { color: #9ad08a; } .cf-ctx li.burnt em { color: #f07a5a; } .cf-ctx li.raw em { color: #c8a0d0; }
 .cf-ctx p { grid-column: 1; margin: 0; color: rgba(232,225,210,0.6); font-size: 0.66rem; }

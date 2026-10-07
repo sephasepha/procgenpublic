@@ -5,7 +5,8 @@
 //
 // What earns what is decided where the work happens, from the amounts in XP below:
 //   firemaking   a piece catching (camp), coals forming, a breath when the fire needs one, gathering ash and char
-//   cooking      food cooking (by how far each item gets towards done, unburnt), eating a dish or a stew
+//   cooking      food cooking (by how far each item gets towards done, unburnt), freeing food that was sticking,
+//                eating a dish or a stew
 //   medicine     a right step of a treatment, finding out a step, a cure (body)
 (function (root) {
   const SKILLS = {
@@ -15,7 +16,7 @@
   };
   const XP = {
     catch: { tinder: 1, kindling: 2, fuel: 4 }, coals: 3, breath: 1, gather: 1,  // firemaking
-    cook: 8, dish: 10, stew: 6,                                                  // cooking: cook is per item fully cooked
+    cook: 8, dish: 10, stew: 6, tend: 1,                                         // cooking: cook is per item fully cooked; tend frees stuck food
     step: 3, stepPerStage: 2, discover: 5, cure: 6,                              // medicine: cure is per stage (1..3)
   };
   // experience from one level to the next: 30 at level 1, rising

@@ -81,8 +81,8 @@
     placePiece: F.placePiece, movePiece: F.movePiece, removePiece: F.removePiece, residueOf: F.residueOf, collect: F.collect,
     strike: F.strike, heatAt: F.heatAt, fireOutput: F.fireOutput, burning: F.burning, preview: F.preview, fireState: F.fireState,
     // the vessels
-    placeVessel: K.placeVessel, moveVessel: K.moveVessel, removeVessel: K.removeVessel, addToVessel: K.addToVessel,
-    judge: K.judge, foodState: K.foodState,
+    placeVessel: K.placeVessel, moveVessel: K.moveVessel, removeVessel: K.removeVessel, addToVessel: K.addToVessel, tend: K.tend,
+    judge: K.judge, foodState: K.foodState, windowOf: K.windowOf,
   };
   if (isNode) module.exports = api; else root.CampSim = api;
 })(typeof window !== 'undefined' ? window : globalThis);

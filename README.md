@@ -170,10 +170,10 @@ so a refactor can prove it changed nothing (`node tests/camp-golden.js --record`
 - **Using things.** Tap a tray button to pick it up (it stays in hand, so you can lay several pieces), then tap the
   floor or a vessel to use it. Tap it again, or press Esc, to put it down. You can also drag straight from a button
   into the scene. Drag a piece or an empty vessel back onto the tray to take it back.
-- **Arranging the fire.** Press and drag anything already in the pit (or a vessel) to move it, even with an item in
+- **Arranging the fire.** Press and drag any unburnt piece in the pit (or a vessel) to move it, even with an item in
   hand: a press that moves drags, a press that doesn't is a tap. Pieces are picked by the nearest within a finger's
   reach, stay where you took hold of them, lift with a shadow while held, and show the same catch/air/smother ring
-  where they are.
+  where they are. What has burnt down (embers, coals, ash) stays where it lies: touching it is only ever a tap.
 - **Larder:** a compact grid of icons with counts; the ingredient in hand is named above it. With a pot, pan or
   skewer selected (it is selected when you set it down or tap it), tapping an ingredient puts it straight in; the
   button flashes when it goes in and shakes when it can't (full, or water in a pan).
@@ -228,6 +228,24 @@ so a refactor can prove it changed nothing (`node tests/camp-golden.js --record`
   little health) with little margin before it boils dry and burns; two make a **thin** one with plenty of margin;
   three or more a **watery** one, worth less. A pot dish is the same dish however much water is in it; its worth
   scales with richness. The panel shows the water left and the richness.
+- **Burning.** Food burns three ways (`camp/cooking.js`), each scaled by the ingredient's texture: delicate (eggs,
+  greens, fruit, honey, eel) burns half again as fast and has the narrowest window, tough (roots, bone, salt) a
+  little over half as fast with the widest, fat (Moonlard) melts into the pan and never dries out.
+  - **Sticking.** Cooking without water (a pan, a skewer, a dry or nearly dry pot), food sticks to the metal above
+    100°, and stuck food scorches above 140°. **Flip** the pan, **Turn** the skewer or **Stir** the pot (the button in
+    the vessel panel, or F) to free it; each costs the vessel a few degrees. The button pulses and the item's bar
+    glows red when something is stuck and catching. Fat in a pan greases it: everything sticks and scorches less.
+  - **Overcooking.** Each item has a window past done (the green band on its bar). Cooked dry past it, food dries
+    out (overdone) and the extra cooking turns to scorch, so food left on the heat creeps from done to overdone to
+    burnt even on steady 180° coals, faster the hotter it is. Food in water does not overcook.
+  - **Searing.** Above a vessel's burn point (a pan 190°, a skewer 230°, a pot 150°, a dry pot 118°) everything
+    scorches regardless: a pan right over the flames burns food before it is done.
+  - So a gentle heat is slow and forgiving and a hot one fast and tight: steak-hot coals at 180° with a flip every
+    few seconds give a gristle about eight good seconds, 130° about ten, and left alone it burns within about twenty.
+  - Food states: raw, cooking, nearly, done, **overdone** (dried out or a little scorched: it does 85% of what it
+    would, and a dish with anything overdone gives 75% of its bonus), burnt. Smoke over a vessel builds as it
+    catches: wisps where food sticks, then darker smoke as it scorches, then flames licking up from what is burning.
+    Food darkens to brown when dried out and black as it burns.
 - **Pots and pans hold their heat.** They warm at their own pace but cool slowly (a pot over about a minute, a pan
   over about twenty seconds), so food pulled off the fire keeps cooking, and keeps burning.
 - **Coals.** A log that burns out leaves a bed of coals, not quick embers: they glow for many minutes, give a vessel
@@ -260,7 +278,7 @@ was just earned beside it; it lights up on a new level. Levels need 30 experienc
 | Skill | Earned by |
 | --- | --- |
 | Firemaking | each piece catching (tinder 1, kindling 2, fuel 4), coals forming (3), a breath when the fire wanted one (1), gathering ash and char (1 each) |
-| Cooking | food cooking: 8 for each item taken from raw to done, earned as it goes, unburnt only; eating a dish (10) or a stew (6) |
+| Cooking | food cooking: 8 for each item taken from raw to done, earned as it goes, unburnt only; freeing stuck food with a flip or stir (1); eating a dish (10) or a stew (6) |
 | Medicine | each right step of a treatment (3, plus 2 per stage), finding out a step (5), a cure (6 per stage) |
 
 The amounts are in `Skills.XP`. Camp time runs through `Camp.advance`, so food cooking and the fire catching earn

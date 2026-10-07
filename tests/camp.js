@@ -57,14 +57,41 @@ console.log('Spacing');
   const ok = S.preview(c, 'kindling', 0.07, 2); check(ok.catches && !ok.smothers.length, 'and that kindling beside the flames will catch without smothering them'); }
 
 { const c = S.createCamp(1); c.unlimitedFire = true; c.stock.kindling = 0; for (let k = 0; k < 30; k++) S.placePiece(c, 'kindling', 0.3 + k * 0.01, 2); check(c.pieces.length === 30 && c.stock.kindling === 0, 'with unlimited fire supplies, kindling never runs out'); }
+console.log('Burning');
+// a vessel held at a temperature (as over coals that hold steady): when its first item is done, overdone, burnt
+function hold(T, items, flipEvery, secs, type) {
+  const c = camp(() => {}); const v = S.placeVessel(c, type || 'pan', 3, 2); items.forEach(i => S.addToVessel(c, v.id, i));
+  const at = {}, stick = [];
+  for (let t = 0; t < (secs || 120) * 10; t++) {
+    v.T = T; if (flipEvery && t && t % (flipEvery * 10) === 0) S.tend(c, v.id);
+    S.step(c, 0.1); const st = S.foodState(v.items[0]); if (!(st in at)) at[st] = t / 10; if (t === 50) stick.push(v.items[0].stick);
+  }
+  return { at, v, c, stick: stick[0] };
+}
+{ const r = hold(180, ['starGristle'], 0); check(r.at.burnt > 0 && r.at.burnt < 40, `a pan left on 180 degree coals burns what is in it (burnt at ${r.at.burnt}s)`); }
+{ const r = hold(180, ['starGristle'], 3); check(r.at.done > 0 && r.at.overdone > r.at.done + 4 && r.at.burnt > r.at.overdone, `flipped every few seconds, it is done, stays good a while, then overdone, then burnt (done ${r.at.done}, overdone ${r.at.overdone}, burnt ${r.at.burnt})`); }
+{ const a = hold(180, ['starGristle'], 0), b = hold(180, ['starGristle'], 3); check(b.at.burnt > a.at.burnt + 8, `flipping holds off burning (left ${a.at.burnt}s, flipped ${b.at.burnt}s)`); check(!('done' in a.at) || a.at.overdone - a.at.done < 3, 'left alone, food sticks and is overdone as soon as it is done'); }
+{ const lo = hold(130, ['starGristle'], 3), hi = hold(180, ['starGristle'], 3); check(lo.at.overdone - lo.at.done > hi.at.overdone - hi.at.done, `a gentler heat is slower but more forgiving (good for ${(lo.at.overdone - lo.at.done).toFixed(1)}s at 130, ${(hi.at.overdone - hi.at.done).toFixed(1)}s at 180)`); }
+{ const r = hold(300, ['starGristle'], 1); check(r.at.burnt < 5 && !('done' in r.at), 'a searing pan burns food before it is done, flipped or not'); }
+{ const d = hold(170, ['choirEgg'], 3), t = hold(170, ['saintsFinger'], 3); check(d.at.burnt - d.at.done < t.at.burnt - t.at.done, `delicate food burns sooner after it is done than tough food (egg ${(d.at.burnt - d.at.done).toFixed(1)}s, root ${(t.at.burnt - t.at.done).toFixed(1)}s)`); }
+{ const a = hold(180, ['starGristle'], 0), b = hold(180, ['starGristle', 'moonlard'], 0); check(b.stick < a.stick * 0.6 && b.at.burnt > a.at.burnt, `fat greases the pan: food sticks and burns less (stuck ${a.stick.toFixed(2)} vs ${b.stick.toFixed(2)})`); }
+{ const r = hold(180, ['starGristle'], 0, 6); const T0 = r.v.T, f = S.tend(r.c, r.v.id); check(f && f.freed > 0.4 && r.v.items[0].stick === 0 && r.v.T < T0, 'a flip frees what was sticking and costs a little heat'); }
+{ const c = camp(() => {}); const v = S.placeVessel(c, 'pot', 3, 2); ['blackWater', 'blackWater', 'weepingTuber'].forEach(i => S.addToVessel(c, v.id, i)); for (let t = 0; t < 600; t++) { v.T = 100; S.step(c, 0.1); } check(v.items[2].stick === 0 && v.items[2].scorch === 0 && S.foodState(v.items[2]) === 'done', 'food in water neither sticks nor overcooks'); }
+{ const r = hold(160, ['lanternEye', 'weepingTuber'], 0, 30, 'pot'); check(r.v.items[0].stick > 0.5, 'a dry pot sticks'); const s = hold(160, ['lanternEye', 'weepingTuber'], 3, 120, 'pot'), n = hold(160, ['lanternEye', 'weepingTuber'], 0, 120, 'pot'); check(s.at.burnt > n.at.burnt, `stirring a dry pot holds off burning (left ${n.at.burnt}s, stirred ${s.at.burnt}s)`); }
+{ const c = camp(() => {}); const v = S.placeVessel(c, 'pan', 3, 2); S.addToVessel(c, v.id, 'starGristle'); const it = v.items[0];
+  it.progress = 1.1; const good = { ...c.stats }; S.eat(c, v.id); const dGood = good.hunger - c.stats.hunger;
+  S.addToVessel(c, v.id, 'starGristle'); v.items[0].progress = 1.9; v.items[0].dried = true; const b = { ...c.stats }; check(S.judge(v).state === 'overdone', 'food dried past its window is overdone'); S.eat(c, v.id); const dOver = b.hunger - c.stats.hunger;
+  check(dOver > 0 && dOver < dGood, `overdone food does a little less (hunger ${dGood.toFixed(1)} vs ${dOver.toFixed(1)})`); }
+
 console.log('Cooking');
-function cook(type, dx, items, secs) {
+function cook(type, dx, items, secs, flipEvery) {
   const c = camp(bed); S.strike(c, 0, 2); let v = null, cookedAt = -1, burntAt = -1;
-  run(c, 30 + secs, (cc, t) => { tend(cc, t); if (t === 300) { v = S.placeVessel(cc, type, dx, 2); items.forEach(i => S.addToVessel(cc, v.id, i)); } if (v) { const j = S.judge(v); if (cookedAt < 0 && j.state === 'cooked') cookedAt = (t - 300) / 10; if (burntAt < 0 && j.state === 'burnt') burntAt = (t - 300) / 10; } });
+  run(c, 30 + secs, (cc, t) => { tend(cc, t); if (v && flipEvery && (t - 300) % (flipEvery * 10) === 0) S.tend(cc, v.id); if (t === 300) { v = S.placeVessel(cc, type, dx, 2); items.forEach(i => S.addToVessel(cc, v.id, i)); } if (v) { const j = S.judge(v); if (cookedAt < 0 && j.state === 'cooked') cookedAt = (t - 300) / 10; if (burntAt < 0 && j.state === 'burnt') burntAt = (t - 300) / 10; } });
   return { c, v, cookedAt, burntAt };
 }
 { const r = cook('pan', 0, ['starGristle', 'moonlard'], 90); check(r.burntAt >= 0 && r.burntAt < 20, `a pan right over the fire burns fast (burnt at ${r.burntAt}s)`); }
-{ const r = cook('pan', 0.1, ['starGristle', 'moonlard'], 90); check(r.cookedAt > 0 && r.cookedAt < 30 && r.burntAt < 0, `a pan at the edge of the flames cooks fast without burning (cooked ${r.cookedAt}s, burnt ${r.burntAt}s)`); }
+{ const r = cook('pan', 0.1, ['starGristle', 'moonlard'], 90, 3); check(r.cookedAt > 0 && r.cookedAt < 30 && (r.burntAt < 0 || r.burntAt > r.cookedAt + 8), `a pan at the edge of the flames, flipped, cooks fast with time to take it off (cooked ${r.cookedAt}s, burnt ${r.burntAt}s)`); }
+{ const r = cook('pan', 0.1, ['starGristle', 'moonlard'], 120); check(r.burntAt > 0, `the same pan left alone burns (burnt ${r.burntAt}s)`); }
 { const r = cook('pan', 0.3, ['starGristle', 'moonlard'], 90); check(r.cookedAt < 0, 'a pan far from the fire does not cook in time'); }
 { const r = cook('pot', 0, ['blackWater', 'blackWater', 'lanternEye', 'weepingTuber'], 120); check(r.cookedAt > 0 && r.burntAt < 0, `a pot of water boils its contents without burning (cooked ${r.cookedAt}s)`); check(r.v.T <= 100.01, 'a pot with water stays at the boil'); }
 { const c = camp(() => {}); const v = S.placeVessel(c, 'pan', 0, 2); check(!S.addToVessel(c, v.id, 'blackWater'), 'black water only goes in the pot'); check(S.addToVessel(c, v.id, 'eelSlice') && S.addToVessel(c, v.id, 'cometHoney') && S.addToVessel(c, v.id, 'moonlard') && !S.addToVessel(c, v.id, 'waxFig'), 'a pan holds three things'); }
