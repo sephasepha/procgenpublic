@@ -149,7 +149,10 @@ the pit, the vessels and the fire; what you use and what you need to know are pl
 | `camp/cooking.js` | Pots, pans and skewers: temperature, water and boil-off, cooking and scorching, stews, what the contents amount to (`judge`, `foodState`) and what eating does. Its tuning is `COOK`; each vessel's own properties are in `camp/data.js`. |
 | `camp/sim.js` | The camp as a whole: its state, one step (fire, then vessels, then body), the body's needs, foraging, and the cost of blowing and the effect of eating. It exports everything as `CampSim`. |
 | `camp/data.js` | Fire supplies, vessels, the 20 ingredients, the dishes, ash and char. |
-| `camp/camp.js` | The screen: drawing, the controls, input. It reads its thresholds (choking, smouldering, burnt) from the simulation, so what it shows always agrees with what happens. |
+| `camp/view.js` | What the screen's parts share (`CampView`): the live state (canvas, size, the camp, what is being dragged), the projection from the floor to the scene, sprites, layout and hit-testing. It reads its thresholds (choking, smouldering, burnt) from the simulation, so what the screen shows always agrees with what happens. |
+| `camp/draw.js` | Painting the scene: the floor, the pit, pieces, vessels, particles, firelight and darkness, hands and charms, and the placement ring for what is in hand. |
+| `camp/panels.js` | The readable UI: the screen's markup, the fire gauge, the vessel panel, the tray and larder counts, and notes. |
+| `camp/camp.js` | Opens and closes the screen, runs its loop, and turns input (taps, drags, keys) into actions on the camp. |
 
 `tests/camp.js` tests the rules (over 400 checks); `tests/camp-golden.js` replays a scripted session (fire, coals,
 stews, a pan, a skewer, eating, foraging, ash and char) and compares its state exactly with `tests/camp-golden.json`,
@@ -306,6 +309,7 @@ wasm/               C sources of the WebAssembly kernels and build.sh
 tools/bench.js, tools/bench-browser.py, tools/profile.js   performance tracking
 tiles/              Tiles page
 tools/autotile.js   authoring helper for example rooms
+tools/camp-screen-check.py   plays a scripted camp session with time and randomness fixed and records what the screen shows; diff two builds to prove a change to the screen code changed nothing visible
 assets/           shared styles, icons, service worker registration
 tests/run.js      generator test suite
 ```
