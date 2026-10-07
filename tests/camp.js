@@ -63,8 +63,8 @@ function cook(type, dx, items, secs) {
   run(c, 30 + secs, (cc, t) => { tend(cc, t); if (t === 300) { v = S.placeVessel(cc, type, dx, 2); items.forEach(i => S.addToVessel(cc, v.id, i)); } if (v) { const j = S.judge(v); if (cookedAt < 0 && j.state === 'cooked') cookedAt = (t - 300) / 10; if (burntAt < 0 && j.state === 'burnt') burntAt = (t - 300) / 10; } });
   return { c, v, cookedAt, burntAt };
 }
-{ const r = cook('pan', 0, ['starGristle', 'moonlard'], 90); check(r.burntAt >= 0 && r.burntAt < 40, `a pan right over the fire burns (burnt at ${r.burntAt}s)`); }
-{ const r = cook('pan', 0.1, ['starGristle', 'moonlard'], 90); check(r.cookedAt > 0 && r.burntAt < 0, `a pan at the edge of the flames cooks without burning (cooked ${r.cookedAt}s, burnt ${r.burntAt}s)`); }
+{ const r = cook('pan', 0, ['starGristle', 'moonlard'], 90); check(r.burntAt >= 0 && r.burntAt < 20, `a pan right over the fire burns fast (burnt at ${r.burntAt}s)`); }
+{ const r = cook('pan', 0.1, ['starGristle', 'moonlard'], 90); check(r.cookedAt > 0 && r.cookedAt < 30 && r.burntAt < 0, `a pan at the edge of the flames cooks fast without burning (cooked ${r.cookedAt}s, burnt ${r.burntAt}s)`); }
 { const r = cook('pan', 0.3, ['starGristle', 'moonlard'], 90); check(r.cookedAt < 0, 'a pan far from the fire does not cook in time'); }
 { const r = cook('pot', 0, ['blackWater', 'lanternEye', 'weepingTuber'], 120); check(r.cookedAt > 0 && r.burntAt < 0, `a pot of water boils its contents without burning (cooked ${r.cookedAt}s)`); check(r.v.T <= 100.01, 'a pot with water stays at the boil'); }
 { const c = camp(() => {}); const v = S.placeVessel(c, 'pan', 0, 2); check(!S.addToVessel(c, v.id, 'blackWater'), 'black water only goes in the pot'); check(S.addToVessel(c, v.id, 'eelSlice') && S.addToVessel(c, v.id, 'cometHoney') && S.addToVessel(c, v.id, 'moonlard') && !S.addToVessel(c, v.id, 'waxFig'), 'a pan holds three things'); }

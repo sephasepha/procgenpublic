@@ -16,7 +16,7 @@
   const VESSELS = {
     pot: { name: 'Pot', note: 'Iron pot. Dry, it is an oven and scorches what is in it. With water it boils; simmer cooked food long enough and it comes together as a stew.', cap: 4, gain: 0.17, tau: 10, burnAt: 150, dryBurnAt: 118, boils: true,
       pal: { a: '#2a2a30', b: '#4a4a56', c: '#14141a', d: '#6a6a7a' }, px: ['........', '.d....d.', 'dbbbbbbd', 'abbbbbba', 'aaaaaaaa', 'aaaaaaaa', '.aaaaaa.', '..c..c..'] },
-    pan: { name: 'Pan', note: 'Blackened pan. Fries fast and burns faster.', cap: 3, gain: 0.25, tau: 6, burnAt: 205,
+    pan: { name: 'Pan', note: 'Blackened pan. Fries fast and burns faster.', cap: 3, gain: 0.25, tau: 3, speed: 2, burnAt: 190,
       pal: { a: '#2a2a30', b: '#4a4a56', c: '#6a4a3a' }, px: ['........', '........', '.bbbbb..', 'abbbbba.', 'aaaaaacc', '.aaaaa..', '........', '........'] },
     skewer: { name: 'Skewer', note: 'A spit of sharpened bone. Holds two things over open flame.', cap: 2, gain: 0.3, tau: 3, burnAt: 230,
       pal: { a: '#e8e0c8', b: '#a89c80' }, px: ['........', '........', '........', 'abbbbbbb', 'aaaaaaaa', '........', '........', '........'] },

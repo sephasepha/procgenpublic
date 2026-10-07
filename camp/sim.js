@@ -225,8 +225,9 @@
       const scorch = Math.max(0, v.T - (dry && V.dryBurnAt ? V.dryBurnAt : V.burnAt)) / 90 * (dry ? 1.6 : 1);
       v.items.forEach(it => {
         const I = ING[it.id];
-        it.progress += cookRate / I.cook * dt;
-        if (!I.water) it.scorch += scorch * 0.06 * dt;
+        // a pan is thin iron on the coals: it heats fast, cooks fast and burns fast (speed)
+        it.progress += cookRate / I.cook * dt * (V.speed || 1);
+        if (!I.water) it.scorch += scorch * 0.06 * dt * (V.speed || 1);
       });
       v.scorch = v.items.length ? Math.max(...v.items.map(it => it.scorch)) : 0;
       if (V.boils && v.water > 0 && v.T >= 95 && !v.stewed) {
