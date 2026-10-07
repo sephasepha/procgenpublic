@@ -224,9 +224,19 @@
   // the item in hand: what a tap on the scene will do
   function select(k) {
     const c = st.c;
+    // with a vessel selected, an ingredient tapped in the larder goes straight into it
+    const sv = k && ING[k] && st.vsel && c.vessels.find(v => v.id === st.vsel);
+    if (sv) { addTo(sv, k); return; }
     if (k && k === st.sel) k = null;
     if (k && VES[k] && c.vessels.some(v => v.type === k)) { const v = c.vessels.find(q => q.type === k); st.vsel = v.id; k = null; } // already out: select it instead
     st.sel = k;
+    refresh(true); ctx();
+  }
+  function addTo(v, k) {
+    const c = st.c, I = ING[k], b = el.querySelector(`.cf-larder .cf-btn[data-k="${k}"]`);
+    const why = c.stock[k] <= 0 ? `No ${I.name} left.` : I.only && !I.only.includes(v.type) ? `${I.name} only goes in the pot.` : !S.addToVessel(c, v.id, k) ? `The ${VES[v.type].name.toLowerCase()} is full.` : null;
+    if (b) { b.classList.remove('added', 'refused'); void b.offsetWidth; b.classList.add(why ? 'refused' : 'added'); }
+    if (why) { const r = v.box; note(why, r ? r.x + r.w / 2 : LW / 2, r ? r.y : LH / 2, 1800); }
     refresh(true); ctx();
   }
   function down(e) {

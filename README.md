@@ -150,7 +150,9 @@ pit, the vessels and the fire; what you use and what you need to know are plain,
   hand: a press that moves drags, a press that doesn't is a tap. Pieces are picked by the nearest within a finger's
   reach, stay where you took hold of them, lift with a shadow while held, and show the same catch/air/smother ring
   where they are.
-- **Larder:** a compact grid of icons with counts; the ingredient in hand is named above it.
+- **Larder:** a compact grid of icons with counts; the ingredient in hand is named above it. With a pot, pan or
+  skewer selected (it is selected when you set it down or tap it), tapping an ingredient puts it straight in; the
+  button flashes when it goes in and shakes when it can't (full, or water in a pan).
 - **Layout: nothing sits over the fire.** The screen is bands: a slim fire-status strip across the top, the scene,
   a dock for the larder and the selected vessel (below the scene in portrait, a column beside it in landscape), and
   the tray. Opening the larder or a vessel resizes the scene rather than covering it, and the scene always renders

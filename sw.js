@@ -1,5 +1,5 @@
 // Network first, so every push shows up on the next reload; the cache only answers when offline.
-const CACHE = 'undercroft-v30';
+const CACHE = 'undercroft-v31';
 const SHELL = ['./', 'index.html', 'workbench.html', 'lab.html', 'tiles.html', 'tiles/tiles.js', 'gen/dressing.js', 'gen/rooms.js', 'assets/style.css', 'gen/mazes.js', 'gen/core.js', 'workbench/app.js', 'lab/lab.js', 'explore/explore.js', 'gen/world.js', 'infinite/infinite.js', 'camp/data.js', 'camp/sim.js', 'camp/camp.js', 'body/data.js', 'body/sim.js', 'body/body.js', 'infinite/nav.js', 'infinite/page.js', 'infinite/worker.js', 'gen/wasm.js', 'wasm/gen.wasm', 'assets/sw-register.js', 'assets/build.js', 'manifest.webmanifest', 'assets/icon-192.png'];
 
 self.addEventListener('install', e => {

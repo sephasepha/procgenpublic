@@ -351,3 +351,8 @@ html.has-screens .camp { bottom: var(--navh); }
   .cf-group + .cf-group, .cf-blow + .cf-group { border-left: 0; padding-left: 2px; }
   .cf-ctx { padding: 6px 10px; gap: 3px 8px; } .cf-ctx .acts button { height: 30px; min-width: 50px; padding: 0 8px; } .cf-ctx .acts button[data-a="close"] { min-width: 30px; }
 }
+/* an ingredient tapped into the selected vessel: a quick confirmation (or refusal) on its button */
+.cf-larder .cf-btn.added { animation: added 0.45s ease-out; }
+.cf-larder .cf-btn.refused { animation: refused 0.35s ease-in-out; }
+@keyframes added { 0% { border-color: var(--brass); background: rgba(207,167,78,0.45); transform: scale(0.9); } 100% { transform: scale(1); } }
+@keyframes refused { 25% { transform: translateX(-3px); border-color: #d86a4a; } 75% { transform: translateX(3px); border-color: #d86a4a; } }
