@@ -56,6 +56,7 @@ console.log('Spacing');
   check(S.preview(c, 'kindling', 0.4, 2).catches === false, 'the preview says kindling far from the flames will not catch');
   const ok = S.preview(c, 'kindling', 0.07, 2); check(ok.catches && !ok.smothers.length, 'and that kindling beside the flames will catch without smothering them'); }
 
+{ const c = S.createCamp(1); c.unlimitedFire = true; c.stock.kindling = 0; for (let k = 0; k < 30; k++) S.placePiece(c, 'kindling', 0.3 + k * 0.01, 2); check(c.pieces.length === 30 && c.stock.kindling === 0, 'with unlimited fire supplies, kindling never runs out'); }
 console.log('Cooking');
 function cook(type, dx, items, secs) {
   const c = camp(bed); S.strike(c, 0, 2); let v = null, cookedAt = -1, burntAt = -1;

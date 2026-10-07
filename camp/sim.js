@@ -49,8 +49,8 @@
 
   // ---------- fire ----------
   function placePiece(c, kind, x, z) {
-    if (!FIRE[kind] || c.stock[kind] <= 0) return null;
-    c.stock[kind]--;
+    if (!FIRE[kind] || (!c.unlimitedFire && c.stock[kind] <= 0)) return null;
+    if (!c.unlimitedFire) c.stock[kind]--;
     const k = FIRE[kind], p = { id: c.nextId++, kind, x, z, T: AMBIENT, m: k.mass, m0: k.mass, burning: false, ash: false, out: false, smoke: 0 };
     c.pieces.push(p); return p;
   }
@@ -59,7 +59,7 @@
   function removePiece(c, id) {
     const k = c.pieces.findIndex(q => q.id === id); if (k < 0) return false;
     const p = c.pieces[k]; c.pieces.splice(k, 1);
-    if (!p.burning && p.m > p.m0 * 0.9) c.stock[p.kind]++;
+    if (!p.burning && p.m > p.m0 * 0.9 && !c.unlimitedFire) c.stock[p.kind]++;
     return true;
   }
   // strike over a point: sparks heat the tinder there a lot, anything else a little

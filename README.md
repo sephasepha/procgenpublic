@@ -150,7 +150,13 @@ pit, the vessels and the fire; what you use and what you need to know are plain,
   hand: a press that moves drags, a press that doesn't is a tap. Pieces are picked by the nearest within a finger's
   reach, stay where you took hold of them, lift with a shadow while held, and show the same catch/air/smother ring
   where they are.
-- **The fire gauge** (top right; across the top on a narrow screen) shows how the fire is doing:
+- **Layout: nothing sits over the fire.** The screen is bands: a slim fire-status strip across the top, the scene,
+  a dock for the larder and the selected vessel (below the scene in portrait, a column beside it in landscape), and
+  the tray. Opening the larder or a vessel resizes the scene rather than covering it, and the scene always renders
+  at its own aspect.
+- **Prototype settings:** tinder, kindling and fuel are unlimited (∞ on their buttons). Food can be dragged from
+  the larder straight onto a pot, pan or skewer, or picked and then tapped onto one.
+- **The fire gauge** (the strip across the top) shows how the fire is doing:
   - a strength bar from Snuffed through Steady to Roaring, coloured like the fire (dull red, orange, yellow-white);
   - Air (it turns red and blinks when the fire is smothered) and Fuel, with an estimate of how long it will last;
   - which signs are showing: flame, embers, smoke;

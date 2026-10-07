@@ -90,9 +90,7 @@
     if (el) return;
     el = document.createElement('div'); el.className = 'camp fire-screen'; el.hidden = true;
     const btn = (k, label, cls) => `<button type="button" class="cf-btn ${cls || ''}" data-k="${k}" aria-pressed="false"><canvas width="8" height="8" aria-hidden="true"></canvas><span class="nm">${label}</span><span class="ct"></span></button>`;
-    el.innerHTML = `<canvas class="scene" aria-label="The fire pit. Choose something from the tray, then tap the floor or a vessel to use it, or drag it there."></canvas>
-      <div class="camp-note" hidden></div>
-      <section class="cf-gauge" aria-label="The fire">
+    el.innerHTML = `<section class="cf-gauge" aria-label="The fire">
         <div class="cf-head"><b class="cf-state">Empty pit</b><span class="cf-trend" aria-hidden="true"></span></div>
         <div class="cf-meter" role="meter" aria-label="Fire strength" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i class="cf-fill"></i><i class="cf-mark" style="left:30%"></i><i class="cf-mark" style="left:82%"></i></div>
         <div class="cf-scale" aria-hidden="true"><span>Snuffed</span><span>Steady</span><span>Roaring</span></div>
@@ -100,9 +98,13 @@
         <div class="cf-signs"><span data-s="flame">Flame</span><span data-s="embers">Embers</span><span data-s="smoke">Smoke</span></div>
         <p class="cf-hint" aria-live="polite"></p>
       </section>
-      <div class="cf-ctx" hidden></div>
+      <canvas class="scene" aria-label="The fire pit. Choose something from the tray, then tap the floor or a vessel to use it, or drag it there."></canvas>
+      <div class="camp-note" hidden></div>
       <div class="cf-tip" hidden aria-live="polite"></div>
+      <div class="cf-dock">
+      <div class="cf-ctx" hidden></div>
       <div class="cf-larder" hidden role="group" aria-label="Larder">${LARDER.map(k => btn(k, ING[k].name, 'ing')).join('')}</div>
+      </div>
       <nav class="cf-tray" aria-label="Camp kit">
         <div class="cf-group" role="group" aria-label="Fire">${KIT.map(k => btn(k, NAMES[k])).join('')}</div>
         <button type="button" class="cf-blow" aria-label="Blow on the fire"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h11a3 3 0 1 0-3-3M3 13h15a3 3 0 1 1-3 3M3 17h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Blow</span></button>
@@ -129,14 +131,18 @@
     window.addEventListener('pointerup', e => {
       if (!drag || !drag.btn) return; const d = drag; drag = null;
       if (!d.moved) return select(d.key);
-      if (e.target === cv) dropSlot(d.key, P(e));
+      // on touch the release is reported to the button the drag began on, so go by where the finger is
+      const r = cv.getBoundingClientRect();
+      if (e.clientX >= r.left && e.clientX < r.right && e.clientY >= r.top && e.clientY < r.bottom) dropSlot(d.key, P(e));
     });
     el.querySelector('.cf-blow').addEventListener('click', blow);
     el.querySelector('.cf-open').addEventListener('click', () => larder());
     el.querySelector('.cf-forage').addEventListener('click', forage);
     el.querySelector('.cf-ctx').addEventListener('click', ctxAction);
     window.addEventListener('resize', () => { if (!el.hidden) size(); });
-    if (window.ResizeObserver) new ResizeObserver(() => { if (!el.hidden && st && el.querySelector('.cf-tray').offsetHeight + 'px' !== el.style.getPropertyValue('--trayh')) size(); }).observe(el.querySelector('.cf-tray'));
+    // the scene band changes size when the larder or a vessel panel opens: re-render it at its new size
+    let seen = '';
+    if (window.ResizeObserver) new ResizeObserver(() => { const r = cv.getBoundingClientRect(), k = Math.round(r.width) + 'x' + Math.round(r.height); if (!el.hidden && st && k !== seen) { seen = k; size(); } }).observe(cv);
     window.addEventListener('keydown', e => {
       if (el.hidden) return;
       if (e.key === 'Escape') { if (st.sel || st.vsel) { select(null); st.vsel = null; ctx(); } else if (!el.querySelector('.cf-larder').hidden) larder(false); else leave(); }
@@ -144,10 +150,11 @@
     });
   }
   function size() {
-    // the tray wraps to as many rows as the screen needs; the scene and the panels sit above whatever it takes
-    el.style.setProperty('--trayh', el.querySelector('.cf-tray').offsetHeight + 'px');
+    // the bands (status, scene, dock, tray) are laid out by CSS; the scene renders at whatever size it is given
     const r = cv.getBoundingClientRect(), aspect = r.width / Math.max(1, r.height);
-    LH = 270; LW = Math.max(300, Math.min(760, Math.round(LH * aspect)));
+    // a low-resolution scene at the band's own aspect (never stretched): about 270 rows, at most 760 columns
+    LH = 270; LW = Math.round(LH * aspect);
+    if (LW > 760) { LW = 760; LH = Math.max(90, Math.round(LW / aspect)); }
     if (aspect < 1) { LW = 360; LH = Math.round(LW / aspect); } // portrait: taller scene, same width
     cv.width = LW; cv.height = LH; g.imageSmoothingEnabled = false;
     // looking down at the pit: the horizon sits above the frame, the pit a little below the middle
@@ -159,6 +166,7 @@
     if (!st) {
       const c = S.createCamp(1), saved = load();
       if (saved) { Object.assign(c.stats, saved.stats); Object.assign(c.stock, saved.stock); }
+      c.unlimitedFire = true; // prototype: tinder, kindling and fuel never run out
       st = { c, L: null, saveAt: 0, sel: null, vsel: null, hover: null, uiAt: 0, flash: 0 };
     }
     return st.c;
@@ -203,7 +211,7 @@
   let drag = null;
   const P = e => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * LW, y: (e.clientY - r.top) / r.height * LH }; };
   const inBox = (p, b) => p.x >= b.x && p.y >= b.y && p.x < b.x + b.w && p.y < b.y + b.h;
-  const overTray = e => { const t = el.querySelector('.cf-tray').getBoundingClientRect(); return e.clientY >= t.top; };
+  const overTray = e => e.clientY >= cv.getBoundingClientRect().bottom; // anywhere below the scene: the dock or the tray
   function hitPlaced(p) {
     // nearest first: vessels, then pieces
     const vs = st.c.vessels.slice().sort((a, b) => a.z - b.z);
@@ -243,7 +251,7 @@
   // use an item at a point in the scene (a drop from the tray, or a tap with it in hand)
   function dropSlot(k, p) {
     const c = st.c, f = onFloorAt(p);
-    if (FIRE[k]) { if (!f) return; if (c.stock[k] <= 0) { note(`No ${FIRE[k].name.toLowerCase()} left. Forage in the sack for more.`, p.x, p.y); return select(null); } S.placePiece(c, k, f.x, f.z); refresh(true); return; }
+    if (FIRE[k]) { if (!f) return; if (!c.unlimitedFire && c.stock[k] <= 0) { note(`No ${FIRE[k].name.toLowerCase()} left. Forage in the sack for more.`, p.x, p.y); return select(null); } S.placePiece(c, k, f.x, f.z); refresh(true); return; }
     if (k === 'striker') { if (!f) return; const n = S.strike(c, f.x, f.z); emit('spark', f.x, f.z, 0.03, 14); return; }
     if (VES[k]) { if (!f) return; const v = S.placeVessel(c, k, f.x, f.z); if (!v) note(`The ${VES[k].name.toLowerCase()} is already out.`, p.x, p.y); else { st.vsel = v.id; select(null); } refresh(true); return; }
     if (ING[k]) {
@@ -318,8 +326,9 @@
     const c = st.c;
     el.querySelectorAll('.cf-btn[data-k]').forEach(b => {
       const k = b.dataset.k, n = c.stock[k], out = VES[k] && c.vessels.some(v => v.type === k);
-      b.querySelector('.ct').textContent = n === undefined ? (out ? 'out' : '') : String(n);
-      b.classList.toggle('empty', n === 0); b.classList.toggle('out', !!out);
+      const inf = c.unlimitedFire && FIRE[k];
+      b.querySelector('.ct').textContent = inf ? '∞' : n === undefined ? (out ? 'out' : '') : String(n);
+      b.classList.toggle('empty', !inf && n === 0); b.classList.toggle('out', !!out);
       const on = st.sel === k; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
       b.title = artOf(k).name + (n !== undefined ? ` (${n} left)` : '') + '. ' + (artOf(k).note || '');
     });
