@@ -114,6 +114,7 @@ console.log('Water, coals and what is left');
 }
 { const c = camp(c => { S.placePiece(c, 'kindling', 0, 2); }); const p = c.pieces[0]; p.m = p.m0 * 0.5; p.T = 20; const g = S.collect(c, p.id); check(g && g.char === 1, 'a half-burnt stick put out is char'); }
 
+{ const c = camp(() => {}); for (let k = 0; k < 200; k++) { c.t = k * 3.7; S.forage(c); } check(c.stock.ash === 20 && c.stock.char === 20, 'foraging never turns up ash or char'); }
 console.log('Eating');
 { const c = camp(() => {}); const v = S.placeVessel(c, 'skewer', 0, 2); S.addToVessel(c, v.id, 'lanternEye'); const before = { ...c.stats }; S.eat(c, v.id); check(c.stats.soul < before.soul && c.stats.health < before.health, 'a raw Lantern Eye hurts soul and health'); }
 { const c = camp(() => {}); const v = S.placeVessel(c, 'skewer', 0, 2); S.addToVessel(c, v.id, 'lanternEye'); v.items[0].progress = 1.2; const before = { ...c.stats }; S.eat(c, v.id); check(c.stats.hunger < before.hunger && c.stats.soul >= before.soul, 'a cooked Lantern Eye eases hunger without hurting soul'); }

@@ -4,7 +4,8 @@
 // tap the floor (or a vessel) to use it, or drag it straight there. Your hands take what you eat; the five charms
 // show how you are. Touch anything in the scene for a note about it.
 (function (root) {
-  const RES = root.CAMP_RESIDUE, S = root.CampSim, FIRE = root.CAMP_FIRE, STRIKER = root.CAMP_STRIKER, VES = root.CAMP_VESSELS, ING = root.CAMP_INGREDIENTS, STATS = root.CAMP_STATS;
+  // thresholds come from the simulation, so what the screen shows always agrees with what the fire does
+  const RES = root.CAMP_RESIDUE, S = root.CampSim, CHOKE = S.CAMP_TUNING.chokeAir, SMOULDER = S.CAMP_TUNING.smokeAt, COOK = S.CAMP_COOK, FIRE = root.CAMP_FIRE, STRIKER = root.CAMP_STRIKER, VES = root.CAMP_VESSELS, ING = root.CAMP_INGREDIENTS, STATS = root.CAMP_STATS;
   const PIT = S.CAMP_PIT, H_CAM = 1.3;
   let el = null, cv, g, LW = 480, LH = 270, H0, F, CX, st = null, raf = 0, last = 0, floorImg = null, sprites = {}, onLeave = null;
 
@@ -203,7 +204,7 @@
   function vesselNote(v) {
     const j = S.judge(v);
     if (j.state === 'empty') return `${VES[v.type].name}. Empty. ${VES[v.type].note}`;
-    const state = it => it.scorch >= 0.35 ? 'burnt' : it.progress >= 1 ? 'done' : it.progress >= 0.5 ? 'nearly' : it.progress > 0.05 ? 'warming' : 'raw';
+    const state = S.foodState;
     const water = v.type === 'pot' ? (v.water > 0.5 ? ' Water at a ' + (v.T >= 99 ? 'boil.' : 'simmer.') : v.water > 0 ? ' The water is nearly gone.' : ' It is dry.') : '';
     return v.items.map(it => `${ING[it.id].name}: ${state(it)}`).join(', ') + '.' + water + (j.dish ? ` It has become ${j.dish.name}.` : j.possible ? ` Could be ${j.possible.name}.` : '');
   }
@@ -308,7 +309,7 @@
     }
     if (d.from === 'vessel') { st.vsel = st.vsel === d.obj.id ? null : d.obj.id; ctx(); return; }
     if (d.from === 'piece' && S.residueOf(d.obj).ash + S.residueOf(d.obj).char > 0) return gather(d.obj, p);
-    if (d.from === 'piece') { const q = d.obj, k = FIRE[q.kind]; return note(`${k.name}: ${q.ash ? (q.ember > 20 ? 'embers, still glowing' : 'ash') : q.burning ? (q.air < 0.45 ? 'burning, choking for air' : 'burning') : q.out ? 'gone out, smouldering' : q.T > 60 ? 'hot' : 'cold'}.`, p.x, p.y); }
+    if (d.from === 'piece') { const q = d.obj, k = FIRE[q.kind]; return note(`${k.name}: ${q.ash ? (q.ember > 20 ? 'embers, still glowing' : 'ash') : q.burning ? (q.air < CHOKE ? 'burning, choking for air' : 'burning') : q.out ? 'gone out, smouldering' : q.T > 60 ? 'hot' : 'cold'}.`, p.x, p.y); }
     const ch = L.charms.find(b => inBox(p, { x: b.x - 2, y: 0, w: b.w + 4, h: b.y + b.h + 4 }));
     if (ch) return note(`${CHARM_NAME[ch.key]}. ${words[ch.key](c.stats[ch.key])}`, p.x + 20, p.y + 30);
     if (st.sackBox && inBox(p, st.sackBox)) return forage();
@@ -395,7 +396,7 @@
     if (!v) { st.vsel = null; box.hidden = true; box.dataset.key = ''; return; }
     box.hidden = false;
     const j = S.judge(v), V = VES[v.type];
-    const stateOf = it => it.scorch >= 0.35 ? 'burnt' : it.progress >= 1 ? 'done' : it.progress >= 0.5 ? 'nearly' : it.progress > 0.05 ? 'cooking' : 'raw';
+    const stateOf = S.foodState;
     // a pot's water: a gauge of what is left to boil away (one measure per water ingredient), and how rich it will be
     const water = v.type === 'pot' ? (v.water > 0 ? '<span class="wbar"><i></i></span>' : v.items.length ? 'dry: scorching' : 'dry') : '';
     const rich = j.richness ? `<span class="rich ${j.richness}">${j.richness}</span>` : '';
@@ -413,7 +414,7 @@
     const sf = box.querySelector('.stew'); if (sf) sf.textContent = `stew forming ${Math.round(j.stewing * 100)}%`;
     const wb = box.querySelector('.wbar i'); if (wb) { const f = Math.max(0, Math.min(1, v.water / Math.max(1, j.waters))); wb.style.width = Math.round(f * 100) + '%'; wb.parentNode.classList.toggle('low', f < 0.3); }
     const T = box.querySelector('.T'); T.textContent = `${Math.round(v.T)}° · ${heatWord(v.T)}`; T.className = 'T ' + (v.T > V.burnAt ? 'hot' : v.T > 68 ? 'warm' : '');
-    box.querySelectorAll('li i').forEach((i, n) => { const it = v.items[n]; if (it) { i.style.setProperty('--p', Math.min(1, it.progress).toFixed(3)); i.style.setProperty('--s', Math.min(1, it.scorch / 0.35).toFixed(3)); } });
+    box.querySelectorAll('li i').forEach((i, n) => { const it = v.items[n]; if (it) { i.style.setProperty('--p', Math.min(1, it.progress).toFixed(3)); i.style.setProperty('--s', Math.min(1, it.scorch / COOK.burnt).toFixed(3)); } });
   }
   function ctxAction(e) {
     const a = e.target.closest('[data-a]'); if (!a) return;
@@ -433,9 +434,9 @@
     const br = Math.min(1, c.breath || 0);
     c.pieces.forEach(q => {
       // flames: more, taller and whiter the harder a piece burns; small, low and red when it is starved of air
-      const heat = q.burning ? Math.min(1.5, q.vigour * (q.air < 0.45 ? 0.6 : 1) * (1 + 0.5 * br) * (q.kind === 'fuel' ? 1.15 : 1)) : 0;
+      const heat = q.burning ? Math.min(1.5, q.vigour * (q.air < CHOKE ? 0.6 : 1) * (1 + 0.5 * br) * (q.kind === 'fuel' ? 1.15 : 1)) : 0;
       if (q.burning && Math.random() < dt * (6 + 34 * heat)) emit('flame', q.x, q.z, 0.01, 1 + (heat > 0.9 && Math.random() < 0.5 ? 1 : 0), heat);
-      if (q.smoke > 0.2 && Math.random() < dt * 7 * Math.min(1.4, q.smoke)) emit('smoke', q.x, q.z, 0.03, 1, 0, q.burning ? (q.air < 0.45 ? 0.8 : 0.2) : 0.6);
+      if (q.smoke > 0.2 && Math.random() < dt * 7 * Math.min(1.4, q.smoke)) emit('smoke', q.x, q.z, 0.03, 1, 0, q.burning ? (q.air < CHOKE ? 0.8 : 0.2) : 0.6);
       if (q.ash && q.ember > 30 && Math.random() < dt * (1 + 6 * br) * Math.min(1, q.ember / 150)) emit('spark', q.x, q.z, 0.01, 1);
     });
     c.vessels.forEach(v => {
@@ -452,7 +453,7 @@
   }
   function draw(time) {
     const c = st.c, L = st.L, out = S.fireOutput(c), fs = st.fs = S.fireState(c), br = Math.min(1, c.breath || 0);
-    const flicker = fs.air < 0.45 && fs.lit ? 0.35 : 0.15, glow = Math.min(1, out / 1800) * (1 - flicker + flicker * Math.sin(time * 9) * Math.sin(time * 5.3)) * (1 + 0.25 * br);
+    const flicker = fs.air < fs.chokeAt && fs.lit ? 0.35 : 0.15, glow = Math.min(1, out / 1800) * (1 - flicker + flicker * Math.sin(time * 9) * Math.sin(time * 5.3)) * (1 + 0.25 * br);
     const [fr, fg, fb] = fireColor(fs.strength, fs.air);
     g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
     g.drawImage(floorImg, 0, 0);
@@ -523,7 +524,7 @@
         else if (pv.smothers.length) { col = 'rgba(240,80,60,0.9)'; t = 'Too close: it will smother the flames.'; tip = 'bad'; pv.smothers.forEach(id => { const q = c.pieces.find(p => p.id === id); if (q) ring(q.x, q.z, 0.05, `rgba(240,80,60,${0.6 + 0.3 * Math.sin(time * 10)})`); }); }
         else if (!pv.warm) { col = 'rgba(150,150,170,0.7)'; t = 'Too far from the flames to catch.'; tip = 'far'; }
         else if (!pv.catches) { col = 'rgba(240,180,70,0.8)'; t = 'Warm here, but too far to catch yet.'; tip = 'far'; }
-        else if (pv.air < 0.45) { col = 'rgba(240,80,60,0.9)'; t = 'Packed in too tight: it will choke.'; tip = 'bad'; }
+        else if (pv.air < CHOKE) { col = 'rgba(240,80,60,0.9)'; t = 'Packed in too tight: it will choke.'; tip = 'bad'; }
         else if (pv.air < fs.airFull) { col = 'rgba(240,180,70,0.85)'; t = 'It will catch, but short of air.'; tip = 'ok'; }
         else { col = 'rgba(140,220,120,0.9)'; t = 'Good spot: it will catch and breathe.'; tip = 'good'; }
         ring(f.x, f.z, 0.06, col); ring(f.x, f.z, 0.075, col);
@@ -551,8 +552,8 @@
     const k = FIRE[q.kind], s = sc(q.z), size = (q.kind === 'fuel' ? 0.2 : q.kind === 'kindling' ? 0.15 : 0.08) * s, x = sx(q.x, q.z), y = sy(q.z);
     let img;
     if (q.ash) img = tinted(q.kind, k, '#6a6660', 0.85);
-    else if (q.burning) img = tinted(q.kind, k, q.air < 0.45 ? '#a8381a' : q.vigour > 0.9 ? '#ffb040' : '#ff7a30', 0.35 + 0.15 * Math.sin(time * 11 + q.id));
-    else if (q.out && q.T > k.ignite * 0.45) img = tinted(q.kind, k, '#5a2414', 0.5); // smouldering: dull, dark red
+    else if (q.burning) img = tinted(q.kind, k, q.air < CHOKE ? '#a8381a' : q.vigour > 0.9 ? '#ffb040' : '#ff7a30', 0.35 + 0.15 * Math.sin(time * 11 + q.id));
+    else if (q.out && q.T > k.ignite * SMOULDER) img = tinted(q.kind, k, '#5a2414', 0.5); // smouldering: dull, dark red
     else { const burnt = 1 - q.m / q.m0; img = burnt > 0.05 ? tinted(q.kind, k, '#14100e', Math.min(0.9, burnt * 1.2 + 0.2)) : sprite(q.kind, k); }
     const w = Math.max(3, Math.round(size)), h = q.ash ? Math.max(2, Math.round(w * 0.35)) : w;
     const lifted = drag && drag.from === 'piece' && drag.moved && drag.obj === q;
@@ -582,14 +583,14 @@
       g.globalCompositeOperation = 'lighter'; const gr = g.createRadialGradient(x, y - 1, 0, x, y - 1, w * 0.9); gr.addColorStop(0, `rgba(255,${Math.round(90 + 60 * Math.min(1, e))},30,${Math.min(0.9, 0.6 * e)})`); gr.addColorStop(1, 'rgba(200,50,20,0)'); g.fillStyle = gr; g.fillRect(x - w, y - w * 0.6, w * 2, w * 1.1); g.globalCompositeOperation = 'source-over';
       g.fillStyle = `rgba(255,${Math.round(120 + 80 * Math.min(1, e))},50,${Math.min(1, e)})`; for (let i = 0; i < 3; i++) g.fillRect(Math.round(x - w / 3 + i * w / 3 + Math.sin(i * 3 + q.id)), Math.round(y - 1 - (i % 2)), 1, 1);
     }
-    if (q.burning) { g.globalCompositeOperation = 'lighter'; const v = Math.min(1.3, q.vigour); g.fillStyle = `rgba(255,${q.air < 0.45 ? 70 : 140},40,${0.18 * v})`; g.beginPath(); g.ellipse(x, y - h * 0.4, w * 0.8, h * 0.7, 0, 0, 7); g.fill(); g.globalCompositeOperation = 'source-over'; }
+    if (q.burning) { g.globalCompositeOperation = 'lighter'; const v = Math.min(1.3, q.vigour); g.fillStyle = `rgba(255,${q.air < CHOKE ? 70 : 140},40,${0.18 * v})`; g.beginPath(); g.ellipse(x, y - h * 0.4, w * 0.8, h * 0.7, 0, 0, 7); g.fill(); g.globalCompositeOperation = 'source-over'; }
     q.box = { x: x - w / 2 - 2, y: y - h - 2, w: w + 4, h: h + 6 };
   }
   // food changes as it cooks: raw colours, browning, then black
   function itemSprite(it) {
     const I = ING[it.id];
     if (it.scorch >= 0.2) return tinted(it.id, I, '#14100e', Math.min(0.9, 0.3 + it.scorch));
-    if (it.progress > 0.05) return tinted(it.id, I, '#7a4a22', Math.min(0.6, it.progress * 0.5));
+    if (it.progress > COOK.warming) return tinted(it.id, I, '#7a4a22', Math.min(0.6, it.progress * 0.5));
     return sprite(it.id, I);
   }
   function drawVessel(v, time) {

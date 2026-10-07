@@ -138,8 +138,22 @@ The **Rules** panel in the explorer re-checks these live against every loaded se
 ## Camp: fire and cooking
 
 The **Camp** tab (♨) switches to a second screen: a fixed first-person view down at a fire pit on the cavern floor.
-It is two mini-games run by a small simulation (`camp/sim.js`, no DOM, tested in `tests/camp.js`). The scene is the
-pit, the vessels and the fire; what you use and what you need to know are plain, readable controls over it.
+It is two mini-games run by a small simulation with no DOM, so it carries over to a 3D build as it is. The scene is
+the pit, the vessels and the fire; what you use and what you need to know are plain, readable controls around it.
+
+**Where the code is:**
+
+| File | What it holds |
+|---|---|
+| `camp/fire.js` | The fire: laying, striking, air, heat, catching and going out, breath, embers and coals, ash and char, the placement preview and the gauge's reading. Its header documents a piece's states and fields and how a step works; every number it runs on is in its tuning table (`TUNING`) or the gauge's (`GAUGE`). |
+| `camp/cooking.js` | Pots, pans and skewers: temperature, water and boil-off, cooking and scorching, stews, what the contents amount to (`judge`, `foodState`) and what eating does. Its tuning is `COOK`; each vessel's own properties are in `camp/data.js`. |
+| `camp/sim.js` | The camp as a whole: its state, one step (fire, then vessels, then body), the body's needs, foraging, and the cost of blowing and the effect of eating. It exports everything as `CampSim`. |
+| `camp/data.js` | Fire supplies, vessels, the 20 ingredients, the dishes, ash and char. |
+| `camp/camp.js` | The screen: drawing, the controls, input. It reads its thresholds (choking, smouldering, burnt) from the simulation, so what it shows always agrees with what happens. |
+
+`tests/camp.js` tests the rules (over 400 checks); `tests/camp-golden.js` replays a scripted session (fire, coals,
+stews, a pan, a skewer, eating, foraging, ash and char) and compares its state exactly with `tests/camp-golden.json`,
+so a refactor can prove it changed nothing (`node tests/camp-golden.js --record` rewrites it when a change is meant).
 
 - **The tray** along the bottom holds labelled buttons with counts: Tinder, Kindling, Fuel and Strike; a large
   **Blow** button; the Pot, Pan and Skewer; the **Larder** drawer (all 20 ingredients); and Forage. Tap a button to
