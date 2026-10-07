@@ -14,9 +14,9 @@
   const STRIKER = { name: 'Striker', note: 'Flint on iron. Strike it over tinder.', pal: { a: '#6a6a72', b: '#9a9aa6', c: '#3a3a42', d: '#ffd060' }, px: ['......d.', '.....dbd', '....abb.', '...abb..', '..abb...', '.ccb....', 'cc......', 'c.......'] };
 
   const VESSELS = {
-    pot: { name: 'Pot', note: 'Iron pot. Dry, it is an oven and scorches what is in it. With water it boils; simmer cooked food long enough and it comes together as a stew.', cap: 4, gain: 0.17, tau: 10, burnAt: 150, dryBurnAt: 118, boils: true,
+    pot: { name: 'Pot', note: 'Iron pot. Dry, it is an oven and scorches what is in it. With water it boils; simmer cooked food long enough and it comes together as a stew.', cap: 4, gain: 0.17, tau: 10, coolTau: 60, burnAt: 150, dryBurnAt: 118, boils: true, boilOff: 0.00015,
       pal: { a: '#2a2a30', b: '#4a4a56', c: '#14141a', d: '#6a6a7a' }, px: ['........', '.d....d.', 'dbbbbbbd', 'abbbbbba', 'aaaaaaaa', 'aaaaaaaa', '.aaaaaa.', '..c..c..'] },
-    pan: { name: 'Pan', note: 'Blackened pan. Fries fast and burns faster.', cap: 3, gain: 0.25, tau: 3, speed: 2, burnAt: 190,
+    pan: { name: 'Pan', note: 'Blackened pan. Fries fast and burns faster.', cap: 3, gain: 0.25, tau: 3, coolTau: 20, speed: 2, burnAt: 190,
       pal: { a: '#2a2a30', b: '#4a4a56', c: '#6a4a3a' }, px: ['........', '........', '.bbbbb..', 'abbbbba.', 'aaaaaacc', '.aaaaa..', '........', '........'] },
     skewer: { name: 'Skewer', note: 'A spit of sharpened bone. Holds two things over open flame.', cap: 2, gain: 0.3, tau: 3, burnAt: 230,
       pal: { a: '#e8e0c8', b: '#a89c80' }, px: ['........', '........', '........', 'abbbbbbb', 'aaaaaaaa', '........', '........', '........'] },
@@ -103,6 +103,13 @@
   ];
   const STATS = ['health', 'soul', 'hunger', 'thirst', 'exhaustion'];
 
-  const api = { CAMP_FIRE: FIRE, CAMP_STRIKER: STRIKER, CAMP_VESSELS: VESSELS, CAMP_INGREDIENTS: INGREDIENTS, CAMP_DISHES: DISHES, CAMP_STATS: STATS };
+  // what a fire leaves behind, kept like anything else you carry
+  const RESIDUE = {
+    ash: { name: 'Ash', note: 'Fine grey ash from a burnt-out fire. Dry, clean, and good for more than you would think.',
+      px: ['........', '........', '...aa...', '..aAAa..', '.aAaaAa.', 'aAaaaaAa', 'aaaaaaaa', '........'], pal: { a: '#8a8580', A: '#b8b2aa' } },
+    char: { name: 'Char', note: 'A lump of charcoal from a log that burnt down to coals and went cold. Light, black, and it burns hot again.',
+      px: ['........', '...cC...', '..cCsc..', '.ccccCc.', '.cCcccs.', '..cccC..', '...cc...', '........'], pal: { c: '#2a272e', C: '#7a7484', s: '#c8c2d0' } },
+  };
+  const api = { CAMP_FIRE: FIRE, CAMP_RESIDUE: RESIDUE, CAMP_STRIKER: STRIKER, CAMP_VESSELS: VESSELS, CAMP_INGREDIENTS: INGREDIENTS, CAMP_DISHES: DISHES, CAMP_STATS: STATS };
   if (typeof module !== 'undefined' && module.exports && typeof window === 'undefined') module.exports = api; else Object.assign(root, api);
 })(typeof window !== 'undefined' ? window : globalThis);

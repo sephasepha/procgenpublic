@@ -197,7 +197,22 @@ pit, the vessels and the fire; what you use and what you need to know are plain,
   scorches what is in it (sooner than a pan). **With water, a stew has to come together:** nothing burns while the water
   lasts, and once everything in it is cooked, about 25 seconds more at the boil turns it into a stew (the panel shows
   "stew forming"). Until then the risk is the water boiling away; a finished stew holds its water better. Pot dishes
-  are stews, and any stew is a little kinder to eat than plain boiled food. Tap a vessel to open its panel: its
+  are stews, and any stew is a little kinder to eat than plain boiled food.
+- **Water is a wager.** Each water ingredient is one measure to boil away. Water boils off in proportion to how much
+  heat the pot gets beyond what it needs to boil: set back at a gentle simmer it keeps for minutes, over the flames
+  one measure is gone in under a minute. One measure makes a **rich** stew (half again as good, and it mends a
+  little health) with little margin before it boils dry and burns; two make a **thin** one with plenty of margin;
+  three or more a **watery** one, worth less. A pot dish is the same dish however much water is in it; its worth
+  scales with richness. The panel shows the water left and the richness.
+- **Pots and pans hold their heat.** They warm at their own pace but cool slowly (a pot over about a minute, a pan
+  over about twenty seconds), so food pulled off the fire keeps cooking, and keeps burning.
+- **Coals.** A log that burns out leaves a bed of coals, not quick embers: they glow for many minutes, give a vessel
+  set on them strong, steady heat (enough to keep a pot at the boil and a pan frying for minutes after the flames are
+  gone), and relight fuel laid on them. Tinder and kindling leave embers that are soon gone.
+- **Ash and char.** When the glow goes out, the fire leaves something to keep: tap (or drag to the tray) a cold heap to
+  gather it, with anything cold lying beside it. Kindling leaves ash, a log ash and a lump of char where its coals
+  went out, and a stick or log put out half-burnt is char. Glowing coals are too hot to pick up. What you keep shows
+  under the larder ("Kept from the fire"). Tap a vessel to open its panel: its
   temperature, each ingredient's cooking progress (and scorch), the dish it is becoming, and **Eat** and **Put
   away** buttons. Drawing a vessel to your hands also eats from it.
 - **Eating.** Raw food is dangerous, cooked food is barely edible, burnt food hurts. The 20 base ingredients span six

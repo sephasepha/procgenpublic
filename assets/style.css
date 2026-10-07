@@ -356,3 +356,10 @@ html.has-screens .camp { bottom: var(--navh); }
 .cf-larder .cf-btn.refused { animation: refused 0.35s ease-in-out; }
 @keyframes added { 0% { border-color: var(--brass); background: rgba(207,167,78,0.45); transform: scale(0.9); } 100% { transform: scale(1); } }
 @keyframes refused { 25% { transform: translateX(-3px); border-color: #d86a4a; } 75% { transform: translateX(3px); border-color: #d86a4a; } }
+.cf-ctx .wbar { display: inline-block; width: 46px; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.1); overflow: hidden; vertical-align: middle; }
+.cf-ctx .wbar i { display: block; height: 100%; width: 0; background: #6fa8d0; transition: width 0.3s linear; }
+.cf-ctx .wbar.low i { background: #e0a050; animation: blink 0.8s steps(2) infinite; }
+.cf-ctx .rich { font-size: 0.62rem; padding: 0 5px; border-radius: 6px; border: 1px solid; }
+.cf-ctx .rich.rich { color: #e8b060; border-color: rgba(232,176,96,0.6); } .cf-ctx .rich.thin { color: #b8c0c8; border-color: rgba(184,192,200,0.4); } .cf-ctx .rich.watery { color: #8ab8d8; border-color: rgba(138,184,216,0.4); }
+.cf-lhead.kept { margin-top: 2px; }
+.cf-res { cursor: default; }

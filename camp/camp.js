@@ -4,7 +4,7 @@
 // tap the floor (or a vessel) to use it, or drag it straight there. Your hands take what you eat; the five charms
 // show how you are. Touch anything in the scene for a note about it.
 (function (root) {
-  const S = root.CampSim, FIRE = root.CAMP_FIRE, STRIKER = root.CAMP_STRIKER, VES = root.CAMP_VESSELS, ING = root.CAMP_INGREDIENTS, STATS = root.CAMP_STATS;
+  const RES = root.CAMP_RESIDUE, S = root.CampSim, FIRE = root.CAMP_FIRE, STRIKER = root.CAMP_STRIKER, VES = root.CAMP_VESSELS, ING = root.CAMP_INGREDIENTS, STATS = root.CAMP_STATS;
   const PIT = S.CAMP_PIT, H_CAM = 1.3;
   let el = null, cv, g, LW = 480, LH = 270, H0, F, CX, st = null, raf = 0, last = 0, floorImg = null, sprites = {}, onLeave = null;
 
@@ -103,7 +103,7 @@
       <div class="cf-tip" hidden aria-live="polite"></div>
       <div class="cf-dock">
       <div class="cf-ctx" hidden></div>
-      <div class="cf-larder" hidden role="group" aria-label="Larder"><div class="cf-lhead"></div>${LARDER.map(k => btn(k, ING[k].name, 'ing')).join('')}</div>
+      <div class="cf-larder" hidden role="group" aria-label="Larder"><div class="cf-lhead"></div>${LARDER.map(k => btn(k, ING[k].name, 'ing')).join('')}<div class="cf-lhead kept">Kept from the fire</div>${Object.keys(RES).map(k => `<div class="cf-btn cf-res" data-r="${k}" title="${RES[k].name}" role="img" aria-label="${RES[k].name}"><canvas width="8" height="8" aria-hidden="true"></canvas><span class="nm">${RES[k].name}</span><span class="ct"></span></div>`).join('')}</div>
       </div>
       <nav class="cf-tray" aria-label="Camp kit">
         <div class="cf-group" role="group" aria-label="Fire">${KIT.map(k => btn(k, NAMES[k])).join('')}</div>
@@ -117,6 +117,7 @@
     document.body.appendChild(el);
     cv = el.querySelector('canvas.scene'); g = cv.getContext('2d');
     el.querySelectorAll('.cf-btn[data-k]').forEach(b => { const x = b.querySelector('canvas').getContext('2d'); x.drawImage(sprite(b.dataset.k, artOf(b.dataset.k)), 0, 0); });
+    el.querySelectorAll('.cf-res').forEach(b => { b.querySelector('canvas').getContext('2d').drawImage(sprite('res-' + b.dataset.r, RES[b.dataset.r]), 0, 0); });
     cv.addEventListener('pointerdown', down); cv.addEventListener('pointermove', moveP); cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', () => { drag = null; });
     cv.addEventListener('pointerleave', () => { if (st) st.hover = null; });
     // tray buttons: tap to pick up (tap again to put down), or drag straight into the scene
@@ -280,7 +281,7 @@
     if (!drag || drag.btn) return;
     const d = drag, p = P(e), L = st.L, c = st.c; drag = null;
     if (!d.moved) return tap(d, p);
-    if (d.from === 'piece') { if (overTray(e)) { S.removePiece(c, d.obj.id); refresh(true); } return; }
+    if (d.from === 'piece') { if (overTray(e)) { if (S.residueOf(d.obj).ash + S.residueOf(d.obj).char > 0) gather(d.obj, p); else if (S.removePiece(c, d.obj.id) === false) note('Too hot to pick up.', p.x, p.y, 1400); refresh(true); } return; }
     if (d.from === 'vessel') {
       const v = d.obj;
       if (inBox(p, L.hands)) return eatFrom(v, p);
@@ -306,11 +307,21 @@
       return dropSlot(st.sel, p);
     }
     if (d.from === 'vessel') { st.vsel = st.vsel === d.obj.id ? null : d.obj.id; ctx(); return; }
+    if (d.from === 'piece' && S.residueOf(d.obj).ash + S.residueOf(d.obj).char > 0) return gather(d.obj, p);
     if (d.from === 'piece') { const q = d.obj, k = FIRE[q.kind]; return note(`${k.name}: ${q.ash ? (q.ember > 20 ? 'embers, still glowing' : 'ash') : q.burning ? (q.air < 0.45 ? 'burning, choking for air' : 'burning') : q.out ? 'gone out, smouldering' : q.T > 60 ? 'hot' : 'cold'}.`, p.x, p.y); }
     const ch = L.charms.find(b => inBox(p, { x: b.x - 2, y: 0, w: b.w + 4, h: b.y + b.h + 4 }));
     if (ch) return note(`${CHARM_NAME[ch.key]}. ${words[ch.key](c.stats[ch.key])}`, p.x + 20, p.y + 30);
     if (st.sackBox && inBox(p, st.sackBox)) return forage();
     if (st.vsel) { st.vsel = null; ctx(); }
+  }
+  // keep what the fire left: ash from cold heaps, char from coals gone out or a piece put out half-burnt
+  function gather(q, p) {
+    // sweep up what lies with it: every cold heap within a hand's width
+    const near = st.c.pieces.filter(o => o !== q && o.spent && Math.hypot(o.x - q.x, o.z - q.z) < 0.07).map(o => o.id);
+    const got = S.collect(st.c, q.id); if (!got) return;
+    near.forEach(id => { const g2 = S.collect(st.c, id); if (g2) { got.ash += g2.ash; got.char += g2.char; } });
+    note([got.ash ? `Ash ×${got.ash}` : '', got.char ? `Char ×${got.char}` : ''].filter(Boolean).join(', ') + ' kept.', p.x, p.y, 1600);
+    save(); refresh(true);
   }
   function forage() {
     const c = st.c, L = st.L, got = S.forage(c); emit('smoke', L.sackF.x, L.sackF.z, 0.02, 4);
@@ -343,6 +354,7 @@
       b.title = artOf(k).name + (n !== undefined ? ` (${n} left)` : '') + '. ' + (artOf(k).note || '');
     });
     cv.style.cursor = st.sel ? 'crosshair' : '';
+    el.querySelectorAll('.cf-res').forEach(b => { const n = c.stock[b.dataset.r] || 0; b.querySelector('.ct').textContent = String(n); b.classList.toggle('empty', !n); });
     // the larder is icons only; the one in hand is named
     const lh = el.querySelector('.cf-lhead'); if (lh) lh.textContent = st.sel && ING[st.sel] ? `${ING[st.sel].name} · ${c.stock[st.sel]}` : 'Larder';
   }
@@ -371,6 +383,7 @@
     const bl = el.querySelector('.cf-blow'); bl.classList.toggle('want', !!fs.needsAir); bl.querySelector('span').textContent = fs.needsAir ? 'Blow!' : 'Blow';
     fuel.firstChild.style.width = pct(fs.fuel / 180) + '%'; fuel.classList.toggle('low', fs.lit > 0 && fs.fuel < 25); fuel.setAttribute('aria-valuenow', String(pct(fs.fuel / 180)));
     const t = Math.round(fs.fuel); G.querySelector('.cf-time').textContent = fs.fuel > 0.5 ? (t >= 60 ? `~${Math.floor(t / 60)}m ${String(t % 60).padStart(2, '0')}s` : `~${t}s`) : '';
+    const es = G.querySelector('.cf-signs [data-s="embers"]'); es.textContent = fs.coals > 0.05 ? 'Coals' : 'Embers';
     G.querySelectorAll('.cf-signs span').forEach(sp => { const v = fs[sp.dataset.s]; sp.style.setProperty('--v', v.toFixed(2)); sp.classList.toggle('on', v > 0.05); });
     const h = G.querySelector('.cf-hint'); if (h.textContent !== fs.hint) h.textContent = fs.hint;
     G.dataset.state = fs.state.toLowerCase().replace(/ /g, '-');
@@ -383,10 +396,12 @@
     box.hidden = false;
     const j = S.judge(v), V = VES[v.type];
     const stateOf = it => it.scorch >= 0.35 ? 'burnt' : it.progress >= 1 ? 'done' : it.progress >= 0.5 ? 'nearly' : it.progress > 0.05 ? 'cooking' : 'raw';
-    const water = v.type === 'pot' ? (v.water > 0.5 ? 'water' : v.water > 0 ? 'water nearly gone' : v.items.length ? 'dry: scorching' : 'dry') : '';
+    // a pot's water: a gauge of what is left to boil away (one measure per water ingredient), and how rich it will be
+    const water = v.type === 'pot' ? (v.water > 0 ? '<span class="wbar"><i></i></span>' : v.items.length ? 'dry: scorching' : 'dry') : '';
+    const rich = j.richness ? `<span class="rich ${j.richness}">${j.richness}</span>` : '';
     // a pot's stew: forming (once everything in it is cooked), then formed
     const stewing = j.stewing > 0 ? '<span class="stew"></span>' : '';
-    const dish = j.dish ? `<span class="dish">${j.dish.name}</span>` : j.stew ? '<span class="dish">Stew</span>' : stewing || (j.possible ? `<span class="dish maybe">could be ${j.possible.name}</span>` : '');
+    const dish = (j.dish ? `<span class="dish">${j.dish.name}</span>` : j.stew ? '<span class="dish">Stew</span>' : stewing || (j.possible ? `<span class="dish maybe">could be ${j.possible.name}</span>` : '')) + rich;
     // rebuild only when something you can read changes, so the buttons stay put under your finger
     const key = [v.id, water, dish, ...v.items.map(it => it.id + stateOf(it))].join('|');
     if (box.dataset.key !== key) {
@@ -396,6 +411,7 @@
         <div class="acts"><button type="button" data-a="eat" ${v.items.length ? '' : 'disabled'}>Eat</button><button type="button" data-a="away" ${v.items.length ? 'disabled' : ''} aria-label="Put away">Away</button><button type="button" data-a="close" aria-label="Close">✕</button></div>`;
     }
     const sf = box.querySelector('.stew'); if (sf) sf.textContent = `stew forming ${Math.round(j.stewing * 100)}%`;
+    const wb = box.querySelector('.wbar i'); if (wb) { const f = Math.max(0, Math.min(1, v.water / Math.max(1, j.waters))); wb.style.width = Math.round(f * 100) + '%'; wb.parentNode.classList.toggle('low', f < 0.3); }
     const T = box.querySelector('.T'); T.textContent = `${Math.round(v.T)}° · ${heatWord(v.T)}`; T.className = 'T ' + (v.T > V.burnAt ? 'hot' : v.T > 68 ? 'warm' : '');
     box.querySelectorAll('li i').forEach((i, n) => { const it = v.items[n]; if (it) { i.style.setProperty('--p', Math.min(1, it.progress).toFixed(3)); i.style.setProperty('--s', Math.min(1, it.scorch / 0.35).toFixed(3)); } });
   }
@@ -541,8 +557,26 @@
     const w = Math.max(3, Math.round(size)), h = q.ash ? Math.max(2, Math.round(w * 0.35)) : w;
     const lifted = drag && drag.from === 'piece' && drag.moved && drag.obj === q;
     if (lifted) { g.fillStyle = 'rgba(0,0,0,0.35)'; g.beginPath(); g.ellipse(x, y, w * 0.55, Math.max(1, w * 0.18), 0, 0, 7); g.fill(); }
-    g.drawImage(img, Math.round(x - w / 2), Math.round(y - h + 1 - (lifted ? 3 : 0)), w, h);
     const br = Math.min(1, st.c.breath || 0);
+    if (q.coal && !q.spent) { // a bed of coals: black lumps split by glowing cracks, brighter under a breath
+      const e = Math.min(1, q.ember / 220) * (0.8 + 0.2 * Math.sin(time * 1.7 + q.id)) * (1 + 0.6 * br), n = 5, lw = Math.max(2, Math.round(w / 3.2));
+      for (let i = 0; i < n; i++) {
+        const lx = Math.round(x - w / 2 + (i * 0.23 + ((q.id * 7 + i * 3) % 5) * 0.03) * w), ly = Math.round(y - lw - (i % 2) * Math.max(1, lw / 2) + 1);
+        g.fillStyle = '#1a1416'; g.fillRect(lx, ly, lw, lw);
+        g.fillStyle = `rgba(255,${Math.round(80 + 110 * e)},40,${0.35 + 0.6 * e})`; g.fillRect(lx + ((i + q.id) % 2), ly + lw - 1, Math.max(1, lw - 1), 1); if (lw > 2) g.fillRect(lx + lw - 1, ly + 1, 1, lw - 2);
+      }
+      g.globalCompositeOperation = 'lighter'; const gr = g.createRadialGradient(x, y - 1, 0, x, y - 1, w * 1.1); gr.addColorStop(0, `rgba(255,110,40,${0.45 * e})`); gr.addColorStop(1, 'rgba(200,50,20,0)'); g.fillStyle = gr; g.fillRect(x - w * 1.2, y - w * 0.8, w * 2.4, w * 1.3); g.globalCompositeOperation = 'source-over';
+      q.box = { x: x - w / 2 - 2, y: y - w * 0.6, w: w + 4, h: w * 0.6 + 4 };
+      return;
+    }
+    if (q.spent) { // cold: a grey heap of ash to gather, with a black lump of char where coals went out
+      g.fillStyle = '#6e6a66'; g.beginPath(); g.ellipse(x, y - 1, w * 0.45, Math.max(1.5, w * 0.16), 0, 0, 7); g.fill();
+      g.fillStyle = '#9a958e'; g.fillRect(Math.round(x - w * 0.15), Math.round(y - 2), Math.max(1, Math.round(w * 0.3)), 1);
+      if (q.coal) { g.fillStyle = '#141216'; g.fillRect(Math.round(x - 1), Math.round(y - 3), Math.max(2, Math.round(w / 4)), 2); }
+      q.box = { x: x - w / 2 - 2, y: y - w * 0.4, w: w + 4, h: w * 0.4 + 4 };
+      return;
+    }
+    g.drawImage(img, Math.round(x - w / 2), Math.round(y - h + 1 - (lifted ? 3 : 0)), w, h);
     if (q.ash && q.ember > 12) { // an ember bed: a pulsing orange glow that a breath brightens
       const e = Math.min(1, q.ember / 180) * (0.75 + 0.25 * Math.sin(time * 2.3 + q.id * 1.7)) * (1 + 0.8 * br);
       g.globalCompositeOperation = 'lighter'; const gr = g.createRadialGradient(x, y - 1, 0, x, y - 1, w * 0.9); gr.addColorStop(0, `rgba(255,${Math.round(90 + 60 * Math.min(1, e))},30,${Math.min(0.9, 0.6 * e)})`); gr.addColorStop(1, 'rgba(200,50,20,0)'); g.fillStyle = gr; g.fillRect(x - w, y - w * 0.6, w * 2, w * 1.1); g.globalCompositeOperation = 'source-over';

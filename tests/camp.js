@@ -66,7 +66,7 @@ function cook(type, dx, items, secs) {
 { const r = cook('pan', 0, ['starGristle', 'moonlard'], 90); check(r.burntAt >= 0 && r.burntAt < 20, `a pan right over the fire burns fast (burnt at ${r.burntAt}s)`); }
 { const r = cook('pan', 0.1, ['starGristle', 'moonlard'], 90); check(r.cookedAt > 0 && r.cookedAt < 30 && r.burntAt < 0, `a pan at the edge of the flames cooks fast without burning (cooked ${r.cookedAt}s, burnt ${r.burntAt}s)`); }
 { const r = cook('pan', 0.3, ['starGristle', 'moonlard'], 90); check(r.cookedAt < 0, 'a pan far from the fire does not cook in time'); }
-{ const r = cook('pot', 0, ['blackWater', 'lanternEye', 'weepingTuber'], 120); check(r.cookedAt > 0 && r.burntAt < 0, `a pot of water boils its contents without burning (cooked ${r.cookedAt}s)`); check(r.v.T <= 100.01, 'a pot with water stays at the boil'); }
+{ const r = cook('pot', 0, ['blackWater', 'blackWater', 'lanternEye', 'weepingTuber'], 120); check(r.cookedAt > 0 && r.burntAt < 0, `a pot of water boils its contents without burning (cooked ${r.cookedAt}s)`); check(r.v.T <= 100.01, 'a pot with water stays at the boil'); }
 { const c = camp(() => {}); const v = S.placeVessel(c, 'pan', 0, 2); check(!S.addToVessel(c, v.id, 'blackWater'), 'black water only goes in the pot'); check(S.addToVessel(c, v.id, 'eelSlice') && S.addToVessel(c, v.id, 'cometHoney') && S.addToVessel(c, v.id, 'moonlard') && !S.addToVessel(c, v.id, 'waxFig'), 'a pan holds three things'); }
 
 { const r = cook('pot', 0, ['lanternEye', 'weepingTuber'], 90); check(r.burntAt >= 0, `a dry pot over the fire is an oven: it burns its contents (burnt at ${r.burntAt}s)`); }
@@ -77,6 +77,42 @@ function cook(type, dx, items, secs) {
   check(stewAt > 0 && cookedAt > 0 && stewAt - cookedAt >= 200, `a stew comes together only after a simmer, once everything is cooked (cooked ${(cookedAt - 300) / 10}s, stew ${(stewAt - 300) / 10}s)`);
   check(S.judge(v).stew && S.judge(v).state === 'stew', 'and then it is a stew'); }
 { const c = camp(() => {}); const v = S.placeVessel(c, 'pot', 0, 2); ['blackWater', 'lanternEye', 'weepingTuber'].forEach(i => S.addToVessel(c, v.id, i)); v.items.forEach(it => { it.progress = 1.1; }); check(!S.judge(v).dish, 'a cooked pot is not yet the dish: it has to come together'); }
+
+console.log('Water, coals and what is left');
+{ const c = camp(() => {}); const pot = S.placeVessel(c, 'pot', 0.5, 2), pan = S.placeVessel(c, 'pan', -0.5, 2); pot.T = 100; pan.T = 200;
+  for (let t = 0; t < 300; t++) S.step(c, 0.1);
+  check(pot.T > 60 && pan.T > 50, `off the fire, pots and pans hold their heat (after 30 s: pot ${pot.T.toFixed(0)}, pan ${pan.T.toFixed(0)})`); }
+{ // one measure of water: rich but little margin; two: thinner, safer
+  const go = waters => { const c = camp(bed); S.strike(c, 0, 2); let v = null, stew = -1, dry = -1, burnt = -1;
+    run(c, 260, (cc, t) => { tend(cc, t); if (t === 300) { v = S.placeVessel(cc, 'pot', 0, 2); for (let w = 0; w < waters; w++) S.addToVessel(cc, v.id, 'blackWater'); ['lanternEye', 'weepingTuber'].forEach(i => S.addToVessel(cc, v.id, i)); }
+      if (v) { const j = S.judge(v); if (stew < 0 && j.stew) stew = t; if (dry < 0 && !(v.water > 0)) dry = t; if (burnt < 0 && j.state === 'burnt') burnt = t; } });
+    return { v, stew, dry, burnt, j: S.judge(v) }; };
+  const one = go(1), two = go(2);
+  check(one.stew > 0 && one.dry > one.stew && one.burnt > one.dry, `one water over the flames: stew, then dry, then burnt (stew ${one.stew}, dry ${one.dry}, burnt ${one.burnt})`);
+  check(two.dry < 0 || two.dry - two.stew > (one.dry - one.stew) * 2, 'two waters leave much more time after the stew forms');
+  const a = camp(() => {}), b = camp(() => {});
+  [[a, 1], [b, 2]].forEach(([c, w]) => { const v = S.placeVessel(c, 'pot', 0, 2); for (let k = 0; k < w; k++) S.addToVessel(c, v.id, 'blackWater'); ['lanternEye', 'weepingTuber'].forEach(i => S.addToVessel(c, v.id, i)); v.items.forEach(it => { it.progress = 1.1; }); v.stewed = true; v.water = 0.5; });
+  const ja = S.judge(a.vessels[0]), jb = S.judge(b.vessels[0]);
+  check(ja.richness === 'rich' && jb.richness === 'thin' && ja.quality > jb.quality, 'one water makes a rich stew, two a thin one');
+  check(ja.dish && jb.dish && ja.dish === jb.dish, 'the dish is the same however much water');
+  const ha = a.stats.hunger, hb = b.stats.hunger; S.eat(a, a.vessels[0].id); S.eat(b, b.vessels[0].id); check(ha - a.stats.hunger > hb - b.stats.hunger, 'and the rich one feeds you more');
+  // a simmer just at the boil keeps its water far longer than a pot over the flames
+  const keep = dx => { const c = camp(bed); S.strike(c, 0, 2); let v = null; run(c, 200, (cc, t) => { tend(cc, t); if (t === 300) { v = S.placeVessel(cc, 'pot', dx, 2); S.addToVessel(cc, v.id, 'blackWater'); } }); return v.water; };
+  check(keep(0.1) > keep(0) + 0.3, 'a pot set back from the flames boils off less water');
+}
+{ // logs burn down to coals that cook for minutes, then go cold to ash and char
+  const c = camp(bed); c.unlimitedFire = true; S.strike(c, 0, 2);
+  run(c, 50, (cc, t) => { if (t === 250) S.placePiece(cc, 'fuel', 0.03, 2.03); if (t === 450) S.placePiece(cc, 'fuel', -0.04, 2.01); });
+  let coalsAt = -1, boilOnCoals = 0, hot = null;
+  run(c, 1500, (cc, t) => { const f = S.fireState(cc); if (coalsAt < 0 && f.state === 'Coals') { coalsAt = t; const q = cc.pieces.find(p => p.coal && !p.spent); hot = q ? S.collect(cc, q.id) : 'none'; } if (f.state === 'Coals' && 12 + S.heatAt(cc, 0.1, 2) * 0.17 >= 100) boilOnCoals++; });
+  check(coalsAt > 0, 'burnt-out logs leave a bed of coals');
+  check(boilOnCoals > 600, `the coals alone keep a pot beside them at the boil for minutes (${(boilOnCoals / 10).toFixed(0)}s)`);
+  check(hot === null, 'glowing coals cannot be picked up');
+  run(c, 4000);
+  let ash = 0, char = 0; c.pieces.slice().forEach(p => { const g = S.collect(c, p.id); if (g) { ash += g.ash; char += g.char; } });
+  check(char >= 2 && ash >= 4 && c.stock.char >= 2 && c.stock.ash >= 4, `cold heaps give ash and char to keep (ash ${ash}, char ${char})`);
+}
+{ const c = camp(c => { S.placePiece(c, 'kindling', 0, 2); }); const p = c.pieces[0]; p.m = p.m0 * 0.5; p.T = 20; const g = S.collect(c, p.id); check(g && g.char === 1, 'a half-burnt stick put out is char'); }
 
 console.log('Eating');
 { const c = camp(() => {}); const v = S.placeVessel(c, 'skewer', 0, 2); S.addToVessel(c, v.id, 'lanternEye'); const before = { ...c.stats }; S.eat(c, v.id); check(c.stats.soul < before.soul && c.stats.health < before.health, 'a raw Lantern Eye hurts soul and health'); }
