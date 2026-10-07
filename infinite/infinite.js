@@ -86,7 +86,7 @@
     el.hidden = true;
     // a game shell: the view fills the screen, the HUD floats over it
     el.innerHTML = `
-      <div class="xp-stage"><canvas class="main" aria-label="Explore view: drag anywhere to walk"></canvas></div>
+      <div class="xp-stage"><canvas class="main" aria-label="Explore view: tap a spot to walk there, or drag anywhere to steer"></canvas></div>
       <div class="hud hud-tl">
         <button class="xp-round" data-x="close" type="button" aria-label="Menu: world settings and tools">☰</button>
         <div class="xp-loc"><div class="xp-title"></div><div class="xp-sub"></div></div>
@@ -115,19 +115,25 @@
     // a floating thumb-stick: put a thumb (or the mouse) down anywhere on the view and drag towards a direction
     const cvs = el.querySelector('canvas.main'), stick = el.querySelector('.stick'), knob = stick.querySelector('.knob');
     let sp = null;
+    // a quick tap (no drag) walks you to the tapped spot by the shortest known route instead
     cvs.addEventListener('pointerdown', e => {
       e.preventDefault(); cvs.setPointerCapture?.(e.pointerId); goFull();
-      sp = { id: e.pointerId, x: e.clientX, y: e.clientY, d: -1 };
-      stick.hidden = false; stick.style.left = e.clientX + 'px'; stick.style.top = e.clientY + 'px'; knob.style.transform = 'translate(-50%, -50%)';
+      sp = { id: e.pointerId, x: e.clientX, y: e.clientY, d: -1, t: performance.now(), stick: false };
     });
     cvs.addEventListener('pointermove', e => {
       if (!sp || e.pointerId !== sp.id || !st) return;
       const dx = e.clientX - sp.x, dy = e.clientY - sp.y, r = Math.hypot(dx, dy), k = Math.min(1, 44 / (r || 1));
+      if (!sp.stick) { if (r < 10) return; sp.stick = true; st.path = null; stick.hidden = false; stick.style.left = sp.x + 'px'; stick.style.top = sp.y + 'px'; }
       knob.style.transform = `translate(calc(-50% + ${dx * k}px), calc(-50% + ${dy * k}px))`;
       const d = r < 14 ? -1 : Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0);
       if (d !== sp.d) { if (sp.d >= 0) release(sp.d); if (d >= 0) press(d); sp.d = d; }
     });
-    const lift = e => { if (!sp || (e && e.pointerId !== sp.id)) return; if (sp.d >= 0) release(sp.d); sp = null; stick.hidden = true; };
+    const lift = e => {
+      if (!sp || (e && e.pointerId !== sp.id)) return;
+      if (sp.d >= 0) release(sp.d);
+      if (e && e.type === 'pointerup' && !sp.stick && performance.now() - sp.t < 450) tapAt(e.clientX, e.clientY);
+      sp = null; stick.hidden = true;
+    };
     ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => cvs.addEventListener(t, lift));
     el.addEventListener('click', e => {
       const x = e.target.closest('[data-x]'); if (!x) return;
@@ -145,7 +151,7 @@
     window.addEventListener('keydown', e => {
       if (el.hidden) return;
       const k = KEYS[e.key];
-      if (k !== undefined) { e.preventDefault(); if (!e.repeat) press(k); }
+      if (k !== undefined) { e.preventDefault(); st.path = null; if (!e.repeat) press(k); }
       if (e.key === 'Escape') close();
     });
     window.addEventListener('keyup', e => { const k = KEYS[e.key]; if (k !== undefined) release(k); });
@@ -225,12 +231,56 @@
     const want = [];
     if (st.buffer && st.buffer.until > t) want.push(st.buffer.d);
     st.held.forEach(d => { if (!want.includes(d)) want.push(d); });
+    if (want.length) st.path = null; // the stick or keys take over from a tapped route
+    else if (st.path) { followPath(t - carry); return; }
     for (const d of want) {
       if (tryStep(d, t - carry)) { if (st.buffer && st.buffer.d === d) st.buffer = null; return; }
     }
     if (st.buffer && st.buffer.until <= t) st.buffer = null;
     if (want.length && !st.bumped) { bump(); st.bumped = true; } else if (!want.length) st.bumped = false;
   }
+  // ---------- tap to walk: the shortest route over charted floor to the tapped tile ----------
+  const PATH_MAX = 60000; // tiles searched at most (a few sectors' worth)
+  function screenToTile(clientX, clientY) {
+    const v = st.view; if (!v) return null;
+    const r = cv.getBoundingClientRect(), x = (clientX - r.left) * cv.width / r.width, y = (clientY - r.top) * cv.height / r.height;
+    return [Math.floor((x - v.ox) / v.bs), Math.floor((y - v.oy) / v.bs)];
+  }
+  function findPath(tx, ty) {
+    // breadth-first from the player over passable tiles in generated sectors; four-way, like walking
+    const start = K(st.gx, st.gy), prev = new Map([[start, null]]), q = [[st.gx, st.gy]];
+    for (let h = 0; h < q.length && q.length < PATH_MAX; h++) {
+      const [x, y] = q[h];
+      if (x === tx && y === ty) { const out = []; for (let k = K(x, y); k !== start; k = prev.get(k)) out.push(k.split(',').map(Number)); return out.reverse(); }
+      for (let d = 0; d < 4; d++) { const nx = x + DX[d], ny = y + DY[d], kk = K(nx, ny); if (!prev.has(kk) && passAt(nx, ny) === 1) { prev.set(kk, K(x, y)); q.push([nx, ny]); } }
+    }
+    return null;
+  }
+  function tapAt(clientX, clientY) {
+    if (!st || !st.placed) return;
+    const t = screenToTile(clientX, clientY); if (!t) return;
+    // a tap on a wall or the void means the nearest floor to it (within a couple of tiles)
+    let best = null;
+    for (let r = 0; r <= 2 && !best; r++) for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) {
+      if (Math.max(Math.abs(x), Math.abs(y)) !== r || passAt(t[0] + x, t[1] + y) !== 1) continue;
+      const d = x * x + y * y; if (!best || d < best.d) best = { x: t[0] + x, y: t[1] + y, d };
+    }
+    if (!best) { st.path = null; st.goal = { x: t[0], y: t[1], bad: performance.now() }; return; }
+    if (best.x === st.gx && best.y === st.gy) { st.path = null; return; }
+    const path = findPath(best.x, best.y);
+    st.goal = { x: best.x, y: best.y, bad: path ? 0 : performance.now() };
+    st.path = path && path.length ? path : null;
+    if (!path) toast('No known way there yet.');
+    st.held = []; st.buffer = null;
+  }
+  // one step along the route; if the world changed under it, look again
+  function followPath(t) {
+    const [nx, ny] = st.path[0], d = [0, 1, 2, 3].find(k => st.gx + DX[k] === nx && st.gy + DY[k] === ny);
+    if (d === undefined || !tryStep(d, t)) { const g2 = st.goal; st.path = g2 && !(g2.x === st.gx && g2.y === st.gy) ? findPath(g2.x, g2.y) : null; if (!st.path || !st.path.length) { st.path = null; return false; } return false; }
+    st.path.shift(); if (!st.path.length) st.path = null;
+    return true;
+  }
+
   // kept for scripted use (tests, tools): one immediate step
   function move(d) { if (!st || !st.placed || el.hidden) return; st.mv = null; tryStep(d, performance.now()); }
   function bump() { const c = el.querySelector('canvas.main'); c.classList.remove('xp-bump'); void c.offsetWidth; c.classList.add('xp-bump'); }
@@ -519,6 +569,7 @@
     const px = st.from[0] + (st.gx - st.from[0]) * ease(st.t), py = st.from[1] + (st.gy - st.from[1]) * ease(st.t);
     const bs = st.map ? Math.max(1, W / (SW * 1.6)) : closeScale();
     const ox = W / 2 - (px + 0.5) * bs, oy = H / 2 - (py + 0.5) * bs;
+    st.view = { ox, oy, bs };
     // the void: in the Constellation of Mazes, unexplored dark is a field of slowly turning stars
     if (a.stars > 0.02) {
       starField().forEach(s2 => {
@@ -603,6 +654,18 @@
         g.fillRect(sx, sy, sz, sz);
       });
       g.globalAlpha = 1;
+    }
+    // the tapped route: dots to the goal, and a ring where you are going (red briefly if there is no way)
+    if (st.goal) {
+      const gx = ox + (st.goal.x + 0.5) * bs, gy = oy + (st.goal.y + 0.5) * bs, bad = st.goal.bad && time * 1000 - st.goal.bad < 900;
+      if (st.path) {
+        g.fillStyle = 'rgba(243,211,107,0.55)'; const dr = Math.max(1.5 * dpr, bs * 0.09);
+        st.path.forEach(([x, y], i) => { if (i % 2 === 0 || i === st.path.length - 1) { g.beginPath(); g.arc(ox + (x + 0.5) * bs, oy + (y + 0.5) * bs, dr, 0, 7); g.fill(); } });
+      }
+      if (st.path || bad) {
+        const rr = Math.max(5 * dpr, bs * 0.42) * (1 + 0.08 * Math.sin(time * 6));
+        g.strokeStyle = bad ? 'rgba(224,90,90,0.85)' : 'rgba(243,211,107,0.9)'; g.lineWidth = 2 * dpr; g.beginPath(); g.arc(gx, gy, rr, 0, 7); g.stroke();
+      } else st.goal = null;
     }
     // the player
     const pr = Math.max(4 * dpr, bs * (st.map ? 0.6 : 0.32));

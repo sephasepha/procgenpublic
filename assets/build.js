@@ -1,2 +1,2 @@
 // Bumped on every deploy, shown in the menu so you can confirm which version is running.
-window.BUILD = '2026-10-07 · 24';
+window.BUILD = '2026-10-07 · 25';
