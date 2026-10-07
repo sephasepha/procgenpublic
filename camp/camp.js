@@ -13,6 +13,23 @@
   const { S, FIRE, VES, ING, CHOKE, PIT } = V;
   let raf = 0, last = 0, onLeave = null;
 
+  // ---------- experience: tending the fire earns firemaking, food cooking earns cooking ----------
+  const XP = root.Skills ? Skills.XP : null, earn = (k, n) => { if (root.Skills) Skills.earn(k, n); };
+  const caught = new Set(), coaled = new Set(); // pieces that have earned their catching, their coals
+  // how far, all told, the food on the fire has cooked (each item up to done, and only while it is not burnt)
+  const cookedSoFar = c => c.vessels.reduce((n, v) => n + v.items.reduce((m, it) => m + (ING[it.id].water || it.scorch >= V.COOK.burnt ? 0 : Math.min(1, it.progress)), 0), 0);
+  // time passes at the camp, whichever screen is open: the fire burns, food cooks, and that earns experience
+  function advance(dt) {
+    const c = ensure(), before = cookedSoFar(c);
+    S.step(c, dt);
+    if (!XP) return;
+    const cooked = cookedSoFar(c) - before; if (cooked > 0) earn('cooking', cooked * XP.cook);
+    c.pieces.forEach(q => {
+      if (q.burning && !caught.has(q.id)) { caught.add(q.id); earn('fire', XP.catch[q.kind] || 1); }
+      if (q.coal && !coaled.has(q.id)) { coaled.add(q.id); earn('fire', XP.coals); }
+    });
+  }
+
   // ---------- saving: your stats and what you carry ----------
   const SAVE = 'undercroft-camp-v1';
   function load() { try { const s = JSON.parse(localStorage.getItem(SAVE)); if (s && s.stats) return s; } catch (e) { /* storage unavailable */ } return null; }
@@ -64,7 +81,7 @@
     raf = requestAnimationFrame(loop);
     const dt = Math.min(0.1, (t - last) / 1000); last = t;
     const st = V.st, c = st.c;
-    S.step(c, dt);
+    advance(dt);
     D.emitFrom(c, dt);
     if (root.Body && Body.tick) Body.tick(dt); // what is eating you keeps eating while you cook
     D.stepParts(dt);
@@ -221,7 +238,9 @@
   function eatFrom(v, p) {
     const L = V.st.L, r = S.eat(V.st.c, v.id);
     if (!r) return UI.note('Nothing in it to eat.', p.x, p.y);
-    const j = r.judged, how = j.dish ? `${j.dish.name}. ${j.dish.note}` : j.state === 'raw' ? 'Raw. It fights you all the way down.' : j.state === 'underdone' ? 'Half-cooked. Something in it is still moving.' : j.state === 'burnt' ? 'Burnt to bitterness. It hurts going down.' : 'Cooked. Barely edible. It will keep you alive.';
+    const j = r.judged;
+    if (XP) { if (j.dish) earn('cooking', XP.dish); else if (j.stew) earn('cooking', XP.stew); }
+    const how = j.dish ? `${j.dish.name}. ${j.dish.note}` : j.state === 'raw' ? 'Raw. It fights you all the way down.' : j.state === 'underdone' ? 'Half-cooked. Something in it is still moving.' : j.state === 'burnt' ? 'Burnt to bitterness. It hurts going down.' : 'Cooked. Barely edible. It will keep you alive.';
     UI.note(how, L.hands.x + 30, L.hands.y - 20, 4200); save(); UI.ctx();
   }
   function putAway(v, p) {
@@ -236,6 +255,7 @@
     const near = c.pieces.filter(o => o !== q && o.spent && Math.hypot(o.x - q.x, o.z - q.z) < 0.07).map(o => o.id);
     const got = S.collect(c, q.id); if (!got) return;
     near.forEach(id => { const more = S.collect(c, id); if (more) { got.ash += more.ash; got.char += more.char; } });
+    if (XP) earn('fire', (got.ash + got.char) * XP.gather);
     UI.note([got.ash ? `Ash ×${got.ash}` : '', got.char ? `Char ×${got.char}` : ''].filter(Boolean).join(', ') + ' kept.', p.x, p.y, 1600);
     save(); UI.refresh();
   }
@@ -248,7 +268,8 @@
   }
   // a breath into the bed of the fire
   function blow() {
-    const c = V.st.c; S.blow(c); V.st.flash = 1;
+    const c = V.st.c, wanted = S.fireState(c).needsAir; S.blow(c); V.st.flash = 1;
+    if (wanted && XP) earn('fire', XP.breath); // a breath when the fire needed one
     c.pieces.filter(p => !p.ash || p.ember > 10).forEach(p => { D.emit('spark', p.x, p.z, 0.01, p.ash ? 3 : 2); });
     D.breathe();
     UI.pulse(V.el.querySelector('.cf-blow'), 'puff');
@@ -256,5 +277,5 @@
 
   // where a floor point is on screen (for scripted checks and, later, aiming in 3D)
   const at = (x, z) => { const r = V.cv.getBoundingClientRect(); return { x: r.left + V.sx(x, z) / V.LW * r.width, y: r.top + (V.sy(z) - 3) / V.LH * r.height }; };
-  root.Camp = { open, leave, at, state: () => V.st, shared: ensure, save: () => { if (V.st) save(); }, drawCharms: D.drawCharms };
+  root.Camp = { open, leave, at, advance, state: () => V.st, shared: ensure, save: () => { if (V.st) save(); } };
 })(window);

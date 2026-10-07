@@ -244,24 +244,57 @@ Along the bottom of every game screen is a bar for moving between the three scre
 world), **Camp** and **Body**. Keys 1, 2 and 3 do the same. The Camp tab glows while the fire is alight, and the Body
 tab shows how many afflictions have taken hold. The world keeps its place while you are away.
 
+### Experience
+
+The right of the screens bar holds one **experience bar**. Each kind of work has its own skill, level and experience
+(`skills/skills.js`), and the bar swaps its name, level and fill to whichever skill last earned something, with what
+was just earned beside it; it lights up on a new level. Levels need 30 experience at first, rising (`30 × level^1.4`).
+
+| Skill | Earned by |
+| --- | --- |
+| Firemaking | each piece catching (tinder 1, kindling 2, fuel 4), coals forming (3), a breath when the fire wanted one (1), gathering ash and char (1 each) |
+| Cooking | food cooking: 8 for each item taken from raw to done, earned as it goes, unburnt only; eating a dish (10) or a stew (6) |
+| Medicine | each right step of a treatment (3, plus 2 per stage), finding out a step (5), a cure (6 per stage) |
+
+The amounts are in `Skills.XP`. Camp time runs through `Camp.advance`, so food cooking and the fire catching earn
+experience whichever screen is open. `tests/skills.js` covers levelling.
+
 ## Body: afflictions and treatment
 
-The ✚ Body button opens the second screen beside the camp: a table by candlelight with **The Pilgrim's Body**, an
-anatomical chart on which whatever has taken hold of you shows as living ink. Like the camp, everything is diegetic:
-no meters or menus, only the chart, the surgeon's roll of tools, the omen bones, an hourglass and the same five charms.
+The ✚ Body screen: a table by candlelight with **The Pilgrim's Body**, an anatomical chart on which whatever has
+taken hold of you shows as living ink, the surgeon's roll of tools, the omen bones and an hourglass. Your needs run
+along the top: **HP** and **SOUL** large, with what the afflictions are draining from them a minute, then hunger,
+thirst and fatigue.
 
+- **Examining (the X-ray).** Touch an afflicted part and the screen becomes a cure screen after Metal Gear Solid 3:
+  an X-ray of the part (skeleton showing through, a scan sweeping down) with the wound circled and a line to its
+  status beside it: the ailment's name, its stage, how close it is to worsening, its **condition** (what it looks
+  like) and its **cure**, step by step, the current step marked. Several afflictions on one part get tabs; touching
+  another afflicted part in the X-ray examines it; ◂ or Escape goes back to the chart.
+- **Treat by trying.** Drag a tool onto the X-ray or the panel to use it on that wound (or onto the chart, for the
+  worst on that part). You do not know any treatment at first: an ailment is **???** and each step **?** until you
+  find the right tool for it. The right tool does the step and reveals it, and the ailment's name with it; a wrong
+  one hurts (health and SOUL) but is not used up, and stays listed, crossed out, beside the step you tried it on.
+  Each stage of an ailment is learnt separately; once all of a stage's steps are known the pilgrims' note on it
+  appears. What you have learnt is kept with the body (`known`, `tried` in `body/sim.js`, read through `chart()`).
 - **Ten afflictions** (`body/data.js`), each with three stages: Star-Rot, the Whispering Cyst, Glyph-Burn, the Lantern
-  Gaze (head only), Bloom, the Pale Leech (limbs), the Bone Choir (limbs), Tide-Lung (torso), the Hollow Hunger
-  (torso) and the Fade. Every stage has its own look on the chart, a drain on health, SOUL, hunger, thirst and
-  exhaustion, the minutes before it worsens, and a chance per minute to **spread to a neighbouring part**.
-- **Treatment** is an exact sequence of tools for the stage: drag a tool from the roll onto a part. Ink ticks mark
-  the steps done; the last step cures it. A wrong tool hurts (health and SOUL) and is wasted. If a stage advances
+  Gaze (head only), Bloom, the Thorn-Leech (limbs), the Bone Choir (limbs), Tide-Lung (torso), the Hollow Hunger
+  (torso) and the Fade. Every stage has its own look, a drain on health, SOUL, hunger, thirst and exhaustion, the
+  minutes before it worsens, and a chance per minute to **spread to a neighbouring part**. If a stage advances
   mid-treatment, the treatment starts over. The **cautery iron** only works while the camp fire is burning.
 - **Twelve tools**: knife, tweezers, cautery, hymnal and blindfold, plus limited spirits, salt, moss, thread, wax,
   splint and gauze (tally notches show how many are left).
 - **The omen bones** roll on the ailment table. **The hourglass** lets five minutes pass for both the body and the camp.
 - The stats are shared with the camp, and both keep running: afflictions go on draining you while you cook, and the
-  fire goes on burning while you treat yourself. `tests/body.js` covers progression, spread, treatment and the table.
+  fire goes on burning while you treat yourself. `tests/body.js` covers progression, spread, treatment, discovery and
+  the table.
+
+| File | What it holds |
+| --- | --- |
+| `body/data.js` | Parts, tools and the ailment table. |
+| `body/sim.js` | Afflictions advancing, draining and spreading; treatment; what you have learnt (`chart()`). No DOM. |
+| `body/chart.js` | Drawing the body in chart space: parts, the marks afflictions leave, the skeleton for the X-ray. |
+| `body/body.js` | The screen: the chart, the X-ray and status panel, the needs, the roll, input. |
 
 ## Real time and WebAssembly
 
@@ -304,6 +337,8 @@ infinite/           streaming explorer, generation worker, home page
 gen/dressing.js     tilesets, example rooms, materials, learning, dressing WFC
 gen/rooms.js        room-based sector layout: themes, room grammar, suites, districts, crossings
 camp/               the camp screen: data (fire, vessels, 20 ingredients, dishes), simulation, view
+body/               the body screen: ailments, treatment and discovery, the chart and X-ray
+skills/             skills and experience, and the experience bar
 gen/wasm.js         loads wasm/gen.wasm and swaps in the WebAssembly kernels
 wasm/               C sources of the WebAssembly kernels and build.sh
 tools/bench.js, tools/bench-browser.py, tools/profile.js   performance tracking

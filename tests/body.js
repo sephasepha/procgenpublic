@@ -18,12 +18,28 @@ console.log('Taking hold and getting worse');
 
 console.log('Treatment');
 { const b = B.createBody(3), s = stats(); const a = B.roll(b, 'starRot', 'legL'); const r1 = B.apply(b, 'legL', 'salt', {}, s), r2 = B.apply(b, 'legL', 'gauze', {}, s); check(r1.ok && !r1.cured && r2.ok && r2.cured && !b.afflictions.length, 'salt then gauze cures speckled Star-Rot'); }
-{ const b = B.createBody(3), s = stats(); B.roll(b, 'starRot', 'legL'); const h = s.health; const r = B.apply(b, 'legL', 'gauze', {}, s); check(!r.ok && r.why === 'wrong' && s.health < h && b.afflictions[0].step === 0, 'the wrong tool hurts and does nothing'); check(b.tools.gauze === D.BODY_TOOLS.gauze.uses - 1, 'and is wasted'); }
+{ const b = B.createBody(3), s = stats(); B.roll(b, 'starRot', 'legL'); const h = s.health; const r = B.apply(b, 'legL', 'gauze', {}, s); check(!r.ok && r.why === 'wrong' && s.health < h && b.afflictions[0].step === 0, 'the wrong tool hurts and does nothing'); check(b.tools.gauze === D.BODY_TOOLS.gauze.uses, 'but is not used up (you only find out it does not fit)'); }
 { const b = B.createBody(3), s = stats(); const a = B.roll(b, 'starRot', 'torso'); a.stage = 2; const r = B.apply(b, 'torso', 'cautery', { fireHot: false }, s); check(!r.ok && r.why === 'cold', 'the cautery iron does nothing while the fire is out'); check(B.apply(b, 'torso', 'cautery', { fireHot: true }, s).ok, 'and works when it is red from the fire'); }
 { const b = B.createBody(3), s = stats(); const a = B.roll(b, 'cyst', 'armL'); B.apply(b, 'armL', 'knife', {}, s); a.progress = 0.999; B.step(b, 60, s); check(a.stage === 1 && a.step === 0, 'a stage advancing mid-treatment starts its treatment over'); }
 { const b = B.createBody(3); check(B.apply(b, 'head', 'knife', {}, stats()).why === 'healthy', 'nothing to treat on a healthy part'); }
 { const b = B.createBody(3), s = stats(); B.roll(b, 'gaze', 'head'); B.roll(b, 'starRot', 'head'); const g = b.afflictions[0]; g.stage = 1; const r = B.apply(b, 'head', 'blindfold', {}, s); check(r.ok && r.affliction === g, 'treatment goes to the worst affliction on the part'); B.apply(b, 'head', 'knife', {}, s); check(g.step === 2, 'and stays with it once started'); }
 { const b = B.createBody(3); b.tools.salt = 0; B.roll(b, 'starRot', 'legL'); check(B.apply(b, 'legL', 'salt', {}, stats()).why === 'none left', 'a used-up tool cannot be used'); }
+
+console.log('Discovery');
+{ const b = B.createBody(3), s = stats(); const a = B.roll(b, 'starRot', 'legL'); let c = B.chart(b, a);
+  check(!c.named && c.name === null && c.steps.length === 2 && c.steps.every(x => x.tool === null) && c.lore === null, 'an ailment starts unknown: no name, its steps unknown, no note');
+  check(c.look === D.BODY_AILMENTS.starRot.stages[0].look, 'but you can see what it looks like');
+  B.apply(b, 'legL', 'knife', {}, s); B.apply(b, 'legL', 'moss', {}, s); B.apply(b, 'legL', 'knife', {}, s); c = B.chart(b, a);
+  check(!c.named && c.steps[0].tried.join() === 'knife,moss', 'wrong tools tried at a step are remembered, once each');
+  const r = B.apply(b, 'legL', 'salt', {}, s); c = B.chart(b, a);
+  check(r.discovered && c.named && c.name === 'Star-Rot' && c.steps[0].tool === 'salt' && c.steps[0].done && c.steps[1].now && c.steps[1].tool === null, 'the right tool reveals the step and names the ailment');
+  B.apply(b, 'legL', 'gauze', {}, s);
+  const a2 = B.roll(b, 'starRot', 'armL'), c2 = B.chart(b, a2);
+  check(c2.steps.every(x => x.tool) && c2.lore && c2.steps[0].now, 'what you learnt holds for the next one, with the pilgrims\' note');
+  check(!B.apply(b, 'armL', 'salt', {}, s).discovered, 'a known step is not discovered again');
+  a2.stage = 1; a2.step = 0; check(B.chart(b, a2).steps.every(x => x.tool === null) && B.chart(b, a2).named, 'each stage is learnt separately, though the name stays known'); }
+{ const b = B.createBody(3), s = stats(); B.roll(b, 'starRot', 'head'); B.roll(b, 'gaze', 'head'); const g = b.afflictions[1]; const r = B.apply(b, 'head', 'blindfold', {}, s, g.id); check(r.ok && r.affliction === g, 'a tool can be aimed at one affliction of several on a part'); }
+{ const b = B.createBody(3); delete b.known; delete b.tried; B.upgrade(b); check(b.known && b.tried, 'an old save gains an empty memory'); }
 
 console.log('The table');
 const tools = D.BODY_TOOLS;

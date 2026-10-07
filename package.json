@@ -3,8 +3,8 @@
   "private": true,
   "description": "Procedural dungeon and maze generation workbench",
   "scripts": {
-    "test": "node tests/wasm.js && QUICK=1 node tests/run.js && QUICK=1 node tests/world.js && node tests/dressing.js && node tests/camp.js && node tests/camp-golden.js && node tests/body.js",
-    "test:full": "node tests/wasm.js && node tests/run.js && node tests/world.js && node tests/dressing.js && node tests/camp.js && node tests/camp-golden.js && node tests/body.js",
+    "test": "node tests/wasm.js && QUICK=1 node tests/run.js && QUICK=1 node tests/world.js && node tests/dressing.js && node tests/camp.js && node tests/camp-golden.js && node tests/body.js && node tests/skills.js",
+    "test:full": "node tests/wasm.js && node tests/run.js && node tests/world.js && node tests/dressing.js && node tests/camp.js && node tests/camp-golden.js && node tests/body.js && node tests/skills.js",
     "build": "sh wasm/build.sh",
     "bench": "node tools/bench.js",
     "bench:browser": "python3 tools/bench-browser.py"
