@@ -146,12 +146,16 @@ pit, the vessels and the fire; what you use and what you need to know are plain,
   pick it up (it stays in hand, so you can lay several pieces), then tap the floor or a vessel to use it. Tap it
   again, or press Esc, to put it down. You can also drag straight from a button into the scene. Drag a piece or an
   empty vessel back onto the tray to take it back.
-- **The fire gauge** (top right) shows how the fire is doing:
+- **The fire gauge** (top right; across the top on a narrow screen) shows how the fire is doing:
   - a strength bar from Snuffed through Steady to Roaring, coloured like the fire (dull red, orange, yellow-white);
   - Air (it turns red and blinks when the fire is smothered) and Fuel, with an estimate of how long it will last;
   - which signs are showing: flame, embers, smoke;
-  - a state with what to do about it: Empty pit, Cold, Catching, Burning steady, Roaring, Starving, Choking,
-    Smouldering, Embers, Snuffed out. A trend arrow shows whether it is rising or falling.
+  - its state: Empty pit, Cold, Catching, Burning steady, Short of air, Roaring, Starving, Choking, Smouldering,
+    Embers, Snuffed out, and a trend arrow for whether it is rising or falling.
+
+  This is a prototype for testing mechanics, so there is no onboarding: no instruction notes or hints. Paper notes
+  only report what happened (what you ate, what you foraged, what you inspected). The tray wraps to as many rows as
+  the screen needs, and the scene and panels lay out above it, so nothing is clipped at any size.
 - **The fire itself shows its health.** Flames are taller, denser and whiter the harder it burns, and small, low and
   red when it is weak or starved of air. A choking fire throws thick dark smoke, a warming log thin grey wisps.
   Embers glow and pulse in the bed, and a breath brightens them.
@@ -166,10 +170,9 @@ pit, the vessels and the fire; what you use and what you need to know are plain,
     out.
   - So kindling laid around tinder catches, logs laid either side of a kindling fire catch, and logs stacked on top
     of the kindling smother it. A cold log laid on a small flame also drains its heat.
-- **While you hold a piece of tinder, kindling or fuel over the floor**, the spot under it shows what would happen
-  there: "good spot", "it will catch, but short of air", "too far from the flames to catch", or "too close: it
-  will smother the flames". Any burning pieces it would choke are ringed in red. Rings around the burning pieces
-  show their air (blue fine, amber short, red choking).
+- **While you hold a piece of tinder, kindling or fuel over the floor**, a ring under it shows what would happen
+  there: green will catch and breathe, amber is short of air or too far to catch, red will smother the flames
+  (and the burning pieces it would choke are ringed in red). Rings around the burning pieces show their air.
 - **Blowing** (the Blow button, or B or Space) tops up every piece's air at once, adds heat to anything already
   warm, makes embers flare (and burn down faster), and can coax a smouldering piece back to flame. The button
   glows and reads **Blow!** when a breath would help: the flames are short of air, something is smouldering, or

@@ -136,6 +136,7 @@
     el.querySelector('.cf-forage').addEventListener('click', forage);
     el.querySelector('.cf-ctx').addEventListener('click', ctxAction);
     window.addEventListener('resize', () => { if (!el.hidden) size(); });
+    if (window.ResizeObserver) new ResizeObserver(() => { if (!el.hidden && st && el.querySelector('.cf-tray').offsetHeight + 'px' !== el.style.getPropertyValue('--trayh')) size(); }).observe(el.querySelector('.cf-tray'));
     window.addEventListener('keydown', e => {
       if (el.hidden) return;
       if (e.key === 'Escape') { if (st.sel || st.vsel) { select(null); st.vsel = null; ctx(); } else if (!el.querySelector('.cf-larder').hidden) larder(false); else leave(); }
@@ -143,6 +144,8 @@
     });
   }
   function size() {
+    // the tray wraps to as many rows as the screen needs; the scene and the panels sit above whatever it takes
+    el.style.setProperty('--trayh', el.querySelector('.cf-tray').offsetHeight + 'px');
     const r = cv.getBoundingClientRect(), aspect = r.width / Math.max(1, r.height);
     LH = 270; LW = Math.max(300, Math.min(760, Math.round(LH * aspect)));
     if (aspect < 1) { LW = 360; LH = Math.round(LW / aspect); } // portrait: taller scene, same width
@@ -165,7 +168,6 @@
     el.hidden = false; document.documentElement.classList.add('xp-open');
     size(); refresh(true);
     if (!raf) { last = performance.now(); raf = requestAnimationFrame(loop); }
-    note('The fire pit. Lay tinder in the ring, kindling around it, then strike over the tinder.', LW / 2, LH * 0.35, 4200);
   }
   function leave(silent) { // silent: another screen is taking over, so don't hand back to the world
     el.hidden = true; cancelAnimationFrame(raf); raf = 0; if (st) save();
@@ -217,10 +219,6 @@
     if (k && VES[k] && c.vessels.some(v => v.type === k)) { const v = c.vessels.find(q => q.type === k); st.vsel = v.id; k = null; } // already out: select it instead
     st.sel = k;
     refresh(true); ctx();
-    if (k) {
-      const what = FIRE[k] ? `Tap the floor to lay ${FIRE[k].name.toLowerCase()}. Tinder in the middle of the ring, kindling close around it, fuel once it is going.` : k === 'striker' ? 'Tap over the tinder to strike.' : VES[k] ? `Tap the floor to set the ${VES[k].name.toLowerCase()} down: close to the flames is hot, further out is gentle.` : `Tap a pot, pan or skewer to put ${ING[k].name} in it.`;
-      note(what, LW / 2, LH * 0.3, 3200);
-    }
   }
   function down(e) {
     e.preventDefault(); cv.setPointerCapture?.(e.pointerId);
@@ -240,7 +238,7 @@
   function dropSlot(k, p) {
     const c = st.c, f = onFloorAt(p);
     if (FIRE[k]) { if (!f) return; if (c.stock[k] <= 0) { note(`No ${FIRE[k].name.toLowerCase()} left. Forage in the sack for more.`, p.x, p.y); return select(null); } S.placePiece(c, k, f.x, f.z); refresh(true); return; }
-    if (k === 'striker') { if (!f) return; const n = S.strike(c, f.x, f.z); emit('spark', f.x, f.z, 0.03, 14); if (!n) note('Sparks on bare stone. Strike over the tinder.', p.x, p.y, 2200); return; }
+    if (k === 'striker') { if (!f) return; const n = S.strike(c, f.x, f.z); emit('spark', f.x, f.z, 0.03, 14); return; }
     if (VES[k]) { if (!f) return; const v = S.placeVessel(c, k, f.x, f.z); if (!v) note(`The ${VES[k].name.toLowerCase()} is already out.`, p.x, p.y); else { st.vsel = v.id; select(null); } refresh(true); return; }
     if (ING[k]) {
       const hit = hitPlaced(p);
@@ -251,7 +249,7 @@
         if (!S.addToVessel(c, v.id, k)) return note(`The ${VES[v.type].name.toLowerCase()} is full.`, p.x, p.y);
         st.vsel = v.id; refresh(true); ctx(); return;
       }
-      return note(`${ING[k].name} needs a pot, pan or skewer. Set one down first.`, p.x, p.y);
+      return;
     }
   }
   function up(e) {
@@ -283,11 +281,10 @@
       return dropSlot(st.sel, p);
     }
     if (d.from === 'vessel') { st.vsel = st.vsel === d.obj.id ? null : d.obj.id; ctx(); return; }
-    if (d.from === 'piece') { const q = d.obj, k = FIRE[q.kind]; return note(`${k.name}: ${q.ash ? (q.ember > 20 ? 'embers, still glowing' : 'ash') : q.burning ? (q.air < 0.45 ? 'burning, choking for air' : 'burning') : q.out ? 'gone out, smouldering' : q.T > 60 ? 'hot' : 'cold'}. Drag it onto the tray to take it back.`, p.x, p.y); }
+    if (d.from === 'piece') { const q = d.obj, k = FIRE[q.kind]; return note(`${k.name}: ${q.ash ? (q.ember > 20 ? 'embers, still glowing' : 'ash') : q.burning ? (q.air < 0.45 ? 'burning, choking for air' : 'burning') : q.out ? 'gone out, smouldering' : q.T > 60 ? 'hot' : 'cold'}.`, p.x, p.y); }
     const ch = L.charms.find(b => inBox(p, { x: b.x - 2, y: 0, w: b.w + 4, h: b.y + b.h + 4 }));
     if (ch) return note(`${CHARM_NAME[ch.key]}. ${words[ch.key](c.stats[ch.key])}`, p.x + 20, p.y + 30);
     if (st.sackBox && inBox(p, st.sackBox)) return forage();
-    if (inBox(p, L.hands)) return note('Your hands. Draw a pot, pan or skewer here to eat from it, or choose one and press Eat.', p.x, p.y);
     if (st.vsel) { st.vsel = null; ctx(); }
   }
   function forage() {
@@ -303,7 +300,6 @@
     lit.forEach(p => { emit('spark', p.x, p.z, 0.01, p.ash ? 3 : 2); });
     for (let k = 0; k < 10; k++) parts.push({ kind: 'breath', x: PIT.x + (Math.random() - 0.5) * 0.3, z: PIT.z - 0.45 - Math.random() * 0.2, h: 0.02, vx: 0, vz: 0.6 + Math.random() * 0.3, vh: 0, life: 0, max: 0.6 });
     const b = el.querySelector('.cf-blow'); b.classList.remove('puff'); void b.offsetWidth; b.classList.add('puff');
-    if (!c.pieces.length) note('You breathe on cold stone.', LW / 2, LH * 0.45, 1600);
   }
   function larder(open) {
     const L = el.querySelector('.cf-larder'), b = el.querySelector('.cf-open');
@@ -483,7 +479,7 @@
         else if (pv.air < 0.45) { col = 'rgba(240,80,60,0.9)'; t = 'Packed in too tight: it will choke.'; tip = 'bad'; }
         else if (pv.air < fs.airFull) { col = 'rgba(240,180,70,0.85)'; t = 'It will catch, but short of air.'; tip = 'ok'; }
         else { col = 'rgba(140,220,120,0.9)'; t = 'Good spot: it will catch and breathe.'; tip = 'good'; }
-        ring(f.x, f.z, 0.06, col); showTip(t, tip, at);
+        ring(f.x, f.z, 0.06, col); ring(f.x, f.z, 0.075, col);
       } else if (f && (k === 'striker' || VES[k])) { const s = sc(f.z); g.strokeStyle = 'rgba(255,240,200,0.5)'; g.beginPath(); g.ellipse(sx(f.x, f.z), sy(f.z), s * (k === 'striker' ? 0.14 : 0.06), s * (k === 'striker' ? 0.06 : 0.025), 0, 0, 7); g.stroke(); }
       if (ING[k]) { const h = hitPlaced(at); if (h && h.type === 'vessel') { g.strokeStyle = 'rgba(243,211,107,0.8)'; g.strokeRect(Math.round(h.obj.box.x) + 0.5, Math.round(h.obj.box.y) + 0.5, Math.round(h.obj.box.w), Math.round(h.obj.box.h)); } }
     }

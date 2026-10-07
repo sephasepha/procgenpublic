@@ -32,7 +32,10 @@
     if (aspect < 1) { LW = 360; LH = Math.round(LW / aspect); }
     cv.width = LW; cv.height = LH; g.imageSmoothingEnabled = false;
     // the chart: a sheet of parchment in the middle of the table
-    const ph = LH - 64, pw = Math.round(ph * 0.82), px = Math.round(LW * 0.44 - pw / 2), py = 8;
+    // the chart fits the screen both ways (portrait screens are narrow): never wider than the table
+    let ph = LH - 64, pw = Math.round(ph * 0.82);
+    if (pw > LW - 16) { pw = LW - 16; ph = Math.round(pw / 0.82); }
+    const px = Math.round(Math.max(8, Math.min(LW - pw - 8, LW * 0.44 - pw / 2))), py = Math.max(8, Math.round((LH - 56 - ph) / 2));
     st.chart = { x: px, y: py, w: pw, h: ph, k: (ph - 20) / 140, ox: px + pw / 2 - 50 * (ph - 20) / 140, oy: py + 10 };
     const slot = Math.min(26, Math.floor((LW - 40) / TOOL_KEYS.length));
     st.roll = { x: Math.round(LW / 2 - slot * TOOL_KEYS.length / 2) - 6, y: LH - 44, w: slot * TOOL_KEYS.length + 12, h: 40, slot };
@@ -54,7 +57,6 @@
     el.hidden = false; document.documentElement.classList.add('xp-open');
     size();
     if (!raf) { last = performance.now(); raf = requestAnimationFrame(loop); }
-    if (!st.b.afflictions.length) note('The Pilgrim\'s Body. Nothing has taken hold of you yet. The bones will tell you what does.', LW / 2, LH * 0.35, 4500);
   }
   function leave(silent) { el.hidden = true; cancelAnimationFrame(raf); raf = 0; save(); const c = camp(); if (c && root.Camp) Camp.save(); if (onLeave && silent !== true) onLeave(); }
 
@@ -187,7 +189,7 @@
     const b = st.b, c = st.chart, cs = camp();
     g.globalAlpha = 1; g.drawImage(table, 0, 0);
     // candlelight
-    const lx = LW * 0.86, ly = LH * 0.5, gr = g.createRadialGradient(lx, ly, 4, lx, ly, LW * 0.8);
+    const lx = LW * 0.86, ly = LH * 0.5, gr = g.createRadialGradient(lx, ly, 4, lx, ly, Math.max(LW, LH) * 0.8);
     gr.addColorStop(0, 'rgba(255,190,110,0.18)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, LW, LH);
     g.fillStyle = '#d8ccb0'; g.fillRect(Math.round(lx) - 2, Math.round(ly) - 2, 5, 12); g.fillStyle = `rgba(255,${200 + 30 * Math.sin(time * 13)},90,1)`; g.fillRect(Math.round(lx), Math.round(ly) - 6, 2, 4);
     // parchment
@@ -222,7 +224,7 @@
     drawCharms(time);
     if (drag && drag.tool && drag.moved) { g.globalAlpha = 0.9; g.drawImage(sprite(drag.tool, TOOLS[drag.tool]), Math.round(drag.p.x - 9), Math.round(drag.p.y - 9), 18, 18); g.globalAlpha = 1; const part = partAt(drag.p); if (part) { shapePath(PARTS[part].shape); g.strokeStyle = 'rgba(243,211,107,0.8)'; g.stroke(); } }
     // vignette
-    const v = g.createRadialGradient(LW / 2, LH / 2, LH * 0.4, LW / 2, LH / 2, LW * 0.7); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.6)'); g.fillStyle = v; g.fillRect(0, 0, LW, LH);
+    const v = g.createRadialGradient(LW / 2, LH / 2, Math.min(LW, LH) * 0.45, LW / 2, LH / 2, Math.max(LW, LH) * 0.75); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.6)'); g.fillStyle = v; g.fillRect(0, 0, LW, LH);
   }
   function drawCharms(time) {
     const cs = camp(); if (!cs) return;
