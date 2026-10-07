@@ -243,9 +243,13 @@
     // the WebAssembly kernel when it is loaded (bit-identical to the JS, about 15x faster)
     const useWasm = S.wasm !== false && typeof DRESS_WASM !== 'undefined' && DRESS_WASM;
     const td = now();
-    const d = (useWasm ? DRESS_WASM.dress : dress)(pass, setOf, SW, SH, seed * 31 + 7, pins);
+    // where areas meet, a WFC over tile corners grows the transition between them (see blend in dressing.js);
+    // the cells it mixes take only plain structural tiles, and the renderer draws them as a blend
+    const tb = now(), B = P.tilesets && typeof blend === 'function' ? (useWasm && DRESS_WASM.blend ? DRESS_WASM.blend : blend)(setOf, SW, SH, seed * 131 + 17, pins.map(p => p[0])) : null;
+    timing.blend = now() - tb;
+    const d = (useWasm ? DRESS_WASM.dress : dress)(pass, setOf, SW, SH, seed * 31 + 7, pins, B ? B.mixed : null);
     timing.dress = now() - td; timing.wasm = !!useWasm;
-    return { deco: d.tiles, dressStats: { fallbacks: d.fallbacks, violations: d.violations } };
+    return { deco: d.tiles, corners: B ? B.corners : null, dressStats: { fallbacks: d.fallbacks, violations: d.violations, blended: B ? B.count : 0 } };
   }
 
   // ---------- room-based sectors (gen/rooms.js): themes, a room grammar, suites, maze corridors ----------
@@ -272,9 +276,9 @@
       });
       const doors = portals.map(p => doorSub(p));
       timing.layout = now() - t0;
-      const { deco, dressStats } = dressSector(S, pass, col, c => STRATUM_STYLE[L.stratumOf[((c / COLS) | 0) * 3 * SW + 3 * (c % COLS) + SW + 1]], pinAt, portals, seed, timing, { passage: L.passage, runner: L.runner, braziers: L.braziers, hall: L.hall, wallOf: i => STRATUM_STYLE[L.stratumOf[i]] });
+      const { deco, corners, dressStats } = dressSector(S, pass, col, c => STRATUM_STYLE[L.stratumOf[((c / COLS) | 0) * 3 * SW + 3 * (c % COLS) + SW + 1]], pinAt, portals, seed, timing, { passage: L.passage, runner: L.runner, braziers: L.braziers, hall: L.hall, wallOf: i => STRATUM_STYLE[L.stratumOf[i]] });
       timing.total = now() - t0;
-      return { sx, sy, ox, oy, own, info, portals, doors, pass, col, deco, dressStats, hubs, doctrine: null, attempts: attempt + 1, ms: Math.round(timing.total), timing,
+      return { sx, sy, ox, oy, own, info, portals, doors, pass, col, deco, corners, dressStats, hubs, doctrine: null, attempts: attempt + 1, ms: Math.round(timing.total), timing,
         entranceSub: L.startSub, ok: true, layout: 'rooms', theme: L.theme, rooms: L.rooms, roomOf: L.roomOf, mission: L.mission, doorWide: L.doorWide, halls: L.halls, districts: L.districts, distOf: L.distOf, mat: L.mat };
     }
     return { sx, sy, info, portals, ok: false, error: last, ms: Math.round(now() - t0) };

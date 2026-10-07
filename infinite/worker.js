@@ -8,6 +8,6 @@ onmessage = async e => {
   let r;
   try { r = genSector(settings, sx, sy); } catch (err) { r = { sx, sy, ok: false, error: String(err) }; }
   if (r.timing) r.timing.wasmError = GenWasm.ready ? null : GenWasm.error || 'not loaded';
-  if (r.ok) postMessage({ gen, r }, [r.pass.buffer, r.col.buffer].concat(r.deco ? [r.deco.buffer] : []));
+  if (r.ok) postMessage({ gen, r }, [r.pass.buffer, r.col.buffer].concat(r.deco ? [r.deco.buffer] : [], r.corners ? [r.corners.buffer] : []));
   else postMessage({ gen, r });
 };

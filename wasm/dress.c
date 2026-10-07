@@ -12,14 +12,15 @@ typedef struct {
   const u32 *allow;       // [4][n][KW]
   const u32 *cls;         // [NCLS][KW]
   const u8 *clsHas;       // [NCLS]
+  const u32 *plain;       // [KW] the structural kit alone, for cells where two areas blend
 } Set;
 static Set sets[MAXSETS];
 static int nsets = 0, KW = 1;
 
 EXPORT void ds_init(int n, int kw) { nsets = n; KW = kw; }
-EXPORT void ds_set(int si, int n, int offset, int fbF, int fbW, int fbR, const double *w, const u32 *allow, const u32 *cls, const u8 *has) {
+EXPORT void ds_set(int si, int n, int offset, int fbF, int fbW, int fbR, const double *w, const u32 *allow, const u32 *cls, const u8 *has, const u32 *plain) {
   Set *s = &sets[si]; s->n = n; s->offset = offset; s->fbFloor = fbF; s->fbWall = fbW; s->fbRock = fbR;
-  s->weight = w; s->allow = allow; s->cls = cls; s->clsHas = has;
+  s->weight = w; s->allow = allow; s->cls = cls; s->clsHas = has; s->plain = plain;
 }
 
 // ---------- state for one call ----------
@@ -108,7 +109,7 @@ static int propagate(void) {
 }
 
 // result: [fallbacks, backtracks, violations]
-EXPORT int ds_dress(const u8 *passIn, const u8 *setOfIn, int w, int h, int seed, const int *pins, int npins, u16 *out, int *stats) {
+EXPORT int ds_dress(const u8 *passIn, const u8 *setOfIn, int w, int h, int seed, const int *pins, int npins, u16 *out, int *stats, const u8 *plainIn) {
   // inputs live in the scratch region (gen/wasm.js resets it and allocates them first); work memory follows
   W = w; H = h; N = W * H; pass = passIn; setOf = setOfIn; rngState = (u32)seed;
   dom = alloc(N * KW * 4); ver = alloc(N * 4); clsOf = alloc(N * 2);
@@ -119,8 +120,10 @@ EXPORT int ds_dress(const u8 *passIn, const u8 *setOfIn, int w, int h, int seed,
   for (int y = 0; y < H; y++) for (int x = 0; x < W; x++) {
     int i = y * W + x, c = classAt(x, y); clsOf[i] = (u16)c;
     const Set *s = &sets[setOf[i]];
-    if (s->clsHas[c]) { const u32 *m = s->cls + c * KW; for (int k = 0; k < KW; k++) dom[i * KW + k] = m[k]; }
-    else setSingle(i, fallbackOf(i));
+    if (s->clsHas[c]) {
+      const u32 *m = s->cls + c * KW; for (int k = 0; k < KW; k++) dom[i * KW + k] = m[k];
+      if (plainIn && plainIn[i]) { u32 any = 0; for (int k = 0; k < KW; k++) any |= dom[i * KW + k] & s->plain[k]; if (any) for (int k = 0; k < KW; k++) dom[i * KW + k] &= s->plain[k]; }
+    } else setSingle(i, fallbackOf(i));
   }
   for (int p = 0; p < npins; p++) { int i = pins[2 * p], t = pins[2 * p + 1]; if ((dom[i * KW + (t >> 5)] >> (t & 31)) & 1) setSingle(i, t); }
   int fallbacks = 0, backtracks = 0;

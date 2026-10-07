@@ -71,7 +71,7 @@ layout is still used by the Arsenal and Generic presets, and by the Underdark wi
 
 Every cell of a finished layout has a **context** read from the floor/wall pattern around it: a wall with floor below is a south face, a floor with walls left and right is a corridor, and so on (wall faces, outer and inner corners, thin walls, wall ends, pillars, wall shadows, corner shadows, corridors, dead ends, room centres).
 
-Each biome's tileset (`gen/dressing.js`) is a **shared structural kit** drawn in the biome's palette (faces, cracked and coursed faces, corners, thin walls, ends, pillars, floor shadows, corridor edges) plus the biome's own details (niches, sconces, furnaces, pipes, banners, moss, runners, rails, drains, carpets, and 2x2 centrepieces). Tiles are 4×4 pixels, or 8×8 for the Underdark strata, which share an 8×8 structural kit. From hand-drawn example rooms the generator learns, for every tile:
+Each biome's tileset (`gen/dressing.js`) is a **shared structural kit** drawn in the biome's palette (faces, cracked and coursed faces, corners, thin walls, ends, pillars, floor shadows, corridor edges) plus the biome's own details (niches, sconces, furnaces, pipes, banners, moss, runners, rails, drains, carpets, and 2x2 centrepieces). Tiles are 4×4 pixels, or 8×8 for the Underdark strata. From hand-drawn example rooms the generator learns, for every tile:
 
 - which contexts it appears in, so faces only go on faces, runners in corridors, centrepieces in room centres,
 - its orientation, inferred from context: write a tile's letter anywhere and it turns to face the right way,
@@ -81,6 +81,44 @@ Each biome's tileset (`gen/dressing.js`) is a **shared structural kit** drawn in
 A WFC pass with backtracking then fills each sector cell by cell. When drawn, plain floor tiles take a random quarter turn and every tile gets a slight brightness jitter, so repeats don't read as repeats.
 
 To add set dressing without drawing new example rooms, give a tile `like: 'X'` and a `share`: it goes wherever tile X was learned (same contexts, same turning) at that share of X's weight, so `like: 'F'` is a floor prop, `like: 'A'` a wall-face variant, `like: 'K'` something standing against a wall. To add art: draw a tile as rows of palette characters, give it an `anchor` if it faces a direction, then use its letter in an example room. `node tools/autotile.js` checks the example rooms and rewrites structural letters to match their geometry. In a 3D engine the same learned rules would place modular meshes.
+
+### Each stratum its own architecture
+
+The three Underdark strata share example rooms, letters, contexts and learned rules, but each draws its structural
+kit differently, so their spaces look built by different hands rather than recoloured:
+
+- **Constellation of Mazes**: crisp ashlar. Square-cut faces and corners, a starfield void.
+- **Uncontrollable Growth**: no masonry at all. Hedge-and-canopy banks of leaf and root, burrows with ragged
+  sides, trunks for pillars, a mycelium floor, earth and roots for the void.
+- **Unsealed Shrines**: dressed temple stone. Coffered tops, dentil cornices, pilasters and plinths, arcades and
+  balustrades, fluted columns, lozenge-tiled floors, buried masonry for the void.
+
+Their surface materials follow suit: the Growth's floors and walls grow (mycelium nets, root mats, soil strata,
+spore beds, root tangle, bark), and the Shrines' are set out by masons (lozenge and hex mosaics, sunbursts, flutes,
+key-pattern friezes). Halls keep their stratum's kit in their own palette. `tests/dressing.js` checks that the
+strata really draw each piece with different shapes.
+
+### Transitions: a WFC over corners
+
+Where areas meet (strata bleeding into each other near the seals, borrowed districts, the Threshold's processional
+halls), a second WFC grows the transition (`blend` in `gen/dressing.js`, and `wasm/blend.c`, bit-identical):
+
+- Every tile corner takes one area. A corner more than two cells from any boundary is its own area; nearer, it may
+  be either side (the ecotone).
+- The rule every cell enforces on its four corners is **no saddle**: diagonal corners alike while the diagonals
+  differ. Materials therefore meet along continuous fronts, never in a chequer.
+- Collapse is lowest-entropy first. Each corner is weighted towards the area it sits in and towards corners already
+  decided beside it, so fronts meander instead of following the grid. Contradictions return a corner to its own
+  area.
+- The dressing WFC then honours it: cells with mixed corners take only the plain structural kit (no prop is cut in
+  half). Pinned pieces (centrepieces, runners, braziers) keep their own area.
+- The renderer draws a mixed cell pixel by pixel, from whichever area's corners weigh most there, using that area's
+  own piece for the same letter and turn. How the front looks depends on what is coming in: the Growth creeps in
+  organic lobes, the Shrines and Threshold in stepped, mason-cut edges, the Constellation in crisp blocks. The near
+  side of a front is shaded, so one surface reads as laid over the other.
+
+It costs about 2 to 8 ms a sector in WebAssembly. `tests/dressing.js` checks there are no saddles, that blending
+stays near boundaries, that pinned cells and props are kept out of it, and `tests/wasm.js` checks JS/wasm parity.
 
 ## Infinite world
 

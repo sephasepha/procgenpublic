@@ -34,6 +34,22 @@ D.DRESS_SETS.forEach((s, si) => {
 });
 const med = a => a.slice().sort((p, q) => p - q)[a.length >> 1];
 console.log(`  dress ${81 * 61} cells: JS median ${med(tJ).toFixed(1)} ms, wasm median ${med(tW).toFixed(1)} ms (${(med(tJ) / med(tW)).toFixed(1)}x)`);
+console.log('Transition WFC: wasm vs JS');
+{
+  const D = require('../gen/dressing.js'), GW = require('../gen/wasm.js');
+  const Wd = 120, Hd = 156, ma = D.DRESS_SETS.findIndex(s => s.key === 'mazes'), gr = D.DRESS_SETS.findIndex(s => s.key === 'growth'), sh = D.DRESS_SETS.findIndex(s => s.key === 'shrines'), th = D.DRESS_SETS.findIndex(s => s.key === 'threshold');
+  const tj = [], tw = [];
+  for (let k = 0; k < 6; k++) {
+    const setOf = new Uint8Array(Wd * Hd);
+    for (let y = 0; y < Hd; y++) for (let x = 0; x < Wd; x++) { const v = Math.sin(x / (7 + k) + k) + Math.cos(y / (9 - k / 2)) + 0.3 * Math.sin((x + y) / 3); setOf[y * Wd + x] = v > 0.9 ? gr : v < -0.9 ? sh : (x > 80 && y < 20) ? th : ma; }
+    const fixed = [500 + k, 3000 + k * 7];
+    let t = performance.now(); const a = D.blend(setOf, Wd, Hd, 99 + k, fixed); tj.push(performance.now() - t);
+    t = performance.now(); const b = DRESS_WASM.blend(setOf, Wd, Hd, 99 + k, fixed); tw.push(performance.now() - t);
+    let dc = 0, dm = 0; for (let i = 0; i < a.corners.length; i++) if (a.corners[i] !== b.corners[i]) dc++; for (let i = 0; i < a.mixed.length; i++) if (a.mixed[i] !== b.mixed[i]) dm++;
+    check(a.count === b.count && dc === 0 && dm === 0, `pattern ${k}: corners differ in ${dc}, mixed in ${dm} (${a.count} vs ${b.count})`);
+  }
+  console.log(`  blend: JS median ${med(tj).toFixed(1)} ms, wasm median ${med(tw).toFixed(1)} ms`);
+}
 console.log('Whole sectors: wasm vs JS (layout WFC and dressing)');
 {
   const W = require('../gen/world.js');
@@ -48,6 +64,8 @@ console.log('Whole sectors: wasm vs JS (layout WFC and dressing)');
       let dp = 0, dd = 0; for (let i = 0; i < a.pass.length; i++) { if (a.pass[i] !== b.pass[i] || a.col[i] !== b.col[i]) dp++; if (a.deco[i] !== b.deco[i]) dd++; }
       check(dp === 0, `${preset} ${x},${y}: layout differs in ${dp} sub-cells`);
       check(dd === 0, `${preset} ${x},${y}: dressing differs in ${dd} sub-cells`);
+      let dc = 0; if (!!a.corners !== !!b.corners) dc = -1; else if (a.corners) for (let i = 0; i < a.corners.length; i++) if (a.corners[i] !== b.corners[i]) dc++;
+      check(dc === 0, `${preset} ${x},${y}: transition corners differ (${dc})`);
       check(b.timing.wasm, `${preset} ${x},${y}: wasm was not used`);
     }
   }

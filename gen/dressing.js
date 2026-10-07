@@ -100,6 +100,54 @@
     D: { px: ['########', '########', '########', '########', '####xxxx', '####xwxx', '####xxhh', '####xxhW'], walk: 0, anchor: 32, name: 'Inner corner' },
   };
 
+  // ---------- each stratum's own structural kit: the same letters and contexts, a different architecture ----------
+  // The Constellation of Mazes builds in crisp ashlar (KIT8 above). The Uncontrollable Growth has no masonry at
+  // all: banks of earth and root, burrows with ragged sides, trunks for pillars, mycelium on the floor. The
+  // Unsealed Shrines are dressed temple stone: coffered tops, dentil cornices, pilasters and plinths, arcades,
+  // fluted columns, lozenge-tiled floors. The example rooms and learned rules are shared; only the shapes differ.
+  const GROWTH_KIT = {
+    F: { px: ['..,.....', '.,;;....', '...;..,.', '....;;..', '..:...;.', '.,....;.', '......,.', '.:......'], walk: 1, spin: 1, name: 'Floor, mycelium' },
+    G: { px: ['..::....', '.:..:...', '..::..,.', '......;.', '.,..;;..', '...;....', '..;...:.', '........'], walk: 1, spin: 1, name: 'Floor, damp' },
+    X: { px: ['...;....', '..;.;...', '.;...;..', ';.....;.', '..,....;', '........', '.:..,...', '........'], walk: 1, spin: 1, w: 0.6, name: 'Floor, root crack' },
+    K: { px: ['KKKKKKKK', 'KnKKKnKK', 'kn.kkn.k', 'k...kn..', '....k..,', '.,......', '......:.', '........'], walk: 1, anchor: FLOOR | 1, name: 'Drip shadow' },
+    L: { px: ['KKKKKKKK', 'KKKkKKkK', 'KKk.kk.k', 'Kk......', 'KKk..,..', 'Kk......', 'Kk...:..', 'KKk.....'], walk: 1, anchor: FLOOR | 9, name: 'Corner hollow' },
+    C: { px: ['Kk....kK', 'KKk..kKK', 'Kk.,..kK', 'Kk...kKK', 'KKk...kK', 'Kk..:.kK', 'Kk....KK', 'KKk..kKK'], walk: 1, anchor: FLOOR | 10, name: 'Burrow' },
+    Z: { px: ['Kk....kK', 'KKk..kKK', 'Kk.,..kK', 'Kk...kKK', 'KKk...kK', 'Kkk..kkK', 'KKkkkkKK', 'KKKKKKKK'], walk: 1, anchor: FLOOR | 14, name: 'Burrow end' },
+    I: { px: ['KKk.....', 'Kk......', 'k.......', '...,....', '........', '.:....,.', '........', '....,...'], walk: 1, anchor: FLOOR | 128, name: 'Root hollow' },
+    R: { px: ['##+#####', '#+*+##+#', '##+##+*#', '#####+##', '#+######', '+*+##+##', '#+###*+#', '#####+##'], walk: 0, spin: 1, name: 'Earth and roots' },
+    E: { px: ['mMMmmmMm', 'MMMMmMMM', 'mMMmmMMm', 'mmmMMmmm', 'mmMMMMmm', 'MMmMMmMM', 'mMmmmmMm', 'MMmMMmmM'], walk: 0, name: 'Root weave' },
+    A: { px: ['mMMmmMMm', 'MMMMMMMM', 'mMhmMMhm', 'hmhhmhhm', 'WnWWnWWW', 'WnWWWnWn', 'nWWnWWnW', 'HnHHnHHn'], walk: 0, anchor: 4, name: 'Earth bank' },
+    Y: { px: ['MMmmMMmm', 'MMMMMMMM', 'mMMhmMMh', 'hhmhhhmh', 'WWWnWWWW', 'WnWWWWnW', 'WWWWnWWW', 'HHnHHHHn'], walk: 0, anchor: 4, name: 'Earth bank, smooth' },
+    S: { px: ['mMMmmMMm', 'MMMMMMMM', 'hmhhmhhm', 'WWWWWWWW', 'dddWWddd', 'WWWWWWWW', 'WWdddWWW', 'HHHHHHHH'], walk: 0, anchor: 4, w: 0.7, name: 'Earth strata' },
+    B: { px: ['mMMmmMMm', 'MMMdMMMM', 'hmhdhmhh', 'WWWdWWWW', 'WWdWdWWW', 'WdWWWdWW', 'W,WWWW,W', 'H,.HHH.H'], walk: 0, anchor: 4, w: 0.5, name: 'Slumping bank' },
+    Q: { px: ['mMMmmhWH', 'MMMMMhWH', 'mMhmMhWH', 'MMMMhhWH', 'mMMhhWWH', 'hhhhWWnH', 'WnWWWWHH', 'HHnHHHH.'], walk: 0, anchor: 6, name: 'Rounded bank' },
+    H: { px: ['hmhhmhhm', 'mMMmmMMm', 'MMMMMMMM', 'hmhhmhhm', 'WnWWWnWW', 'WWWnWWWn', 'WnWWWWWW', 'HHnHHHnH'], walk: 0, anchor: 5, name: 'Root ridge' },
+    J: { px: ['hmhhmhh.', 'mMMmmMh.', 'MMMMMMhh', 'hmhhmhhW', 'WnWWWnWW', 'WWWnWWWH', 'WnWWWWHH', 'HHnHHHH.'], walk: 0, anchor: 7, name: 'Ridge end' },
+    P: { px: ['..mMMm..', '.mMMMMm.', 'mMMhhMMm', 'hMhMMhMh', '.hhhhhh.', '.WeWWeW.', 'KWWeWWWK', 'KKHHHHKK'], walk: 0, anchor: 15, name: 'Trunk' },
+    D: { px: ['####+###', '##+#####', '#####+##', '###+####', '+###mMMm', '####MMMM', '###mMhmh', '##+mhhWn'], walk: 0, anchor: 32, name: 'Root shoulder' },
+  };
+  const SHRINE_KIT = {
+    F: { px: ['.;....;.', ';.,..:.;', '..;..;..', '...;;...', '...;;...', '..;..;..', ';.:..,.;', '.;....;.'], walk: 1, spin: 1, name: 'Floor, lozenge tiles' },
+    G: { px: ['.;....;.', ';..,...;', '..;..;..', '...;;.:.', '.,.;;...', '..;..;..', ';......;', '.;..:.;.'], walk: 1, spin: 1, name: 'Floor, worn lozenges' },
+    X: { px: ['.;....;.', ';.,,,..;', '..;,,;..', '...;;...', '...;;..,', '..;..;,,', ';....,,;', '.;....;.'], walk: 1, spin: 1, w: 0.6, name: 'Floor, lifted tile' },
+    K: { px: ['KKKKKKKK', 'kkkkkkkk', '.;.kk.;.', '...;;...', '...;;...', '..;..;..', ';.:..,.;', '.;....;.'], walk: 1, anchor: FLOOR | 1, name: 'Plinth shadow' },
+    L: { px: ['KKKKKKKK', 'Kkkkkkkk', 'Kk;..;..', 'Kk.;;...', 'Kk.;;...', 'Kk;..;..', 'Kk:..,.;', 'Kk....;.'], walk: 1, anchor: FLOOR | 9, name: 'Plinth corner' },
+    C: { px: ['Kk;..;kK', 'Kk.;;.kK', 'Kk.;;.kK', 'Kk;..;kK', 'Kk;..;kK', 'Kk.;;.kK', 'Kk.;;.kK', 'Kk;..;kK'], walk: 1, anchor: FLOOR | 10, name: 'Processional way' },
+    Z: { px: ['Kk;..;kK', 'Kk.;;.kK', 'Kk.;;.kK', 'Kk;..;kK', 'Kk;..;kK', 'Kk.;;.kK', 'Kkkkkkkk', 'KKKKKKKK'], walk: 1, anchor: FLOOR | 14, name: 'Apse' },
+    I: { px: ['Kk..;...', 'kk.;.;..', '..;...;.', '.;.....;', ';.;...;.', '...;.;..', '....;...', '.,......'], walk: 1, anchor: FLOOR | 128, name: 'Plinth step' },
+    R: { px: ['########', '#++#####', '#++##*##', '########', '####++##', '#*##++##', '########', '##*#####'], walk: 0, spin: 1, name: 'Buried masonry' },
+    E: { px: ['xxxxxxxx', 'xhhhhhhx', 'xhxwwxhx', 'xhwxxwhx', 'xhwxxwhx', 'xhxwwxhx', 'xhhhhhhx', 'xxxxxxxx'], walk: 0, name: 'Coffered top' },
+    A: { px: ['xxxxxxxx', 'xhxhxhxh', 'xxxxxxxx', 'hhhhhhhh', 'WmWWWWmW', 'WmWddWmW', 'mmmmmmmm', 'HHHHHHHH'], walk: 0, anchor: 4, name: 'Pilastered face' },
+    Y: { px: ['xxxxxxxx', 'xhxhxhxh', 'xxxxxxxx', 'hhhhhhhh', 'WSSSSSSW', 'WSWWWWSW', 'mmmmmmmm', 'HHHHHHHH'], walk: 0, anchor: 4, name: 'Panelled face' },
+    S: { px: ['xxxxxxxx', 'xhxhxhxh', 'xxxxxxxx', 'hhmmmmhh', 'WmvvvvmW', 'WmvvvvmW', 'mmvvvvmm', 'HHHHHHHH'], walk: 0, anchor: 4, w: 0.7, name: 'Arcade' },
+    B: { px: ['xxxxxxxx', 'xhxhdhxh', 'xxxxdxxx', 'hhhhdhhh', 'WmWdWWmW', 'WmdWWWmW', 'mmmdmmmm', 'HHHHHHHH'], walk: 0, anchor: 4, w: 0.5, name: 'Cracked face' },
+    Q: { px: ['xxxxxhmH', 'xhxhxhmH', 'xxxxxhmH', 'hhhhhhmH', 'WWWWWmmH', 'WWWWWmmH', 'mmmmmmmH', 'HHHHHHHH'], walk: 0, anchor: 6, name: 'Corner pilaster' },
+    H: { px: ['hhhhhhhh', 'xhxhxhxh', 'xxxxxxxx', 'hhhhhhhh', 'WmWmWmWm', 'WmWmWmWm', 'mmmmmmmm', 'HHHHHHHH'], walk: 0, anchor: 5, name: 'Balustrade' },
+    J: { px: ['hhhhhhhH', 'xhxhxhhm', 'xxxxxxhm', 'hhhhhhhm', 'WmWmWmmm', 'WmWmWmmm', 'mmmmmmmm', 'HHHHHHHH'], walk: 0, anchor: 7, name: 'Balustrade end' },
+    P: { px: ['KmmmmmmK', 'KhxhxhxK', 'KmmmmmmK', '.WsWsWs.', '.WsWsWs.', '.WsWsWs.', 'mmmmmmmm', 'KHHHHHHK'], walk: 0, anchor: 15, name: 'Fluted column' },
+    D: { px: ['########', '#++#####', '#++##*##', '########', '####xxxx', '####xhhh', '####xhxh', '####xhhW'], walk: 0, anchor: 32, name: 'Cornice return' },
+  };
+
   // ---------- biome tilesets: palette, details, example rooms ----------
   // Example rooms are grids of tile letters. Orientation is inferred, so a face letter on any wall
   // facing a floor turns to face it. Digits 1-4 are the quarters of a 2x2 centrepiece.
@@ -296,7 +344,7 @@
          'DADRRRRRDAAAD'],
       ],
     },
-    { key: 'growth', name: 'Uncontrollable Growth', size: 8,
+    { key: 'growth', name: 'Uncontrollable Growth', size: 8, kit: GROWTH_KIT,
       palette: { '.': '#3f7a3a', ',': '#346a33', ':': '#5f9a45', ';': '#2a5229', 'k': '#2b5530', 'K': '#1f4026', 'x': '#5b6b4e', 'w': '#4a5940', 'W': '#34412f', 'h': '#8fb86a', 'H': '#1b2a1c', 'd': '#263322', '#': '#0f1d16', '+': '#16301f', '*': '#1d3d29', 'f': '#f4f0d0', 'y': '#f2d35b', 'v': '#8fd14f', 'V': '#c8f07a', 'r': '#6b4e2e', 'p': '#d77fa1', 'm': '#2f6b2a', 'M': '#5ea040', 'b': '#2d5f7a', 'B': '#6fb3c9', 'l': '#7a5a2e', 'L': '#b9792f', 'a': '#c95a5a', 'A': '#f08a7a', 's': '#e8dcc0', 'c': '#9cffd0', 'C': '#3fae8a', 'e': '#5a3d22', 'E': '#8a6236', 'n': '#3a2716', 'g': '#6f7a66', 'G': '#98a28c' },
       tiles: {
         v: { px: ['xvxxwxvx', 'xVvxxvVx', 'wvxwvxvw', 'hvhhvhvh', 'WvWWvWvW', 'WVWWWWvW', 'WvWWWWVW', 'HvHHHHvH'], walk: 0, anchor: 4, w: 1.6, name: 'Vines' },
@@ -345,7 +393,7 @@
          'DADRRRRRDAAAD'],
       ],
     },
-    { key: 'shrines', name: 'Unsealed Shrines', size: 8,
+    { key: 'shrines', name: 'Unsealed Shrines', size: 8, kit: SHRINE_KIT,
       palette: { '.': '#b07a3a', ',': '#9e6c33', ':': '#c48a42', ';': '#7f5428', 'k': '#8c5f2c', 'K': '#6e4a24', 'x': '#b8ae98', 'w': '#9a917d', 'W': '#6f675a', 'h': '#ddd3bc', 'H': '#3e3830', 'd': '#4e473d', '#': '#2a1d14', '+': '#33241a', '*': '#3d2b1f', 'p': '#8a7aa8', 'P': '#6e5a8c', 'g': '#7f9a3f', 's': '#c9c2b0', 'S': '#a39c8a', 'c': '#f0d080', 'v': '#1a1620', 'm': '#8c8476', 'b': '#3a3530', 'o': '#ffb040', 'O': '#fff0a0', 'u': '#a0522d', 'U': '#cd7f4f', 't': '#8f2a2a', 'T': '#c0443a', 'e': '#e8e0c8', 'r': '#d49a52', 'y': '#e0b84a' },
       tiles: {
         a: { px: ['xwxxxwxx', 'xxWWWWxx', 'xWHccHWx', 'hWHcHHWh', 'WWHHHHWW', 'WWWWWWWW', 'WdWWWWWW', 'HHHHHHHH'], walk: 0, anchor: 4, glow: '#ffc457', name: 'Candle alcove' },
@@ -406,7 +454,7 @@
   // ---------- learning from the examples ----------
   function learn(ts, tsIndex) {
     const size = ts.size || 4;
-    const tiles = { ...(size === 8 ? KIT8 : KIT), ...ts.tiles };
+    const tiles = { ...(ts.kit || (size === 8 ? KIT8 : KIT)), ...ts.tiles };
     // a tile with like: 'X' goes wherever X was learned (same contexts, same turning), at a share of X's weight;
     // that is how set dressing is added without drawing new example rooms
     Object.entries(tiles).forEach(([L, t]) => {
@@ -514,7 +562,10 @@
       wall: M.wall.map(([name, face, top]) => ({ name, face: grid(face).join('').split('').map(rgbOf), top: top ? grid(top).join('').split('').map(rgbOf) : null })),
     } : null;
     const fallback = { floor: index.F0, wall: index.E0, rock: index.R0 };
-    return { ...ts, size, tiles, variants, n, K, allow, weight, classMask, fallback, index, exampleIds, unplaced, learned, classesOf, materials, pal };
+    // plain tiles: the structural kit alone (no props, no strict pieces), for cells where two areas blend
+    const kitLetters = ts.kit || (size === 8 ? KIT8 : KIT);
+    const plainMask = mask(variants.map((v, i) => i).filter(i => kitLetters[variants[i].letter] && !variants[i].strict && !tiles[variants[i].letter].like));
+    return { ...ts, size, tiles, variants, n, K, allow, weight, classMask, fallback, index, exampleIds, unplaced, learned, classesOf, materials, pal, plainMask, group: ts.hallOf || ts.key };
   }
 
   // Threshold: the processional halls where one sector opens into the next, the same in every stratum so a
@@ -563,6 +614,17 @@
     bricks: (w, h, mortar, a, b) => (x, y) => { const row = y / h | 0, xx = x + (row % 2) * (w >> 1); return (y % h === h - 1 || xx % w === w - 1) ? mortar : ((xx / w | 0) * 7 + row * 3) % 5 ? a : b; },
     bands: (n, a, b) => (x, y) => ((y / n | 0) % 2) ? a : b,
     blocks: (mortar, a) => (x, y) => (y % 8 === 7 || ((x + (y / 8 | 0) * 4) % 8) === 7) ? mortar : a,
+    // organic: cells of a network (Voronoi edges on a 16x16 torus), wavy roots, bark grooves, spore clusters
+    cells: (edge, a, b) => { const P = [[3, 2], [11, 4], [6, 9], [14, 12], [1, 13], [9, 15]]; return (x, y) => { const ds = P.map(([px, py]) => { const dx = Math.min(Math.abs(x - px), 16 - Math.abs(x - px)), dy = Math.min(Math.abs(y - py), 16 - Math.abs(y - py)); return dx * dx + dy * dy; }).sort((u, v) => u - v); return ds[1] - ds[0] <= 4 ? edge : (ds[0] % 3 ? a : b); }; },
+    waves: (n, line, a, b) => (x, y) => { const w = (y + Math.round(1.6 * Math.sin(x * Math.PI / 8))) & 15; return w % n === 0 ? line : (w / n | 0) % 2 ? a : b; },
+    grain: (line, a, b) => (x, y) => { const w = (x + Math.round(1.2 * Math.sin(y * Math.PI / 8 + x))) & 15; return w % 4 === 0 ? line : w % 4 === 2 ? b : a; },
+    clusters: (dot, a, b) => { const P = [[4, 4], [12, 6], [7, 12], [14, 14]]; return (x, y) => { const d = Math.min(...P.map(([px, py]) => Math.hypot(Math.min(Math.abs(x - px), 16 - Math.abs(x - px)), Math.min(Math.abs(y - py), 16 - Math.abs(y - py))))); return d < 1.5 ? dot : d < 3 ? b : a; }; },
+    // geometric: lozenges, hexagons, a sunburst, a key-pattern frieze, flutes
+    lozenge: (grout, a, b) => (x, y) => { const u = (x + y) & 7, v = (x - y + 16) & 7; return u === 0 || v === 0 ? grout : ((((x + y) >> 3) + ((x - y + 16) >> 3)) & 1) ? a : b; },
+    hexes: (grout, a, b) => (x, y) => { const row = y >> 2, xx = (x + (row & 1) * 2) & 15, yy = y & 3; return yy === 0 || (xx & 3) === 0 && yy !== 2 ? grout : ((xx >> 2) + row) % 3 ? a : b; },
+    sunburst: (line, a, b) => (x, y) => { const ang = Math.atan2(y - 7.5, x - 7.5), d = Math.hypot(x - 7.5, y - 7.5); return d > 7.6 ? line : (Math.round(ang / (Math.PI / 8)) & 1) ? a : b; },
+    meander: (line, a) => (x, y) => { const X = x & 7, Y = y & 7, K = ['########', '#......#', '#.####.#', '#.#..#.#', '#.#.##.#', '#.#....#', '#.######', '#.......']; return K[Y][X] === '#' ? line : a; },
+    flutes: (line, a, b) => (x, y) => x % 4 === 0 ? line : x % 4 === 2 ? b : a,
   };
   const grid = f => Array.from({ length: 16 }, (_, y) => Array.from({ length: 16 }, (_, x) => f(x, y)).join(''));
   const MATERIALS = {
@@ -570,13 +632,15 @@
       floor: [['Star paving', PAT.slabs(8, ';', '.', ':')], ['Concentric tiles', PAT.squares('.', 'm', 'n')], ['Herringbone', PAT.herringbone(';', '.', ',')], ['Chequer', PAT.checker(4, ':', ',')]],
       wall: [['Ashlar', PAT.blocks('d', 'W'), null], ['Coursed', PAT.bricks(4, 2, 'd', 'W', 'n'), PAT.bricks(4, 2, 'w', 'x', 'h')], ['Banded', PAT.bands(1, 'n', 'W'), null]],
     },
+    // the Growth's surfaces grow: networks, roots, strata and spore beds; nothing in them is laid in courses
     growth: {
-      floor: [['Mossy flags', PAT.offsetSlabs(8, 4, 'm', '.', 'M')], ['Old paving', PAT.slabs(4, 'G', 'g', ',')], ['Leaf mould', PAT.checker(2, '.', 'm')], ['Root weave', PAT.herringbone('l', '.', ',')]],
-      wall: [['Ashlar', PAT.blocks('d', 'W'), null], ['Green courses', PAT.bricks(4, 2, 'm', 'W', 'W'), PAT.bricks(4, 2, 'M', 'x', 'w')], ['Banded', PAT.bands(1, 'W', 'd'), null]],
+      floor: [['Mycelium net', PAT.cells('v', '.', ',')], ['Root mat', PAT.waves(3, 'l', '.', ',')], ['Soil strata', PAT.waves(5, ';', ',', ':')], ['Spore bed', PAT.clusters('c', '.', 'm')]],
+      wall: [['Root tangle', PAT.cells('n', 'W', 'W'), PAT.cells('n', 'x', 'w')], ['Bark', PAT.grain('d', 'W', 'W'), PAT.grain('n', 'x', 'w')], ['Earth strata', PAT.waves(3, 'd', 'W', 'W'), null]],
     },
+    // the Shrines' surfaces are set out by masons: lozenges, hexagons, sunbursts, key-pattern friezes, flutes
     shrines: {
-      floor: [['Temple flags', PAT.offsetSlabs(8, 4, ';', 's', 'S')], ['Mosaic', PAT.squares('r', 'y', 'm')], ['Herringbone', PAT.herringbone(';', '.', 'r')], ['Chequer', PAT.checker(4, 's', 'm')]],
-      wall: [['Ashlar', PAT.blocks('d', 'W'), null], ['Coursed', PAT.bricks(4, 2, 'd', 'W', 'm'), PAT.bricks(4, 2, 'w', 'x', 'h')], ['Banded', PAT.bands(2, 'm', 'W'), null]],
+      floor: [['Lozenge mosaic', PAT.lozenge(';', 's', 'S')], ['Hex tiles', PAT.hexes(';', 'r', '.')], ['Sunburst', PAT.sunburst('m', 'y', 'r')], ['Temple flags', PAT.offsetSlabs(8, 4, ';', 's', 'S')]],
+      wall: [['Fluted', PAT.flutes('d', 'W', 'm'), null], ['Key frieze', PAT.meander('d', 'W'), PAT.meander('w', 'x')], ['Coursed', PAT.bricks(4, 2, 'd', 'W', 'm'), PAT.bricks(4, 2, 'w', 'x', 'h')]],
     },
   };
   const SETS = TILESETS.map(learn);
@@ -587,7 +651,7 @@
   // ---------- the dressing WFC ----------
   // pass[i]: 1 floor / 0 wall; setOf[i]: tileset per cell; pins: optional [[cell, letter], ...] tiles that
   // must go in a cell (landmarks), honoured when the tile fits that cell's context. Returns global tile ids.
-  function dress(pass, setOf, W, H, seed, pins) {
+  function dress(pass, setOf, W, H, seed, pins, plain) {
     const N = W * H, KW = KMAX, dom = new Uint32Array(N * KW), rng = mulberry(seed);
     const walk = (x, y) => pass[y * W + x];
     const cls = new Uint16Array(N);
@@ -596,7 +660,11 @@
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const i = y * W + x, c = classAt(walk, W, H, x, y); cls[i] = c;
       const m = SETS[setOf[i]].classMask.get(c);
-      if (m) dom.set(m, i * KW); else setSingle(i, fallbackOf(i));
+      if (m) {
+        dom.set(m, i * KW);
+        // where two areas blend (see blend), only the plain structural kit: no prop is cut in half by the seam
+        if (plain && plain[i]) { const pm = SETS[setOf[i]].plainMask, o = i * KW; let any = 0; for (let w = 0; w < KW; w++) any |= dom[o + w] & pm[w]; if (any) for (let w = 0; w < KW; w++) dom[o + w] &= pm[w]; }
+      } else setSingle(i, fallbackOf(i));
     }
     (pins || []).forEach(([i, L]) => { const t = SETS[setOf[i]].index[L + '0']; if (t !== undefined && (dom[i * KW + (t >> 5)] >>> (t & 31)) & 1) setSingle(i, t); });
     const count = i => { let n = 0; for (let w = 0; w < KW; w++) { let b = dom[i * KW + w]; while (b) { b &= b - 1; n++; } } return n; };
@@ -700,6 +768,113 @@
     }
     return { tiles: out, fallbacks, backtracks, violations, fallbackCells };
   }
+  // ---------- transitions between areas: a WFC over tile corners ----------
+  // Every lattice corner (W+1 by H+1) takes the material of one area: its stratum's kit (halls count as their
+  // stratum). A corner deep inside an area can only be that area; a corner within reach of a boundary may be
+  // either side (the ecotone, about a tile and a half wide). The rule every cell enforces on its four corners:
+  // no saddle (diagonal corners alike but the two diagonals different), so materials meet along continuous
+  // fronts and never in a chequer. Collapse is lowest-entropy first, weighted towards the area the corner sits
+  // in and towards the corners already decided beside it, so fronts meander instead of following the grid.
+  // Cells whose corners disagree are drawn as a blend of the areas (by the renderer) and dressed with the plain
+  // structural kit (by dress). Pinned cells (centrepieces, runners) keep their own area. Only 8x8 tilesets blend.
+  const GROUPS = [...new Set(SETS.map(s => s.group))], GROUP_OF = SETS.map(s => GROUPS.indexOf(s.group)), BLENDS = SETS.map(s => s.size === 8 ? 1 : 0);
+  function blend(setOf, W, H, seed, fixed) {
+    const N = W * H, CW = W + 1, CH = H + 1, NC = CW * CH, rng = mulberry(seed);
+    const isFixed = new Uint8Array(N), gA = new Uint8Array(N), canBlend = new Uint8Array(N), G = GROUPS.length;
+    let first = -1, any = false;
+    for (let i = 0; i < N; i++) {
+      const si = setOf[i]; gA[i] = GROUP_OF[si]; canBlend[i] = BLENDS[si];
+      if (!canBlend[i]) isFixed[i] = 1; else if (first < 0) first = gA[i]; else if (gA[i] !== first) any = true;
+    }
+    if (!any) return null;
+    (fixed || []).forEach(i => { isFixed[i] = 1; });
+    // cells beside a different area, summed over the grid, so a corner far from any boundary is settled at once
+    const sat = new Int32Array((W + 1) * (H + 1));
+    for (let y = 0; y < H; y++) { let row = 0; for (let x = 0; x < W; x++) { const i = y * W + x, e = (x + 1 < W && gA[i + 1] !== gA[i]) || (y + 1 < H && gA[i + W] !== gA[i]) || (x > 0 && gA[i - 1] !== gA[i]) || (y > 0 && gA[i - W] !== gA[i]) ? 1 : 0; row += e; sat[(y + 1) * (W + 1) + x + 1] = sat[y * (W + 1) + x + 1] + row; } }
+    const edgesIn = (x0, y0, x1, y1) => { x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(W, x1); y1 = Math.min(H, y1); if (x1 <= x0 || y1 <= y0) return 0; return sat[y1 * (W + 1) + x1] - sat[y0 * (W + 1) + x1] - sat[y1 * (W + 1) + x0] + sat[y0 * (W + 1) + x0]; };
+    const dom = new Uint16Array(NC), rep = new Int16Array(NC * G).fill(-1), home = new Int8Array(NC);
+    const near = new Float32Array(NC * G); // how many of the corner's four cells are each group
+    for (let cy = 0; cy < CH; cy++) for (let cx = 0; cx < CW; cx++) {
+      const c = cy * CW + cx, o = c * G;
+      if (edgesIn(cx - 2, cy - 2, cx + 2, cy + 2) === 0) { // far from any boundary: its own area, settled
+        const i = Math.min(H - 1, cy) * W + Math.min(W - 1, cx), gI = gA[i]; home[c] = gI; dom[c] = 1 << gI; rep[o + gI] = setOf[i]; continue;
+      }
+      let fixedG = -1, best = -1, bestN = -1;
+      const nearEdge = true;
+      for (let y = cy - 1; y <= cy; y++) for (let x = cx - 1; x <= cx; x++) {
+        if (x < 0 || y < 0 || x >= W || y >= H) continue;
+        const i = y * W + x, gI = gA[i]; near[o + gI]++; if (rep[o + gI] < 0) rep[o + gI] = setOf[i]; if (isFixed[i]) fixedG = gI;
+      }
+      for (let gI = 0; gI < G; gI++) if (near[o + gI] > bestN) { bestN = near[o + gI]; best = gI; }
+      home[c] = fixedG >= 0 ? fixedG : best;
+      if (fixedG >= 0 || !nearEdge) { dom[c] = 1 << home[c]; continue; }
+      let m = 1 << home[c];
+      for (let y = cy - 2; y < cy + 2; y++) for (let x = cx - 2; x < cx + 2; x++) {
+        if (x < 0 || y < 0 || x >= W || y >= H) continue;
+        const i = y * W + x; if (!canBlend[i]) continue;
+        const gI = gA[i]; m |= 1 << gI; if (rep[o + gI] < 0) rep[o + gI] = setOf[i];
+      }
+      dom[c] = m;
+    }
+    const pc = m => { let n = 0; while (m) { m &= m - 1; n++; } return n; };
+    // the corners of cell (x, y): NW, NE, SE, SW
+    const cornersOf = i => { const x = i % W, y = (i / W) | 0, c = y * CW + x; return [c, c + 1, c + CW + 1, c + CW]; };
+    // arc consistency for one cell: drop corner values that can only be completed as a saddle. A value v at a
+    // corner is unsupported only when the opposite corner is forced to v and the other two are forced to one
+    // other value u; so only singleton domains can remove anything.
+    const one = m => m && !(m & (m - 1));
+    const heap = [];
+    const hpush = c => { heap.push([pc(dom[c]) + rng() * 0.5, c]); let k = heap.length - 1; while (k > 0) { const q = (k - 1) >> 1; if (heap[q][0] <= heap[k][0]) break; [heap[q], heap[k]] = [heap[k], heap[q]]; k = q; } };
+    const hpop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
+    function revise(i, out) {
+      const k = cornersOf(i);
+      for (let j = 0; j < 4; j++) {
+        const opp = dom[k[(j + 2) & 3]], s1 = dom[k[(j + 1) & 3]], s2 = dom[k[(j + 3) & 3]];
+        if (!one(opp) || !one(s1) || s1 !== s2 || opp === s1) continue;
+        if (dom[k[j]] & opp && dom[k[j]] !== opp) { dom[k[j]] &= ~opp; out.push(k[j]); }
+      }
+    }
+    const cellsAround = c => { const cx = c % CW, cy = (c / CW) | 0, out = []; for (const [dx, dy] of [[-1, -1], [0, -1], [-1, 0], [0, 0]]) { const x = cx + dx, y = cy + dy; if (x >= 0 && y >= 0 && x < W && y < H) out.push(y * W + x); } return out; };
+    function propagate(queue) {
+      const changed = [];
+      while (queue.length) {
+        const i = queue.pop(); changed.length = 0; revise(i, changed);
+        for (const c of changed) { if (!dom[c]) dom[c] = 1 << home[c]; hpush(c); cellsAround(c).forEach(n => { if (n !== i) queue.push(n); }); }
+      }
+    }
+    const open = []; for (let c = 0; c < NC; c++) if (pc(dom[c]) > 1) open.push(c);
+    if (!open.length) return null;
+    open.forEach(hpush);
+    // collapse: fewest options first (ties at random), each corner weighted to its area and its decided neighbours
+    const wts = new Float64Array(G);
+    while (heap.length) {
+      const [, c] = hpop();
+      if (pc(dom[c]) <= 1) continue;
+      const cx = c % CW, cy = (c / CW) | 0;
+      let sw = 0;
+      for (let v = 0; v < G; v++) {
+        if (!((dom[c] >> v) & 1)) { wts[v] = 0; continue; }
+        let w = 0.35 + 4 * near[c * G + v]; const b = 1 << v;
+        if (cx + 1 < CW && dom[c + 1] === b) w += 3; if (cx > 0 && dom[c - 1] === b) w += 3;
+        if (cy + 1 < CH && dom[c + CW] === b) w += 3; if (cy > 0 && dom[c - CW] === b) w += 3;
+        wts[v] = w; sw += w;
+      }
+      let rr = rng() * sw, pick = home[c];
+      for (let v = 0; v < G; v++) { rr -= wts[v]; if (wts[v] > 0 && rr <= 0) { pick = v; break; } }
+      dom[c] = 1 << pick;
+      propagate(cellsAround(c));
+    }
+    // the result: each corner's area as a tileset (the nearest cell of that area), and which cells are mixed
+    const corners = new Uint8Array(NC), mixed = new Uint8Array(N);
+    for (let c = 0; c < NC; c++) { const v = 31 - Math.clz32(dom[c]); corners[c] = rep[c * G + v] >= 0 ? rep[c * G + v] : setOf[Math.min(N - 1, Math.min(H - 1, (c / CW) | 0) * W + Math.min(W - 1, c % CW))]; }
+    let count = 0;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x, g0 = gA[i], c = y * CW + x;
+      if (GROUP_OF[corners[c]] !== g0 || GROUP_OF[corners[c + 1]] !== g0 || GROUP_OF[corners[c + CW]] !== g0 || GROUP_OF[corners[c + CW + 1]] !== g0) { mixed[i] = 1; count++; }
+    }
+    return count ? { corners, mixed, count } : null;
+  }
+
   function mulberry(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
   // cheap per-cell hash for render-time variety (spin of plain floors, slight brightness jitter)
@@ -731,7 +906,7 @@
     return null;
   }
 
-  const api = { centrepieceAt, DRESS_SETS: SETS, DRESS_TILES: GTILES, DRESS_OFFSET: OFFSET, dress, classAt, rotCls, cellHash, DRESS_TILE_PX: 4 };
+  const api = { centrepieceAt, DRESS_SETS: SETS, DRESS_TILES: GTILES, DRESS_OFFSET: OFFSET, DRESS_GROUP_OF: GROUP_OF, dress, blend, classAt, rotCls, cellHash, DRESS_TILE_PX: 4 };
   if (typeof module !== 'undefined' && module.exports && typeof window === 'undefined' && typeof importScripts === 'undefined') module.exports = api;
   else Object.assign(root, api);
 })(typeof window !== 'undefined' ? window : globalThis);

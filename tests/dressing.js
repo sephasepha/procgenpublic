@@ -59,6 +59,47 @@ const S = { ...W.WORLD_DEFAULTS, seed: 4 };
   check(bad === 0, `sector ${x},${y}: ${bad} dressing tiles disagree with walkability`);
 });
 
+console.log('Distinct kits and transitions');
+{ // each stratum's structural kit is its own drawing, not a recolour: the same letter's shape differs
+  const shape = (key, L) => { const s = D.DRESS_SETS.find(x => x.key === key); const m = new Map(); return s.variants[s.index[L + '0']].px.join('').split('').map(ch => { if (!m.has(ch)) m.set(ch, m.size); return m.get(ch); }).join(','); }; // the drawing's structure, whatever its colours
+  ['F', 'A', 'E', 'P', 'C'].forEach(L => {
+    check(shape('mazes', L) !== shape('growth', L) && shape('growth', L) !== shape('shrines', L) && shape('mazes', L) !== shape('shrines', L), `the strata draw ${L} with different shapes`);
+  });
+  check(shape('growth', 'A') === shape('growthHall', 'A'), 'halls keep their stratum\'s kit');
+}
+{ // a synthetic boundary: the corner WFC grows a front with no saddles, only near the boundary
+  const Wd = 60, Hd = 40, setOf = new Uint8Array(Wd * Hd), ma = D.DRESS_SETS.findIndex(s => s.key === 'mazes'), gr = D.DRESS_SETS.findIndex(s => s.key === 'growth');
+  for (let y = 0; y < Hd; y++) for (let x = 0; x < Wd; x++) setOf[y * Wd + x] = x + 5 * Math.sin(y / 5) > 30 ? gr : ma;
+  const pinned = [5 * Wd + 30, 20 * Wd + 31];
+  const B = D.blend(setOf, Wd, Hd, 7, pinned), CW = Wd + 1, G = D.DRESS_GROUP_OF;
+  check(B && B.count > 0, `the boundary is blended (${B && B.count} cells)`);
+  let saddles = 0, far = 0, wrongSide = 0;
+  for (let y = 0; y < Hd; y++) for (let x = 0; x < Wd; x++) {
+    const c = y * CW + x, k = [B.corners[c], B.corners[c + 1], B.corners[c + CW + 1], B.corners[c + CW]].map(s => G[s]);
+    if (k[0] === k[2] && k[1] === k[3] && k[0] !== k[1]) saddles++;
+    const bx = 30 - 5 * Math.sin(y / 5); if (B.mixed[y * Wd + x] && Math.abs(x + 0.5 - bx) > 4) far++;
+  }
+  check(saddles === 0, `no saddle corners (${saddles})`);
+  check(far === 0, `blending stays within reach of the boundary (${far} far)`);
+  check(pinned.every(i => !B.mixed[i]), 'pinned cells keep their own area');
+  const single = new Uint8Array(Wd * Hd).fill(ma); check(D.blend(single, Wd, Hd, 7, []) === null, 'one area: nothing to blend');
+  // mixed cells are dressed with the plain kit only
+  const pass = new Uint8Array(Wd * Hd); for (let y = 2; y < Hd - 2; y++) for (let x = 2; x < Wd - 2; x++) pass[y * Wd + x] = 1;
+  const d = D.dress(pass, setOf, Wd, Hd, 3, [], B.mixed);
+  let props = 0; for (let i = 0; i < Wd * Hd; i++) if (B.mixed[i]) { const v = D.DRESS_TILES[d.tiles[i]], set = D.DRESS_SETS[v.ts]; if (set.tiles[v.letter].like || v.strict) props++; }
+  check(props === 0, `no props or strict pieces in blended cells (${props})`);
+}
+{ // real sectors: transitions appear where strata meet, and never in a saddle
+  let blended = 0, saddles = 0;
+  for (const [x, y] of [[0, 0], [1, 0], [-1, -1], [2, 1]]) {
+    const s = W.genSector({ ...W.WORLD_DEFAULTS, seed: 4 }, x, y); if (!s.ok || !s.corners) continue;
+    blended += s.dressStats.blended; const CW = 121;
+    for (let i = 0; i < s.pass.length; i++) { const lx = i % 120, ly = (i / 120) | 0, c = ly * CW + lx, k = [s.corners[c], s.corners[c + 1], s.corners[c + CW + 1], s.corners[c + CW]].map(q => D.DRESS_GROUP_OF[q]); if (k[0] === k[2] && k[1] === k[3] && k[0] !== k[1]) saddles++; }
+  }
+  check(blended > 0, `sectors blend where areas meet (${blended} cells)`);
+  check(saddles === 0, `no saddles in sectors (${saddles})`);
+}
+
 console.log(`\n${checks} checks, ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 if (failures) { console.log(`${failures} FAILED`); process.exit(1); }
 console.log('All passed');

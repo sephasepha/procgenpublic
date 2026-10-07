@@ -22,20 +22,34 @@
       const cp = X.rt_alloc(NCLS * KW * 4), hp = X.rt_alloc(NCLS);
       const C = new Uint32Array(mem(), cp, NCLS * KW), Hs = new Uint8Array(mem(), hp, NCLS);
       s.classMask.forEach((m, c) => { Hs[c] = 1; for (let w = 0; w < m.length; w++) C[c * KW + w] = m[w]; });
-      X.ds_set(si, n, D.DRESS_OFFSET[si], s.fallback.floor, s.fallback.wall, s.fallback.rock, wp, ap, cp, hp);
+      const pl = X.rt_alloc(KW * 4); new Uint32Array(mem(), pl, KW).set(Array.from({ length: KW }, (_, w) => s.plainMask[w] || 0));
+      X.ds_set(si, n, D.DRESS_OFFSET[si], s.fallback.floor, s.fallback.wall, s.fallback.rock, wp, ap, cp, hp, pl);
     });
+    // the transition WFC's tables: each tileset's area (group) and whether it blends
+    const gp = X.rt_alloc(SETS.length), bp = X.rt_alloc(SETS.length);
+    new Uint8Array(mem(), gp, SETS.length).set(D.DRESS_GROUP_OF); new Uint8Array(mem(), bp, SETS.length).set(SETS.map(s => s.size === 8 ? 1 : 0));
+    X.bl_init(Math.max(...D.DRESS_GROUP_OF) + 1, gp, bp);
+    function blend(setOf, W, H, seed, fixed) {
+      const N = W * H, NC = (W + 1) * (H + 1), nf = (fixed || []).length;
+      X.rt_reset();
+      const sp = X.rt_scratch(N), fp = X.rt_scratch(nf * 4 + 4), cp = X.rt_scratch(NC), mp = X.rt_scratch(N);
+      new Uint8Array(mem(), sp, N).set(setOf); if (nf) new Int32Array(mem(), fp, nf).set(fixed);
+      const count = X.bl_blend(sp, W, H, seed | 0, fp, nf, cp, mp);
+      if (count <= 0) return null;
+      return { corners: new Uint8Array(mem(), cp, NC).slice(), mixed: new Uint8Array(mem(), mp, N).slice(), count, wasm: true };
+    }
     // core.js's tables are top-level consts: global bindings in a page or worker, not properties of window
     // eslint-disable-next-line no-undef
     const C = isNode ? require('./core.js') : { NC, T, COLS, ROWS, tiles, tSock, tW, STYLES };
-    function dress(pass, setOf, W, H, seed, pins) {
+    function dress(pass, setOf, W, H, seed, pins, plain) {
       const N = W * H;
       pins = (pins || []).map(([i, L]) => [i, SETS[setOf[i]].index[L + '0']]).filter(p => p[1] !== undefined);
       const np = pins.length;
       X.rt_reset();
-      const pp = X.rt_scratch(N), sp = X.rt_scratch(N), pinp = X.rt_scratch(np * 8 + 8), op = X.rt_scratch(N * 2), stp = X.rt_scratch(16);
-      new Uint8Array(mem(), pp, N).set(pass); new Uint8Array(mem(), sp, N).set(setOf);
+      const pp = X.rt_scratch(N), sp = X.rt_scratch(N), pinp = X.rt_scratch(np * 8 + 8), op = X.rt_scratch(N * 2), stp = X.rt_scratch(16), plp = plain ? X.rt_scratch(N) : 0;
+      new Uint8Array(mem(), pp, N).set(pass); new Uint8Array(mem(), sp, N).set(setOf); if (plain) new Uint8Array(mem(), plp, N).set(plain);
       if (np) { const P = new Int32Array(mem(), pinp, np * 2); pins.forEach(([i, t], k) => { P[2 * k] = i; P[2 * k + 1] = t; }); }
-      X.ds_dress(pp, sp, W, H, seed | 0, pinp, np, op, stp);
+      X.ds_dress(pp, sp, W, H, seed | 0, pinp, np, op, stp, plp);
       const tiles = new Uint16Array(mem(), op, N).slice(), st = new Int32Array(mem(), stp, 3);
       return { tiles, fallbacks: st[0], backtracks: st[1], violations: st[2], fallbackCells: [], wasm: true };
     }
@@ -76,7 +90,7 @@
     }
     tables();
     X.rt_mark(); // everything above is permanent; each call's scratch starts here
-    const api = { dress, log: X.rt_log, exports: X };
+    const api = { dress, blend, log: X.rt_log, exports: X };
     root.DRESS_WASM = api;
     root.WFC_WASM = { solve };
     return api;

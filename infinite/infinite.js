@@ -395,6 +395,58 @@
     return k;
   }
 
+  // ---------- transitions: cells the corner WFC (blend, in gen/dressing.js) gave to more than one area ----------
+  // Each pixel takes the area whose corners weigh most at that point (bilinear over the cell's four corners),
+  // drawn with that area's own kit tile for the same structural letter and turn. How the front looks depends on
+  // what is coming in: the Growth creeps in organic lobes, the Shrines and the Threshold in stepped, mason-cut
+  // edges, the Constellation in crisp blocks. The pixel just inside the front is shaded, so one surface reads as
+  // laid over the other. Noise is a function of the world pixel (period 32), so fronts run on across cells.
+  const BLEND_STYLE = { growth: 'organic', shrines: 'stepped', threshold: 'stepped', mazes: 'blocky' };
+  const vnoise = (() => {
+    const h = (x, y) => { let k = Math.imul(x & 7, 0x27d4eb2d) ^ Math.imul(y & 7, 0x165667b1); k ^= k >>> 15; k = Math.imul(k, 0x2c1b3c6d); k ^= k >>> 12; return (k >>> 0) / 4294967296; };
+    return (px, py) => { const x = px / 4, y = py / 4, x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0, sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+      return (h(x0, y0) * (1 - sx) + h(x0 + 1, y0) * sx) * (1 - sy) + (h(x0, y0 + 1) * (1 - sx) + h(x0 + 1, y0 + 1) * sx) * sy; };
+  })();
+  function blendSlot(t, sp, cs, phase) {
+    const key = 'b' + t + ',' + sp + ',' + cs.join(',') + ',' + phase;
+    let k = MAT.map.get(key); if (k !== undefined) return k;
+    if (!MAT.cv) { MAT.cv = document.createElement('canvas'); MAT.cv.width = MAT.cols * SLOT; MAT.cv.height = MAT.rows * SLOT; MAT.g = MAT.cv.getContext('2d'); }
+    if (MAT.next >= MAT.cols * MAT.rows) { MAT.map.clear(); MAT.next = 0; st.layerDirty = true; }
+    k = MAT.next++; MAT.map.set(key, k);
+    const v = DRESS_TILES[t], own = DRESS_GROUP_OF[v.ts], N = v.size || 4;
+    // the same structural piece in each area present
+    const rgbOf = cs.map(sid => {
+      const S = DRESS_SETS[sid]; let id = S.index[v.letter + v.r]; if (id === undefined) id = S.index[v.letter + '0'];
+      if (id === undefined) id = v.walk ? S.fallback.floor : S.fallback.wall;
+      const w = S.variants[id]; return w.spins ? w.spins[sp % w.spins.length] : w.rgb;
+    });
+    const ownRgb = v.spins ? v.spins[sp % v.spins.length] : v.rgb, G = cs.map(sid => DRESS_GROUP_OF[sid]);
+    const intruder = G.find(g2 => g2 !== own), style = BLEND_STYLE[DRESS_SETS[cs[G.indexOf(intruder)]] ? DRESS_SETS[cs[G.indexOf(intruder)]].group : ''] || 'organic';
+    const ox = (phase & 3) * SLOT, oy = (phase >> 2) * SLOT;
+    // which corner's area owns pixel (x, y) of the cell (may be just outside it, for the shading test)
+    const pick = (x, y) => {
+      let u = (x + 0.5) / SLOT, w = (y + 0.5) / SLOT;
+      if (style === 'stepped') { u = (Math.floor(x / 2) * 2 + 1) / SLOT; w = (Math.floor(y / 2) * 2 + 1) / SLOT; }
+      if (style === 'blocky') { u = (Math.floor(x / 4) * 4 + 2) / SLOT; w = (Math.floor(y / 4) * 4 + 2) / SLOT; }
+      u = Math.max(0, Math.min(1, u)); w = Math.max(0, Math.min(1, w));
+      const wt = [(1 - u) * (1 - w), u * (1 - w), u * w, (1 - u) * w], score = new Map();
+      for (let q = 0; q < 4; q++) score.set(G[q], (score.get(G[q]) || 0) + wt[q]);
+      if (style === 'organic') { const nz = vnoise(ox + x, oy + y) - 0.5; score.forEach((sc, g2) => score.set(g2, sc + (g2 === own ? -1 : 1) * nz * 0.55)); }
+      let best = own, bs = -1; score.forEach((sc, g2) => { if (sc > bs + 1e-9 || (Math.abs(sc - bs) < 1e-9 && g2 === own)) { bs = sc; best = g2; } });
+      return best;
+    };
+    const img = MAT.g.createImageData(SLOT, SLOT), d = img.data;
+    for (let y = 0; y < SLOT; y++) for (let x = 0; x < SLOT; x++) {
+      const g2 = pick(x, y), pi = ((y * N / SLOT) | 0) * N + ((x * N / SLOT) | 0);
+      let c = g2 === own ? ownRgb[pi] : rgbOf[G.indexOf(g2)][pi], f = 1;
+      // shade the near side of a front: the incoming surface lies over the other
+      if (g2 !== pick(x - 1, y) || g2 !== pick(x + 1, y) || g2 !== pick(x, y - 1) || g2 !== pick(x, y + 1)) f = g2 === own ? 0.72 : 1.08;
+      const o = (y * SLOT + x) * 4; d[o] = cl(c[0] * f); d[o + 1] = cl(c[1] * f); d[o + 2] = cl(c[2] * f); d[o + 3] = 255;
+    }
+    MAT.g.putImageData(img, (k % MAT.cols) * SLOT, ((k / MAT.cols) | 0) * SLOT);
+    return k;
+  }
+
   // soft round sprites for glows and fog, drawn once
   const sprites = {};
   function glowSprite(hexc) {
@@ -459,7 +511,15 @@
         slot[c] = slotBase[t] + sp * 4 + jt;
         // materials: structured floors and masonry laid per room and district (8x8 tilesets that define them)
         const m = s.mat ? s.mat[i] : 0, tv = DRESS_TILES[t];
-        if (m && st.tiles && DRESS_SETS[tv.ts].materials) {
+        // where two areas meet, the cell is drawn as a blend of both (the corner WFC decided which corners are which)
+        let blended = false;
+        if (s.corners) {
+          const lx = gx - s.ox * 3, ly = gy - s.oy * 3, cc = ly * (SW + 1) + lx, cs = [s.corners[cc], s.corners[cc + 1], s.corners[cc + SW + 2], s.corners[cc + SW + 1]], og = DRESS_GROUP_OF[tv.ts];
+          if (DRESS_GROUP_OF[cs[0]] !== og || DRESS_GROUP_OF[cs[1]] !== og || DRESS_GROUP_OF[cs[2]] !== og || DRESS_GROUP_OF[cs[3]] !== og) {
+            slot[c] = blendSlot(t, slotSpins[t] > 1 ? (hsh & 3) : 0, cs, (gx & 3) | ((gy & 3) << 2)); fromMat[c] = 1; blended = true;
+          }
+        }
+        if (!blended && m && st.tiles && DRESS_SETS[tv.ts].materials) {
           const fm = m & 15, wm = m >> 4, ph = (gx & 1) | ((gy & 1) << 1);
           if (tv.walk && fm) { slot[c] = matSlot(t, slotSpins[t] > 1 ? (hsh & 3) : 0, jt, 'f', fm, ph); fromMat[c] = 1; }
           else if (!tv.walk && wm) { slot[c] = matSlot(t, slotSpins[t] > 1 ? (hsh & 3) : 0, jt, 'w', wm, ph); fromMat[c] = 1; }
