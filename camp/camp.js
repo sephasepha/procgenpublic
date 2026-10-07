@@ -96,11 +96,12 @@
         <div class="cf-head"><b class="cf-state">Empty pit</b><span class="cf-trend" aria-hidden="true"></span></div>
         <div class="cf-meter" role="meter" aria-label="Fire strength" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i class="cf-fill"></i><i class="cf-mark" style="left:30%"></i><i class="cf-mark" style="left:82%"></i></div>
         <div class="cf-scale" aria-hidden="true"><span>Snuffed</span><span>Steady</span><span>Roaring</span></div>
-        <div class="cf-mini"><label>Air</label><div class="cf-bar air" role="meter" aria-label="Air" aria-valuemin="0" aria-valuemax="100"><i></i></div><label>Fuel</label><div class="cf-bar fuel" role="meter" aria-label="Fuel left" aria-valuemin="0" aria-valuemax="100"><i></i></div><span class="cf-time"></span></div>
+        <div class="cf-mini"><label>Air</label><div class="cf-bar air" role="meter" aria-label="Air" aria-valuemin="0" aria-valuemax="100"><i></i><b style="left:45%"></b><b style="left:65%"></b></div><span class="cf-airw"></span><label>Fuel</label><div class="cf-bar fuel" role="meter" aria-label="Fuel left" aria-valuemin="0" aria-valuemax="100"><i></i></div><span class="cf-time"></span></div>
         <div class="cf-signs"><span data-s="flame">Flame</span><span data-s="embers">Embers</span><span data-s="smoke">Smoke</span></div>
         <p class="cf-hint" aria-live="polite"></p>
       </section>
       <div class="cf-ctx" hidden></div>
+      <div class="cf-tip" hidden aria-live="polite"></div>
       <div class="cf-larder" hidden role="group" aria-label="Larder">${LARDER.map(k => btn(k, ING[k].name, 'ing')).join('')}</div>
       <nav class="cf-tray" aria-label="Camp kit">
         <div class="cf-group" role="group" aria-label="Fire">${KIT.map(k => btn(k, NAMES[k])).join('')}</div>
@@ -339,7 +340,11 @@
     fill.style.background = `linear-gradient(90deg, rgb(${Math.round(r * 0.45)},${Math.round(gg * 0.35)},${Math.round(b * 0.3)}), rgb(${r},${gg},${b}))`;
     fill.style.boxShadow = fs.strength > 0.05 ? `0 0 ${Math.round(4 + 14 * fs.strength)}px rgba(${r},${gg},${b},${0.3 + 0.5 * fs.strength})` : 'none';
     const air = G.querySelector('.cf-bar.air'), fuel = G.querySelector('.cf-bar.fuel');
-    air.firstChild.style.width = pct(fs.air) + '%'; air.classList.toggle('low', fs.lit > 0 && fs.air < 0.45); air.setAttribute('aria-valuenow', String(pct(fs.air)));
+    const hot = fs.lit > 0 || fs.state === 'Smouldering', aw = !hot ? 'open' : fs.air < fs.chokeAt ? 'choking' : fs.air < fs.airFull ? 'short' : 'good';
+    air.firstChild.style.width = pct(fs.air) + '%'; air.dataset.w = aw; air.setAttribute('aria-valuenow', String(pct(fs.air))); air.setAttribute('aria-valuetext', aw);
+    G.querySelector('.cf-airw').textContent = { open: '', choking: 'choking', short: 'short', good: 'good' }[aw];
+    G.querySelector('.cf-airw').dataset.w = aw;
+    const bl = el.querySelector('.cf-blow'); bl.classList.toggle('want', !!fs.needsAir); bl.querySelector('span').textContent = fs.needsAir ? 'Blow!' : 'Blow';
     fuel.firstChild.style.width = pct(fs.fuel / 180) + '%'; fuel.classList.toggle('low', fs.lit > 0 && fs.fuel < 25); fuel.setAttribute('aria-valuenow', String(pct(fs.fuel / 180)));
     const t = Math.round(fs.fuel); G.querySelector('.cf-time').textContent = fs.fuel > 0.5 ? (t >= 60 ? `~${Math.floor(t / 60)}m ${String(t % 60).padStart(2, '0')}s` : `~${t}s`) : '';
     G.querySelectorAll('.cf-signs span').forEach(sp => { const v = fs[sp.dataset.s]; sp.style.setProperty('--v', v.toFixed(2)); sp.classList.toggle('on', v > 0.05); });
@@ -454,12 +459,50 @@
     const sv = st.vsel && c.vessels.find(v => v.id === st.vsel);
     if (sv && sv.box) { g.strokeStyle = `rgba(243,211,107,${0.6 + 0.3 * Math.sin(time * 5)})`; g.setLineDash([2, 2]); g.strokeRect(Math.round(sv.box.x) + 0.5, Math.round(sv.box.y) + 0.5, Math.round(sv.box.w), Math.round(sv.box.h)); g.setLineDash([]); }
     // what is in hand: dragged from the tray, or picked up and waiting for a tap
-    const k = drag && drag.from === 'slot' && drag.moved ? drag.key : st.sel, at = drag && drag.from === 'slot' && drag.moved ? drag.p : st.hover;
+    const moving = drag && drag.from === 'piece' && drag.moved ? drag.obj : null;
+    const k = drag && drag.from === 'slot' && drag.moved ? drag.key : moving ? moving.kind : st.sel, at = drag && drag.from === 'slot' && drag.moved ? drag.p : moving ? drag.p : st.hover;
+    // each piece's air, as a ring on the floor around it: shown while you are laying the fire, or when it is short
+    const placing = k && FIRE[k];
+    c.pieces.forEach(q => {
+      if (q.ash || q === moving || !(q.burning || q.out) || q.air === undefined) return;
+      const bad = q.air < fs.chokeAt, short = q.air < fs.airFull;
+      if (!placing && !short) return;
+      ring(q.x, q.z, 0.06, bad ? `rgba(240,90,60,${0.55 + 0.35 * Math.sin(time * 8)})` : short ? 'rgba(240,180,70,0.6)' : 'rgba(127,176,216,0.4)');
+    });
+    let tip = '';
     if (k && at) {
-      g.globalAlpha = 0.9; g.drawImage(sprite(k, artOf(k)), Math.round(at.x - 8), Math.round(at.y - 18), 16, 16); g.globalAlpha = 1;
-      if (k === 'striker' || FIRE[k] || VES[k]) { const f = onFloorAt(at); if (f) { const s = sc(f.z); g.strokeStyle = 'rgba(255,240,200,0.5)'; g.beginPath(); g.ellipse(sx(f.x, f.z), sy(f.z), s * (k === 'striker' ? 0.14 : 0.06), s * (k === 'striker' ? 0.06 : 0.025), 0, 0, 7); g.stroke(); } }
+      if (!moving) { g.globalAlpha = 0.9; g.drawImage(sprite(k, artOf(k)), Math.round(at.x - 8), Math.round(at.y - 18), 16, 16); g.globalAlpha = 1; }
+      const f = onFloorAt(at);
+      if (f && FIRE[k]) { // what laying it here would do: will it catch, is it too far, will it smother the fire
+        const pv = S.preview(moving ? { ...c, pieces: c.pieces.filter(q => q !== moving) } : c, k, f.x, f.z);
+        let col, t;
+        if (!pv.lit) { col = 'rgba(255,240,200,0.6)'; t = k === 'tinder' ? 'Lay it, then strike over it.' : 'Nothing is burning. Lay it close around tinder.'; tip = 'idle'; }
+        else if (pv.smothers.length) { col = 'rgba(240,80,60,0.9)'; t = 'Too close: it will smother the flames.'; tip = 'bad'; pv.smothers.forEach(id => { const q = c.pieces.find(p => p.id === id); if (q) ring(q.x, q.z, 0.05, `rgba(240,80,60,${0.6 + 0.3 * Math.sin(time * 10)})`); }); }
+        else if (!pv.warm) { col = 'rgba(150,150,170,0.7)'; t = 'Too far from the flames to catch.'; tip = 'far'; }
+        else if (!pv.catches) { col = 'rgba(240,180,70,0.8)'; t = 'Warm here, but too far to catch yet.'; tip = 'far'; }
+        else if (pv.air < 0.45) { col = 'rgba(240,80,60,0.9)'; t = 'Packed in too tight: it will choke.'; tip = 'bad'; }
+        else if (pv.air < fs.airFull) { col = 'rgba(240,180,70,0.85)'; t = 'It will catch, but short of air.'; tip = 'ok'; }
+        else { col = 'rgba(140,220,120,0.9)'; t = 'Good spot: it will catch and breathe.'; tip = 'good'; }
+        ring(f.x, f.z, 0.06, col); showTip(t, tip, at);
+      } else if (f && (k === 'striker' || VES[k])) { const s = sc(f.z); g.strokeStyle = 'rgba(255,240,200,0.5)'; g.beginPath(); g.ellipse(sx(f.x, f.z), sy(f.z), s * (k === 'striker' ? 0.14 : 0.06), s * (k === 'striker' ? 0.06 : 0.025), 0, 0, 7); g.stroke(); }
       if (ING[k]) { const h = hitPlaced(at); if (h && h.type === 'vessel') { g.strokeStyle = 'rgba(243,211,107,0.8)'; g.strokeRect(Math.round(h.obj.box.x) + 0.5, Math.round(h.obj.box.y) + 0.5, Math.round(h.obj.box.w), Math.round(h.obj.box.h)); } }
     }
+    if (!tip) showTip('');
+  }
+  // a ring on the floor of radius rad (m) around (x, z)
+  function ring(x, z, rad, col) {
+    const s = sc(z), rx = s * rad, ry = rx * (H_CAM / z) * 0.9;
+    g.strokeStyle = col; g.lineWidth = 1; g.beginPath(); g.ellipse(Math.round(sx(x, z)) + 0.5, Math.round(sy(z)) + 0.5, rx, ry, 0, 0, 7); g.stroke();
+  }
+  // the placement verdict, beside the pointer
+  function showTip(text, kind, at) {
+    const t = el.querySelector('.cf-tip');
+    if (!text) { if (!t.hidden) t.hidden = true; return; }
+    if (t.textContent !== text) t.textContent = text;
+    t.hidden = false; t.dataset.k = kind;
+    const n = el.querySelector('.camp-note'); if (!n.hidden) { n.hidden = true; clearTimeout(noteTimer); } // the verdict says more than the instructions now
+    const r = cv.getBoundingClientRect(), x = r.left + at.x / LW * r.width, y = r.top + at.y / LH * r.height;
+    t.style.left = Math.max(6, Math.min(r.width - 200, x - 95)) + 'px'; t.style.top = Math.max(6, y - 74) + 'px';
   }
   function drawPiece(q, time) {
     const k = FIRE[q.kind], s = sc(q.z), size = (q.kind === 'fuel' ? 0.2 : q.kind === 'kindling' ? 0.15 : 0.08) * s, x = sx(q.x, q.z), y = sy(q.z);

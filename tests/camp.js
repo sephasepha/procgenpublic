@@ -38,6 +38,24 @@ const heap = (cc, t) => { if (t === 60) for (let k = 0; k < 4; k++) S.placePiece
 { const c = camp(bed); S.strike(c, 0, 2); const seen = new Set(); run(c, 240, (cc, t) => { tend(cc, t); if (t % 10 === 0) { const f = S.fireState(cc); seen.add(f.state); check(f.strength >= 0 && f.strength <= 1 && f.air >= 0 && f.air <= 1, 'gauge values stay in range'); } });
   check(seen.has('Burning steady'), `a tended fire reads burning steady at some point (${[...seen].join(', ')})`); }
 
+console.log('Spacing');
+// the same two logs: stacked on the young fire they smother it; laid either side of it they catch and burn
+{ const stacked = camp(bed), spaced = camp(bed); S.strike(stacked, 0, 2); S.strike(spaced, 0, 2);
+  run(stacked, 40, (cc, t) => { if (t === 60) [[-0.035, 1.985], [0.035, 2.005]].forEach(([x, z]) => S.placePiece(cc, 'fuel', x, z)); });
+  run(spaced, 40, (cc, t) => { if (t === 60) [[0.06, 2], [-0.06, 2]].forEach(([x, z]) => S.placePiece(cc, 'fuel', x, z)); });
+  check(!S.burning(stacked), 'two logs stacked on the fire smother it');
+  check(spaced.pieces.filter(p => p.kind === 'fuel' && p.burning).length === 2, 'the same logs laid either side of it catch'); }
+{ const c = camp(c => { S.placePiece(c, 'tinder', 0, 2); S.placePiece(c, 'kindling', 0.2, 2); }); S.strike(c, 0, 2); run(c, 30); check(!c.pieces.find(p => p.kind === 'kindling').burning && c.pieces.find(p => p.kind === 'kindling').m === D.CAMP_FIRE.kindling.mass, 'kindling laid too far from the flame never catches'); }
+{ const loose = camp(bed), tight = camp(c => { S.placePiece(c, 'tinder', 0, 2); [[-0.012, 2], [0.012, 2], [0, 2.012], [0, 1.988]].forEach(([x, z]) => S.placePiece(c, 'kindling', x, z)); });
+  S.strike(loose, 0, 2); S.strike(tight, 0, 2); run(loose, 8); run(tight, 8);
+  check(S.fireState(tight).air < S.fireState(loose).air - 0.08, `kindling packed tight gets less air than laid loose (${S.fireState(tight).air.toFixed(2)} vs ${S.fireState(loose).air.toFixed(2)})`);
+  check(S.fireState(tight).needsAir, 'and the gauge says it wants a breath'); }
+{ const c = camp(bed); S.strike(c, 0, 2); run(c, 6); const a0 = S.fireState(c).air; S.blow(c); S.step(c, 0.1); check(S.fireState(c).air > a0 + 0.05, 'a breath gives the flames air at once'); }
+{ const c = camp(bed); S.strike(c, 0, 2); run(c, 6);
+  check(S.preview(c, 'fuel', 0, 2).smothers.length > 0, 'the preview warns that a log dropped on the flames will smother them');
+  check(S.preview(c, 'kindling', 0.4, 2).catches === false, 'the preview says kindling far from the flames will not catch');
+  const ok = S.preview(c, 'kindling', 0.07, 2); check(ok.catches && !ok.smothers.length, 'and that kindling beside the flames will catch without smothering them'); }
+
 console.log('Cooking');
 function cook(type, dx, items, secs) {
   const c = camp(bed); S.strike(c, 0, 2); let v = null, cookedAt = -1, burntAt = -1;

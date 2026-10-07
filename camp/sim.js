@@ -19,10 +19,14 @@
     reach: 0.07,        // a flame's heat halves at this distance (m)
     sink: 360,          // degrees a kilogram of cold, unlit mass at touching range takes off a piece's target
     sinkReach: 0.03,    // ...falling to half at this distance: a log laid on a flame drains it, one beside it hardly
-    crowdR: 0.085,      // packing radius (m)
-    airFor: 2.0,        // packed mass (kg) at which air is halved
+    crowdR: 0.04,       // air: other material this close (m) takes half its weight's worth of a piece's air...
+    airFor: 0.6,        // ...and this much packed mass (kg) halves it, more steeply beyond: stack things up and they smother
+    demand: 2000,       // flame output (nearby flames included) that halves the air again: a big fire eats its own air
+    airFull: 0.65,      // with at least this much air a piece burns at full vigour; less, it burns weaker
+    airFall: 1.2,       // seconds for a piece's air to run down to what it can get...
+    airRise: 3.5,       // ...and to come back when given room (a breath tops it up at once)
     catchAir: 0.4,      // needs at least this much air to catch
-    outAir: 0.16,       // goes out below this much air
+    outAir: 0.22,       // goes out below this much air
     outAt: 0.62,        // goes out when it cools below this share of its ignition temperature
     vesselReach: 0.12,  // a vessel feels flames to this distance (half-heat)
     ember: 0.6,         // a burnt-out piece glows at this share of its flame...
@@ -73,10 +77,17 @@
   // what a burnt-out piece leaves behind keeps glowing for a while: an ember bed that feeds logs and cooks food
   function output(p) { return p.burning ? FIRE[p.kind].flame * p.vigour : p.ash ? (p.ember || 0) : 0; }
   const breathed = (c, p) => output(p) * (p.ash ? 1 + P.breathEmber * Math.min(1, c.breath || 0) : 1); // embers under a breath
-  function airAt(c, p) {
-    let packed = 0;
-    c.pieces.forEach(q => { if (q.ash) return; const u = near(p, q, P.crowdR); packed += q.m * Math.exp(-u * u); });
-    return 1 / (1 + Math.pow(packed / P.airFor, 3));
+  // the air a piece can get: less the more material is packed close around it (by distance), and less the harder
+  // the flames at and around it are burning. Each piece's air drifts towards this, so it runs down as a fire builds.
+  function airAt(c, p, out) {
+    let packed = 0, eat = 0;
+    c.pieces.forEach((q, j) => {
+      if (q === p) { eat += out[j]; return; }
+      const d = Math.hypot(p.x - q.x, p.z - q.z);
+      if (!q.ash) packed += q.m * g(d, P.crowdR);
+      if (out[j] > 0) eat += out[j] * g(d, P.crowdR * 1.5);
+    });
+    return 1 / (1 + (packed / P.airFor) ** 2 + eat / P.demand);
   }
   const g = (d, r) => 1 / (1 + (d / r) ** 2);
   function stepFire(c, dt) {
@@ -84,8 +95,14 @@
     // a breath: fresh air into the bed, embers flare, a smouldering piece can be coaxed back
     const br = Math.min(1, c.breath || 0);
     c.breath = (c.breath || 0) * Math.exp(-dt / P.breathLife);
-    ps.forEach(p => { p.air = p.ash ? 1 : airAt(c, p); if (br > 0 && !p.ash) p.air += (1 - p.air) * br * P.breathAir; if (p.vigour === undefined) p.vigour = 0; });
     const out = ps.map(p => breathed(c, p));
+    ps.forEach((p, i) => {
+      if (p.vigour === undefined) p.vigour = 0;
+      if (p.ash) { p.air = 1; p.airT = 1; return; }
+      let t = airAt(c, p, out); if (br > 0) t += (1 - t) * br * P.breathAir;
+      p.airT = t; if (p.air === undefined) p.air = t;
+      p.air += (t - p.air) * Math.min(1, dt / (t < p.air ? P.airFall : P.airRise));
+    });
     ps.forEach((p, i) => {
       if (p.ash) { p.T += (AMBIENT - p.T) * Math.min(1, dt * 0.05); p.ember = (p.ember || 0) * Math.exp(-dt * (1 + 2 * br) / P.emberLife[p.kind]); return; }
       const k = FIRE[p.kind];
@@ -105,7 +122,7 @@
       const k = FIRE[p.kind];
       if (!p.burning && p.T >= k.ignite && p.air >= P.catchAir && p.m > 0) { p.burning = true; p.out = false; }
       if (p.burning && (p.T < k.ignite * (k.outAt || P.outAt) || p.air < P.outAir)) { p.burning = false; p.out = true; } // snuffed: it smoulders and smokes
-      p.vigour = p.burning ? p.air * Math.min(1.25, Math.max(0.5, p.T / k.ignite)) : 0;
+      p.vigour = p.burning ? Math.min(1, p.air / P.airFull) * Math.min(1.25, Math.max(0.5, p.T / k.ignite)) : 0;
       p.m -= (p.burning ? k.burn * p.vigour : 0) * dt;
       p.smoke = Math.max(0, p.smoke - dt * 0.4) + (p.T > k.ignite * 0.45 && (!p.burning || p.air < 0.45) ? dt * 0.8 : 0);
       if (p.m <= 0.002) { p.m = 0; p.burning = false; p.ash = true; p.vigour = 0; p.ember = k.flame * P.ember; }
@@ -123,8 +140,22 @@
   // blow on the fire: air for a choking fire, a flare for embers, a second chance for something smouldering. Tiring.
   function blow(c) {
     c.breath = Math.min(P.breathMax, (c.breath || 0) + 0.7);
+    c.pieces.forEach(p => { if (!p.ash && p.air !== undefined) p.air += (1 - p.air) * 0.35; }); // fresh air, at once
     applyStats(c, { exhaustion: 0.5 });
     return c.breath;
+  }
+
+  // what laying a piece at (x, z) would do: how much heat reaches it from the flames there (will it catch, or is it
+  // too far), how much air it would get, and which burning pieces it would crowd into choking
+  function preview(c, kind, x, z) {
+    const k = FIRE[kind]; if (!k) return null;
+    const ps = c.pieces, out = ps.map(p => breathed(c, p)), probe = { x, z, m: k.mass };
+    let heat = AMBIENT; ps.forEach((o, j) => { if (out[j] > 0) heat += out[j] * g(Math.hypot(x - o.x, z - o.z), P.reach); });
+    const air = airAt({ pieces: ps }, probe, out);
+    const withIt = { pieces: [...ps, { x, z, m: k.mass, ash: false }] }, out2 = [...out, 0];
+    const smothers = ps.filter(p => p.burning && airAt(withIt, p, out2) < Math.min(0.4, airAt(c, p, out) - 0.12)).map(p => p.id);
+    const lit = ps.some(p => p.burning);
+    return { heat, ignite: k.ignite, catches: heat >= k.ignite, warm: heat >= k.ignite * 0.6, air, smothers, lit };
   }
 
   // how the fire is doing, for the gauge: strength (0 snuffed .. 1 roaring), air (how freely it breathes),
@@ -136,7 +167,9 @@
     const embers = ps.reduce((a, p) => a + (p.ash ? p.ember || 0 : 0), 0), smoke = ps.reduce((a, p) => a + (p.smoke || 0), 0);
     const flame = lit.reduce((a, p) => a + output(p), 0);
     const hot = [...lit, ...smoulder];
-    const air = hot.length ? hot.reduce((a, p) => a + (p.air === undefined ? 1 : p.air) * p.m, 0) / Math.max(1e-6, hot.reduce((a, p) => a + p.m, 0)) : 1;
+    // the air the flames are getting (weighted by how much each gives), or what something smouldering is getting
+    const wOf = p => p.burning ? output(p) + 1 : p.m, airOf = p => p.air === undefined ? 1 : p.air;
+    const air = hot.length ? hot.reduce((a, p) => a + airOf(p) * wOf(p), 0) / Math.max(1e-6, hot.reduce((a, p) => a + wOf(p), 0)) : 1;
     const inPit = p => !p.ash && Math.hypot(p.x - PIT.x, p.z - PIT.z) < PIT.r * 1.15;
     const fuel = ps.reduce((a, p) => a + (p.burning ? p.m / (FIRE[p.kind].burn * Math.max(0.4, p.vigour)) : inPit(p) ? p.m / (FIRE[p.kind].burn * 0.8) : 0), 0);
     const strength = 1 - Math.exp(-out / 1600);
@@ -149,12 +182,15 @@
       else if (ps.some(p => p.out && !p.ash)) { state = 'Snuffed out'; hint = 'Too much at once smothered it. Clear some off, lay tinder and strike again.'; }
       else if (ps.some(p => !p.ash)) { state = 'Cold'; hint = ps.some(p => p.kind === 'tinder' && !p.ash) ? 'Strike over the tinder.' : 'It needs tinder to catch.'; }
       else { state = 'Empty pit'; hint = 'Lay tinder in the ring, kindling around it.'; }
-    } else if (air < 0.45) { state = 'Choking'; hint = 'Too much on it. Take some off, or blow.'; }
+    } else if (air < 0.45) { state = 'Choking'; hint = 'Packed too tight to breathe. Blow, or pull something away.'; }
+    else if (air < P.airFull) { state = 'Short of air'; hint = 'It wants air. Blow on it, or give it more room.'; }
     else if (strength < 0.3) { state = 'Catching'; hint = 'Feed it kindling, a little at a time.'; }
     else if (fuel < 25) { state = 'Starving'; hint = 'It is burning through. Add fuel soon.'; }
     else if (strength > 0.82) { state = 'Roaring'; hint = 'Hot. Pull food back from the flames.'; }
     else { state = 'Burning steady'; hint = 'Good. Keep it fed.'; }
-    return { strength, out, air, fuel, flame: Math.min(1, flame / 1500), embers: Math.min(1, embers / 400), smoke: Math.min(1, smoke / 2), breath: Math.min(1, c.breath || 0), trend, state, hint, lit: lit.length };
+    // when a breath would help: a lit fire short of air, something smouldering, or embers with something to light
+    const needsAir = (lit.length > 0 && air < P.airFull) || smoulder.length > 0 || (embers > 40 && ps.some(p => !p.ash && !p.burning && p.kind !== 'fuel'));
+    return { needsAir, airFull: P.airFull, chokeAt: 0.45, strength, out, air, fuel, flame: Math.min(1, flame / 1500), embers: Math.min(1, embers / 400), smoke: Math.min(1, smoke / 2), breath: Math.min(1, c.breath || 0), trend, state, hint, lit: lit.length };
   }
 
   // ---------- vessels and cooking ----------
@@ -242,6 +278,6 @@
 
   function step(c, dt) { c.t += dt; stepFire(c, dt); stepVessels(c, dt); stepBody(c, dt); }
 
-  const api = { CAMP_PIT: PIT, CAMP_TUNING: P, createCamp, placePiece, movePiece, removePiece, strike, step, heatAt, fireOutput, burning, placeVessel, moveVessel, addToVessel, removeVessel, judge, eat, forage, applyStats, blow, fireState };
+  const api = { CAMP_PIT: PIT, CAMP_TUNING: P, createCamp, placePiece, movePiece, removePiece, strike, step, heatAt, fireOutput, burning, placeVessel, moveVessel, addToVessel, removeVessel, judge, eat, forage, applyStats, blow, fireState, preview };
   if (isNode) module.exports = api; else root.CampSim = api;
 })(typeof window !== 'undefined' ? window : globalThis);

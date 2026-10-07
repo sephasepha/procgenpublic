@@ -117,14 +117,26 @@ pit, the vessels and the fire; what you use and what you need to know are plain,
 - **The fire itself shows its health.** Flames are taller, denser and whiter the harder it burns, and small, low and
   red when it is weak or starved of air. A choking fire throws thick dark smoke, a warming log thin grey wisps.
   Embers glow and pulse in the bed, and a breath brightens them.
-- **Making and keeping a fire.** Every piece has a temperature and a remaining mass. Its temperature relaxes towards
-  what the flames around it give, plus its own flame if it burns, less what cold mass beside it soaks up. Burning
-  needs air, and packing things together takes it away. So tinder lights kindling laid around it, a log on burning
-  kindling catches, a lone log dies, and heaping on too much at once smothers the fire, which then has to be laid
-  and struck again.
-- **Blowing** (the Blow button, or B or Space) puts air back into the bed, adds heat to anything already warm,
-  makes embers flare (and burn down faster), and can coax a smouldering piece back to flame. It can save a fire
-  that has had too much put on it. Each breath tires you a little.
+- **Making and keeping a fire: spacing matters both ways.** Every piece has a temperature, a remaining mass and
+  its own air.
+  - **Heat falls off with distance.** A flame warms what is a few centimetres away a lot and what is 15 cm away
+    hardly at all, so a piece laid too far from the flames never catches.
+  - **Air falls off with crowding.** Each piece's air depends on how much material is packed close around it,
+    weighted by distance (anything within about 4 cm counts heavily, and the penalty rises steeply as mass piles
+    up), and on how hard the flames at and around it are burning. Air runs down over a second or so as a fire
+    builds and comes back slowly when given room. Below about 65% a piece burns weaker; below about 22% it goes
+    out.
+  - So kindling laid around tinder catches, logs laid either side of a kindling fire catch, and logs stacked on top
+    of the kindling smother it. A cold log laid on a small flame also drains its heat.
+- **While you hold a piece of tinder, kindling or fuel over the floor**, the spot under it shows what would happen
+  there: "good spot", "it will catch, but short of air", "too far from the flames to catch", or "too close: it
+  will smother the flames". Any burning pieces it would choke are ringed in red. Rings around the burning pieces
+  show their air (blue fine, amber short, red choking).
+- **Blowing** (the Blow button, or B or Space) tops up every piece's air at once, adds heat to anything already
+  warm, makes embers flare (and burn down faster), and can coax a smouldering piece back to flame. The button
+  glows and reads **Blow!** when a breath would help: the flames are short of air, something is smouldering, or
+  embers could light something laid on them. The Air bar is marked at "short" and "choking". Each breath tires
+  you a little.
 - **Cooking.** Set a vessel down and add ingredients. A vessel's temperature follows the heat where it stands: right
   over the flames a pan burns its contents in seconds, at the edge it fries them, too far and nothing happens. A pot
   holds at the boil while it has water and scorches once it boils dry. Tap a vessel to open its panel: its
