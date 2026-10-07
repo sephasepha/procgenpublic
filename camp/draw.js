@@ -132,8 +132,9 @@
     const moving = drag && drag.from === 'piece' && drag.moved ? drag.obj : null;
     const k = drag && drag.from === 'slot' && drag.moved ? drag.key : moving ? moving.kind : st.sel, at = drag && drag.from === 'slot' && drag.moved ? drag.p : moving ? drag.p : st.hover;
     // each piece's air, as a ring on the floor around it: shown while you are laying the fire, or when it is short
+    // (only while tending the fire: cooking, the gauge says enough)
     const placing = k && FIRE[k];
-    c.pieces.forEach(q => {
+    if (st.mode === 'fire') c.pieces.forEach(q => {
       if (q.ash || q === moving || !(q.burning || q.out) || q.air === undefined) return;
       const bad = q.air < fs.chokeAt, short = q.air < fs.airFull;
       if (!placing && !short) return;
@@ -157,7 +158,7 @@
       else col = 'rgba(140,220,120,0.9)';                     // a good spot
       ring(g, f.x, f.z, 0.06, col); ring(g, f.x, f.z, 0.075, col);
     } else if (f && (k === 'striker' || VES[k])) { const s = sc(f.z); g.strokeStyle = 'rgba(255,240,200,0.5)'; g.beginPath(); g.ellipse(sx(f.x, f.z), sy(f.z), s * (k === 'striker' ? 0.14 : 0.06), s * (k === 'striker' ? 0.06 : 0.025), 0, 0, 7); g.stroke(); }
-    if (ING[k]) { const h = V.hitPlaced(at); if (h && h.type === 'vessel') { g.strokeStyle = 'rgba(243,211,107,0.8)'; g.strokeRect(Math.round(h.obj.box.x) + 0.5, Math.round(h.obj.box.y) + 0.5, Math.round(h.obj.box.w), Math.round(h.obj.box.h)); } }
+    if (ING[k]) { const h = V.hitVessel(at); if (h) { g.strokeStyle = 'rgba(243,211,107,0.8)'; g.strokeRect(Math.round(h.obj.box.x) + 0.5, Math.round(h.obj.box.y) + 0.5, Math.round(h.obj.box.w), Math.round(h.obj.box.h)); } }
   }
   // a ring on the floor of radius rad (m) around (x, z)
   function ring(g, x, z, rad, col) {

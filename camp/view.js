@@ -64,11 +64,13 @@
   };
   V.TUNNEL = () => ({ x: Math.round(V.LW * 0.5 - 13), y: 2, w: 26, h: 22 }); // the way back, in the wall
 
-  // what is under a point: a vessel (nearest first), else the nearest piece within a finger's reach
-  V.hitPlaced = p => {
+  // what is under a point: a vessel (nearest first), or the nearest piece of the fire within a finger's reach
+  V.hitVessel = p => {
     const vs = V.st.c.vessels.slice().sort((a, b) => a.z - b.z);
     for (const v of vs) if (v.box && V.inBox(p, v.box)) return { type: 'vessel', obj: v };
-    // pieces are small and often close together
+    return null;
+  };
+  V.hitPiece = p => { // pieces are small and often close together
     let best = null, bd = 1e9;
     V.st.c.pieces.forEach(q => { if (!q.box) return; const cx = q.box.x + q.box.w / 2, cy = q.box.y + q.box.h / 2, d = Math.hypot(p.x - cx, p.y - cy), reach = Math.max(8, q.box.w * 0.7); if (d < reach && d < bd) { bd = d; best = q; } });
     return best ? { type: 'piece', obj: best } : null;

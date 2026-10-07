@@ -151,18 +151,25 @@ the pit, the vessels and the fire; what you use and what you need to know are pl
 | `camp/data.js` | Fire supplies, vessels, the 20 ingredients, the dishes, ash and char. |
 | `camp/view.js` | What the screen's parts share (`CampView`): the live state (canvas, size, the camp, what is being dragged), the projection from the floor to the scene, sprites, layout and hit-testing. It reads its thresholds (choking, smouldering, burnt) from the simulation, so what the screen shows always agrees with what happens. |
 | `camp/draw.js` | Painting the scene: the floor, the pit, pieces, vessels, particles, firelight and darkness, hands and charms, and the placement ring for what is in hand. |
-| `camp/panels.js` | The readable UI: the screen's markup, the fire gauge, the vessel panel, the tray and larder counts, and notes. |
+| `camp/panels.js` | The readable UI: the screen's markup, the Fire/Cook modes, the fire gauge, the vessel panel, the tray and larder counts, and notes. |
 | `camp/camp.js` | Opens and closes the screen, runs its loop, and turns input (taps, drags, keys) into actions on the camp. |
 
 `tests/camp.js` tests the rules (over 400 checks); `tests/camp-golden.js` replays a scripted session (fire, coals,
 stews, a pan, a skewer, eating, foraging, ash and char) and compares its state exactly with `tests/camp-golden.json`,
 so a refactor can prove it changed nothing (`node tests/camp-golden.js --record` rewrites it when a change is meant).
 
-- **The tray** along the bottom holds labelled buttons with counts: Tinder, Kindling, Fuel and Strike; a large
-  **Blow** button; the Pot, Pan and Skewer; the **Larder** drawer (all 20 ingredients); and Forage. Tap a button to
-  pick it up (it stays in hand, so you can lay several pieces), then tap the floor or a vessel to use it. Tap it
-  again, or press Esc, to put it down. You can also drag straight from a button into the scene. Drag a piece or an
-  empty vessel back onto the tray to take it back.
+- **Fire or Cook: one at a time.** Tending the fire and cooking are separate modes, switched by the **Fire** and
+  **Cook** tabs at the left of the tray, so neither mode's controls take room from the other:
+  - *Fire*: Tinder, Kindling, Fuel and Strike, the large **Blow** button, the full gauge, and the fire's pieces
+    answer to touch (move them, gather ash and char). Air rings show only here.
+  - *Cook*: the Pot, Pan and Skewer, the **Larder** drawer (all 20 ingredients) and Forage; the dock with the
+    selected vessel and the larder; the gauge cut to its state and strength bar. Only the vessels answer to touch.
+  - Touching a vessel while tending the fire switches to cooking (where a piece and a vessel overlap, the one in
+    front is touched). Switching puts down whatever the other mode had in hand and closes what it had open. The Fire
+    tab pulses while you cook if the fire wants air or fuel. Esc in Cook with nothing in hand goes back to Fire.
+- **Using things.** Tap a tray button to pick it up (it stays in hand, so you can lay several pieces), then tap the
+  floor or a vessel to use it. Tap it again, or press Esc, to put it down. You can also drag straight from a button
+  into the scene. Drag a piece or an empty vessel back onto the tray to take it back.
 - **Arranging the fire.** Press and drag anything already in the pit (or a vessel) to move it, even with an item in
   hand: a press that moves drags, a press that doesn't is a tap. Pieces are picked by the nearest within a finger's
   reach, stay where you took hold of them, lift with a shadow while held, and show the same catch/air/smother ring

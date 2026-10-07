@@ -1,4 +1,5 @@
-// Camp panels: the plain, readable UI around the scene. The fire gauge (strength, air, fuel, signs), the selected
+// Camp panels: the plain, readable UI around the scene. Two modes, never both at once: tending the fire (fire kit,
+// Blow, the full gauge) and cooking (vessels, larder, foraging, the vessel panel, the gauge cut to its strength). The fire gauge (strength, air, fuel, signs), the selected
 // vessel's panel, the tray of buttons, the larder drawer, and the notes (scraps of paper, the only words in the
 // scene). Builds the screen's markup and keeps it up to date from the camp's state; camp/camp.js wires the input.
 (function (root) {
@@ -21,10 +22,14 @@
       <div class="cf-larder" hidden role="group" aria-label="Larder"><div class="cf-lhead"></div>${V.LARDER.map(k => btn(k, ING[k].name, 'ing')).join('')}<div class="cf-lhead kept">Kept from the fire</div>${Object.keys(RES).map(k => `<div class="cf-btn cf-res" data-r="${k}" title="${RES[k].name}" role="img" aria-label="${RES[k].name}"><canvas width="8" height="8" aria-hidden="true"></canvas><span class="nm">${RES[k].name}</span><span class="ct"></span></div>`).join('')}</div>
       </div>
       <nav class="cf-tray" aria-label="Camp kit">
-        <div class="cf-group" role="group" aria-label="Fire">${V.KIT.map(k => btn(k, V.NAMES[k])).join('')}</div>
-        <button type="button" class="cf-blow" aria-label="Blow on the fire"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h11a3 3 0 1 0-3-3M3 13h15a3 3 0 1 1-3 3M3 17h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Blow</span></button>
-        <div class="cf-group" role="group" aria-label="Vessels">${V.VESK.map(k => btn(k, V.NAMES[k])).join('')}</div>
-        <div class="cf-group" role="group" aria-label="Supplies">
+        <div class="cf-mode" role="tablist" aria-label="Tend the fire or cook">
+          <button type="button" role="tab" data-mode="fire" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c1 4 5 6 5 11a5 5 0 0 1-10 0c0-3 2-4 2-7 2 1 3 3 3 5 1-1 1-3 0-9z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span>Fire</span></button>
+          <button type="button" role="tab" data-mode="cook" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10h18M5 10v6a4 4 0 0 0 4 4h6a4 4 0 0 0 4-4v-6M9 6c0-1 1-1 1-2M14 6c0-1 1-1 1-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Cook</span></button>
+        </div>
+        <div class="cf-group" data-for="fire" role="group" aria-label="Fire">${V.KIT.map(k => btn(k, V.NAMES[k])).join('')}</div>
+        <button type="button" class="cf-blow" data-for="fire" aria-label="Blow on the fire"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h11a3 3 0 1 0-3-3M3 13h15a3 3 0 1 1-3 3M3 17h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Blow</span></button>
+        <div class="cf-group" data-for="cook" role="group" aria-label="Vessels">${V.VESK.map(k => btn(k, V.NAMES[k])).join('')}</div>
+        <div class="cf-group" data-for="cook" role="group" aria-label="Supplies">
           <button type="button" class="cf-btn cf-open" aria-expanded="false" aria-label="Larder: ingredients"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16l-1.5 12h-13zM8 8V6a4 4 0 0 1 8 0v2" fill="none" stroke="currentColor" stroke-width="2"/></svg><span class="nm">Larder</span></button>
           <button type="button" class="cf-btn cf-forage" aria-label="Forage in the sack (tiring)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 10c0-3 3-5 6-5s6 2 6 5l2 9H4zM9 5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span class="nm">Forage</span></button>
         </div>
@@ -101,6 +106,7 @@
     G.querySelector('.cf-airw').textContent = { open: '', choking: 'choking', short: 'short', good: 'good' }[aw];
     G.querySelector('.cf-airw').dataset.w = aw;
     const bl = el.querySelector('.cf-blow'); bl.classList.toggle('want', !!fs.needsAir); bl.querySelector('span').textContent = fs.needsAir ? 'Blow!' : 'Blow';
+    el.querySelector('.cf-mode [data-mode="fire"]').classList.toggle('want', !!fs.needsAir || (fs.lit > 0 && fs.fuel < 25)); // while cooking: the fire wants you
     // fuel left, as a bar and a time
     fuel.firstChild.style.width = pct(fs.fuel / FUEL_FULL) + '%'; fuel.classList.toggle('low', fs.lit > 0 && fs.fuel < 25); fuel.setAttribute('aria-valuenow', String(pct(fs.fuel / FUEL_FULL)));
     const t = Math.round(fs.fuel); G.querySelector('.cf-time').textContent = fs.fuel > 0.5 ? (t >= 60 ? `~${Math.floor(t / 60)}m ${String(t % 60).padStart(2, '0')}s` : `~${t}s`) : '';
@@ -138,5 +144,12 @@
     box.querySelectorAll('li i').forEach((i, n) => { const it = v.items[n]; if (it) { i.style.setProperty('--p', Math.min(1, it.progress).toFixed(3)); i.style.setProperty('--s', Math.min(1, it.scorch / COOK.burnt).toFixed(3)); } });
   }
 
-  root.CampPanels = { markup, paintIcons, pulse, note, charmNote, refresh, larder, larderOpen, gauge, ctx };
+  // show one mode's controls: the tray's groups, the gauge's detail and the dock follow the screen's class
+  function mode(m) {
+    const { el } = V;
+    el.classList.toggle('mode-fire', m === 'fire'); el.classList.toggle('mode-cook', m === 'cook');
+    el.querySelectorAll('.cf-mode [data-mode]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.mode === m)));
+  }
+
+  root.CampPanels = { mode, markup, paintIcons, pulse, note, charmNote, refresh, larder, larderOpen, gauge, ctx };
 })(window);

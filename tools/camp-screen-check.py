@@ -31,8 +31,9 @@ SNAP = """(() => {
   return {
     pixels: cv.toDataURL(), size: [cv.width, cv.height],
     gauge: txt('.cf-gauge'), ctx: txt('.cf-ctx'), note: txt('.camp-note'), larder: txt('.cf-larder'),
-    tray: [...el.querySelectorAll('.cf-tray .cf-btn, .cf-tray .cf-blow')].map(b => b.innerText.replace(/\\s+/g, ' ').trim() + (b.classList.contains('on') ? ' [on]' : '') + (b.classList.contains('want') ? ' [want]' : '')),
+    tray: [...el.querySelectorAll('.cf-tray .cf-btn, .cf-tray .cf-blow')].filter(b => b.checkVisibility()).map(b => b.innerText.replace(/\\s+/g, ' ').trim() + (b.classList.contains('on') ? ' [on]' : '') + (b.classList.contains('want') ? ' [want]' : '')),
     meter: [...el.querySelectorAll('.cf-fill, .cf-bar i')].map(e => e.style.width),
+    mode: Camp.state().mode,
     stock: (() => { const s = Camp.state().c.stock; return [s.ash, s.char, s.lanternEye, s.hymnGrub]; })(),
   };
 })()"""
@@ -65,6 +66,7 @@ def run(page):
     page.click('.cf-blow'); tick(10); snap('blow'); page.click('.cf-blow'); tick(40); snap('blow 2')
     btn('fuel'); page.mouse.move(*at(0, 2)); tick(2); snap('fuel over fire'); page.mouse.move(*at(0.07, 2.0)); tick(2); snap('fuel beside')
     page.mouse.click(*at(0.07, 2.0)); btn('fuel'); tick(2)
+    page.click('.fire-screen .cf-mode [data-mode=cook]'); tick(2); snap('cook mode')
     btn('pot'); page.mouse.click(*at(0.16, 1.88)); tick(2); snap('pot down')
     page.click('.cf-open'); tick(2); snap('larder')
     page.click('.cf-larder .cf-btn[data-k=blackWater]'); page.click('.cf-larder .cf-btn[data-k=lanternEye]'); tick(2); snap('tapped in')
@@ -76,14 +78,16 @@ def run(page):
     page.mouse.click(*at(0.16, 1.9)); tick(2); snap('pot selected')
     page.evaluate("(() => { const c = Camp.state().c; for (let t = 0; t < 900; t++) CampSim.step(c, 0.1); })()"); tick(30); snap('later')
     page.keyboard.press('Escape'); tick(2); snap('escape')
-    page.mouse.click(*at(-0.14, 1.9)); tick(2); page.click('.cf-ctx [data-a=eat]'); tick(2); snap('ate pan')
+    page.click('.fire-screen .cf-mode [data-mode=fire]'); tick(2); snap('fire mode');
+    page.mouse.click(*at(-0.14, 1.9)); tick(2); snap('pan touched from fire'); page.click('.cf-ctx [data-a=eat]'); tick(2); snap('ate pan')
     page.click('.cf-forage'); tick(2); snap('foraged')
     page.mouse.click(*at(0.16, 1.9)); tick(2); page.click('.cf-ctx [data-a=eat]'); tick(2); snap('ate pot')
     page.evaluate("(() => { const c = Camp.state().c; for (let t = 0; t < 4000; t++) CampSim.step(c, 0.1); })()"); tick(30); snap('coals')
     page.evaluate("(() => { const c = Camp.state().c; for (let t = 0; t < 12000; t++) CampSim.step(c, 0.1); })()"); tick(30); snap('cold')
+    page.click('.fire-screen .cf-mode [data-mode=fire]'); tick(2)
     for (x, z) in page.evaluate("Camp.state().c.pieces.filter(p => p.spent).map(p => [p.x, p.z])"): page.mouse.click(at(x, z)[0], at(x, z)[1] - 2); tick(2)
     snap('gathered')
-    page.click('.cf-open'); tick(2); snap('kept')
+    page.click('.fire-screen .cf-mode [data-mode=cook]'); page.click('.cf-open'); tick(2); snap('kept')
     ch = page.evaluate("(() => { const b = Camp.state().L.charms[1], r = document.querySelector('.fire-screen canvas.scene').getBoundingClientRect(), cv = document.querySelector('.fire-screen canvas.scene'); return [r.left + (b.x + 5) * r.width / cv.width, r.top + (b.y + 8) * r.height / cv.height]; })()")
     page.mouse.click(*ch); tick(2); snap('charm')
     return out

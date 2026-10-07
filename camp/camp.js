@@ -2,6 +2,8 @@
 // The scene is the pit, the vessels and the fire; what you can use is a tray of buttons along the bottom (fire kit,
 // a Blow button, vessels, the larder drawer, foraging), and a gauge shows how the fire is doing. Pick a button and
 // tap the floor (or a vessel) to use it, or drag it straight there. Drag a vessel to your hands to eat from it.
+// Tending the fire and cooking are separate modes (the Fire and Cook tabs): the tray, the gauge and what the scene
+// answers to change with the mode. Touching a vessel switches to cooking.
 //
 // This file opens and closes the screen, runs its loop, and turns input into actions on the camp. The rest:
 //   camp/view.js     shared state, projection, sprites, layout, hit-testing
@@ -63,14 +65,14 @@
       const c = S.createCamp(1), saved = load();
       if (saved) { Object.assign(c.stats, saved.stats); Object.assign(c.stock, saved.stock); }
       c.unlimitedFire = true; // prototype: tinder, kindling and fuel never run out
-      V.st = { c, L: null, saveAt: 0, sel: null, vsel: null, hover: null, uiAt: 0, trayAt: 0, flash: 0, sackBox: null };
+      V.st = { c, L: null, mode: 'fire', saveAt: 0, sel: null, vsel: null, hover: null, uiAt: 0, trayAt: 0, flash: 0, sackBox: null };
     }
     return V.st.c;
   }
   function open(leaveFn) {
     ui(); onLeave = leaveFn; ensure();
     V.el.hidden = false; document.documentElement.classList.add('xp-open');
-    size(); UI.refresh();
+    UI.mode(V.st.mode); size(); UI.refresh();
     if (!raf) { last = performance.now(); raf = requestAnimationFrame(loop); }
   }
   function leave(silent) { // silent: another screen is taking over, so don't hand back to the world
@@ -114,6 +116,7 @@
       const r = cv.getBoundingClientRect();
       if (e.clientX >= r.left && e.clientX < r.right && e.clientY >= r.top && e.clientY < r.bottom) use(d.key, V.P(e));
     });
+    el.querySelectorAll('.cf-mode [data-mode]').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
     el.querySelector('.cf-blow').addEventListener('click', blow);
     el.querySelector('.cf-open').addEventListener('click', () => UI.larder());
     el.querySelector('.cf-forage').addEventListener('click', forage);
@@ -125,14 +128,20 @@
     window.addEventListener('keydown', e => {
       if (el.hidden) return;
       const st = V.st;
-      if (e.key === 'Escape') { if (st.sel || st.vsel) { select(null); st.vsel = null; UI.ctx(); } else if (UI.larderOpen()) UI.larder(false); else leave(); }
+      if (e.key === 'Escape') { if (st.sel || st.vsel) { select(null); st.vsel = null; UI.ctx(); } else if (UI.larderOpen()) UI.larder(false); else if (st.mode === 'cook') setMode('fire'); else leave(); }
       if ((e.key === 'b' || e.key === ' ') && !e.repeat && !(e.target && e.target.closest && e.target.closest('button'))) { e.preventDefault(); blow(); }
     });
   }
   const overTray = e => e.clientY >= V.cv.getBoundingClientRect().bottom; // anywhere below the scene: the dock or the tray
   function down(e) {
     e.preventDefault(); V.cv.setPointerCapture?.(e.pointerId);
-    const p = V.P(e), hit = V.hitPlaced(p);
+    const p = V.P(e), st = V.st;
+    // each mode answers to its own things first: tending, the fire's pieces (a vessel touched instead starts
+    // cooking); cooking, only the vessels
+    const vs = V.hitVessel(p), pc = st.mode === 'fire' ? V.hitPiece(p) : null;
+    // where both are under the finger, the one drawn in front (nearer) is the one touched
+    const hit = vs && pc && V.inBox(p, pc.obj.box) && pc.obj.z < vs.obj.z ? pc : vs || pc;
+    if (hit && hit.type === 'vessel' && st.mode === 'fire') setMode('cook');
     if (hit) { // take hold of it where you touched it
       const f = V.toFloor(p.x, p.y + 3);
       V.drag = { from: hit.type, obj: hit.obj, p, start: p, moved: false, gx: f ? hit.obj.x - f.x : 0, gz: f ? hit.obj.z - f.z : 0 };
@@ -168,7 +177,7 @@
       // a vessel or other tool in hand, tapped on a vessel: select that vessel instead
       const tool = !ING[sel] && !FIRE[sel] && sel !== 'striker';
       if (tool && d.from === 'vessel') { st.vsel = d.obj.id; select(null); return; }
-      const hit = V.hitPlaced(p);
+      const hit = V.hitVessel(p);
       if (tool && hit && hit.type === 'vessel') { st.vsel = hit.obj.id; select(null); return; }
       return use(sel, p);
     }
@@ -189,6 +198,14 @@
   }
 
   // ---------- actions ----------
+  // tend the fire, or cook: put down what the other mode had in hand, and close what it had open
+  function setMode(m) {
+    const st = V.st; if (st.mode === m) return;
+    st.mode = m;
+    if (m === 'fire') { st.vsel = null; UI.larder(false); if (st.sel && !FIRE[st.sel] && st.sel !== 'striker') st.sel = null; }
+    else if (st.sel && (FIRE[st.sel] || st.sel === 'striker')) st.sel = null;
+    UI.mode(m); UI.refresh(); UI.ctx();
+  }
   // pick up an item from the tray (or put it down); with a vessel selected, an ingredient goes straight into it
   function select(k) {
     const st = V.st, c = st.c;
@@ -228,7 +245,7 @@
       UI.refresh(); return;
     }
     if (ING[k]) { // an ingredient dropped on a vessel goes in
-      const hit = V.hitPlaced(p); if (!hit || hit.type !== 'vessel') return;
+      const hit = V.hitVessel(p); if (!hit) return;
       const v = hit.obj, why = refusal(v, k);
       if (why) { UI.note(why, p.x, p.y); if (c.stock[k] <= 0) select(null); return; }
       S.addToVessel(c, v.id, k);
