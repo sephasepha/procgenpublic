@@ -146,6 +146,10 @@ pit, the vessels and the fire; what you use and what you need to know are plain,
   pick it up (it stays in hand, so you can lay several pieces), then tap the floor or a vessel to use it. Tap it
   again, or press Esc, to put it down. You can also drag straight from a button into the scene. Drag a piece or an
   empty vessel back onto the tray to take it back.
+- **Arranging the fire.** Press and drag anything already in the pit (or a vessel) to move it, even with an item in
+  hand: a press that moves drags, a press that doesn't is a tap. Pieces are picked by the nearest within a finger's
+  reach, stay where you took hold of them, lift with a shadow while held, and show the same catch/air/smother ring
+  where they are.
 - **The fire gauge** (top right; across the top on a narrow screen) shows how the fire is doing:
   - a strength bar from Snuffed through Steady to Roaring, coloured like the fire (dull red, orange, yellow-white);
   - Air (it turns red and blinks when the fire is smothered) and Fuel, with an estimate of how long it will last;

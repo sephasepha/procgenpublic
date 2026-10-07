@@ -208,9 +208,10 @@
     // nearest first: vessels, then pieces
     const vs = st.c.vessels.slice().sort((a, b) => a.z - b.z);
     for (const v of vs) if (v.box && inBox(p, v.box)) return { type: 'vessel', obj: v };
-    const ps = st.c.pieces.slice().sort((a, b) => a.z - b.z);
-    for (const q of ps) if (q.box && inBox(p, q.box)) return { type: 'piece', obj: q };
-    return null;
+    // pieces: the nearest one within a finger's reach of the point (they are small, and often close together)
+    let best = null, bd = 1e9;
+    st.c.pieces.forEach(q => { if (!q.box) return; const cx = q.box.x + q.box.w / 2, cy = q.box.y + q.box.h / 2, d = Math.hypot(p.x - cx, p.y - cy), reach = Math.max(8, q.box.w * 0.7); if (d < reach && d < bd) { bd = d; best = q; } });
+    return best ? { type: 'piece', obj: best } : null;
   }
   // the item in hand: what a tap on the scene will do
   function select(k) {
@@ -223,7 +224,11 @@
   function down(e) {
     e.preventDefault(); cv.setPointerCapture?.(e.pointerId);
     const p = P(e), hit = hitPlaced(p);
-    if (hit && !(st.sel && ING[st.sel] && hit.type === 'vessel') && !(st.sel && (FIRE[st.sel] || st.sel === 'striker'))) { drag = { from: hit.type, obj: hit.obj, p, start: p, moved: false }; return; }
+    if (hit) { // press and move to rearrange it; a press without moving is a tap (and uses whatever is in hand)
+      const f = toFloor(p.x, p.y + 3);
+      drag = { from: hit.type, obj: hit.obj, p, start: p, moved: false, gx: f ? hit.obj.x - f.x : 0, gz: f ? hit.obj.z - f.z : 0 };
+      return;
+    }
     drag = { from: 'tap', p, start: p, moved: false };
   }
   function moveP(e) {
@@ -231,7 +236,8 @@
     if (!drag || drag.btn) return;
     drag.p = p;
     if (Math.hypot(p.x - drag.start.x, p.y - drag.start.y) > 3) drag.moved = true;
-    if ((drag.from === 'vessel' || drag.from === 'piece') && drag.moved) { const f = toFloor(p.x, p.y + 3); if (f && f.z < 4.5) { drag.obj.x = f.x; drag.obj.z = f.z; } }
+    // the piece stays where you took hold of it, under your finger
+    if ((drag.from === 'vessel' || drag.from === 'piece') && drag.moved) { const f = toFloor(p.x, p.y + 3); if (f && f.z < 4.5) { drag.obj.x = f.x + drag.gx; drag.obj.z = Math.max(1.2, f.z + drag.gz); } }
   }
   const onFloorAt = p => { const f = toFloor(p.x, p.y + 3); return f && f.z < 4.5 && !inBox(p, st.L.hands) ? f : null; };
   // use an item at a point in the scene (a drop from the tray, or a tap with it in hand)
@@ -275,6 +281,7 @@
   }
   function tap(d, p) {
     const L = st.L, c = st.c;
+    if (st.sel && d.from === 'vessel' && !ING[st.sel] && !FIRE[st.sel] && st.sel !== 'striker') { st.vsel = d.obj.id; select(null); return; }
     if (st.sel) {
       const hit = hitPlaced(p);
       if (!(ING[st.sel] || st.sel === 'striker') && hit && hit.type === 'vessel' && !FIRE[st.sel]) { st.vsel = hit.obj.id; select(null); return; }
@@ -468,7 +475,7 @@
     let tip = '';
     if (k && at) {
       if (!moving) { g.globalAlpha = 0.9; g.drawImage(sprite(k, artOf(k)), Math.round(at.x - 8), Math.round(at.y - 18), 16, 16); g.globalAlpha = 1; }
-      const f = onFloorAt(at);
+      const f = moving ? { x: moving.x, z: moving.z } : onFloorAt(at); // a piece being moved is judged where it is
       if (f && FIRE[k]) { // what laying it here would do: will it catch, is it too far, will it smother the fire
         const pv = S.preview(moving ? { ...c, pieces: c.pieces.filter(q => q !== moving) } : c, k, f.x, f.z);
         let col, t;
@@ -508,7 +515,9 @@
     else if (q.out && q.T > k.ignite * 0.45) img = tinted(q.kind, k, '#5a2414', 0.5); // smouldering: dull, dark red
     else { const burnt = 1 - q.m / q.m0; img = burnt > 0.05 ? tinted(q.kind, k, '#14100e', Math.min(0.9, burnt * 1.2 + 0.2)) : sprite(q.kind, k); }
     const w = Math.max(3, Math.round(size)), h = q.ash ? Math.max(2, Math.round(w * 0.35)) : w;
-    g.drawImage(img, Math.round(x - w / 2), Math.round(y - h + 1), w, h);
+    const lifted = drag && drag.from === 'piece' && drag.moved && drag.obj === q;
+    if (lifted) { g.fillStyle = 'rgba(0,0,0,0.35)'; g.beginPath(); g.ellipse(x, y, w * 0.55, Math.max(1, w * 0.18), 0, 0, 7); g.fill(); }
+    g.drawImage(img, Math.round(x - w / 2), Math.round(y - h + 1 - (lifted ? 3 : 0)), w, h);
     const br = Math.min(1, st.c.breath || 0);
     if (q.ash && q.ember > 12) { // an ember bed: a pulsing orange glow that a breath brightens
       const e = Math.min(1, q.ember / 180) * (0.75 + 0.25 * Math.sin(time * 2.3 + q.id * 1.7)) * (1 + 0.8 * br);
