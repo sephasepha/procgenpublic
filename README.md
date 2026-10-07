@@ -150,6 +150,7 @@ pit, the vessels and the fire; what you use and what you need to know are plain,
   hand: a press that moves drags, a press that doesn't is a tap. Pieces are picked by the nearest within a finger's
   reach, stay where you took hold of them, lift with a shadow while held, and show the same catch/air/smother ring
   where they are.
+- **Larder:** a compact grid of icons with counts; the ingredient in hand is named above it.
 - **Layout: nothing sits over the fire.** The screen is bands: a slim fire-status strip across the top, the scene,
   a dock for the larder and the selected vessel (below the scene in portrait, a column beside it in landscape), and
   the tray. Opening the larder or a vessel resizes the scene rather than covering it, and the scene always renders
@@ -190,7 +191,11 @@ pit, the vessels and the fire; what you use and what you need to know are plain,
   you a little.
 - **Cooking.** Set a vessel down and add ingredients. A vessel's temperature follows the heat where it stands: right
   over the flames a pan burns its contents in seconds, at the edge it fries them, too far and nothing happens. A pot
-  holds at the boil while it has water and scorches once it boils dry. Tap a vessel to open its panel: its
+  holds at the boil while it has water and scorches once it boils dry. **A dry pot is a Dutch oven:** it runs hot and
+  scorches what is in it (sooner than a pan). **With water, a stew has to come together:** nothing burns while the water
+  lasts, and once everything in it is cooked, about 25 seconds more at the boil turns it into a stew (the panel shows
+  "stew forming"). Until then the risk is the water boiling away; a finished stew holds its water better. Pot dishes
+  are stews, and any stew is a little kinder to eat than plain boiled food. Tap a vessel to open its panel: its
   temperature, each ingredient's cooking progress (and scorch), the dish it is becoming, and **Eat** and **Put
   away** buttons. Drawing a vessel to your hands also eats from it.
 - **Eating.** Raw food is dangerous, cooked food is barely edible, burnt food hurts. The 20 base ingredients span six

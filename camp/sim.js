@@ -210,20 +210,29 @@
     v.items.push({ id: ing, progress: 0, scorch: 0 });
     return true;
   }
+  // A pot is two vessels. Dry, it is a Dutch oven: it runs hot and scorches what is in it sooner than a pan.
+  // With water it holds at the boil and nothing burns while the water lasts; once everything in it is cooked,
+  // simmering brings it together as a stew (STEW_TIME seconds at the boil). Until then the risk is the water
+  // boiling away; a stew holds its water better.
+  const STEW_TIME = 25;
   function stepVessels(c, dt) {
     c.vessels.forEach(v => {
-      const V = VESSELS[v.type], h = heatAt(c, v.x, v.z);
+      const V = VESSELS[v.type], h = heatAt(c, v.x, v.z), dry = V.boils && !(v.water > 0);
       v.T += (AMBIENT + h * V.gain - v.T) * Math.min(1, dt / V.tau);
-      if (V.boils && v.water > 0 && v.T > 100) { v.water = Math.max(0, v.water - (v.T - 100) * 0.0035 * dt); v.T = 100; } // at a boil: the water goes, not the heat
+      if (V.boils && v.water > 0 && v.T > 100) { v.water = Math.max(0, v.water - (v.T - 100) * 0.0035 * (v.stewed ? 0.5 : 1) * dt); v.T = 100; } // at a boil: the water goes, not the heat
       v.T = Math.max(AMBIENT, v.T);
       const cookRate = Math.max(0, Math.min(1.5, (v.T - 68) / 55));
-      const scorch = Math.max(0, v.T - V.burnAt) / 90;
+      const scorch = Math.max(0, v.T - (dry && V.dryBurnAt ? V.dryBurnAt : V.burnAt)) / 90 * (dry ? 1.6 : 1);
       v.items.forEach(it => {
         const I = ING[it.id];
         it.progress += cookRate / I.cook * dt;
         if (!I.water) it.scorch += scorch * 0.06 * dt;
       });
       v.scorch = v.items.length ? Math.max(...v.items.map(it => it.scorch)) : 0;
+      if (V.boils && v.water > 0 && v.T >= 95 && !v.stewed) {
+        const solids = v.items.filter(it => !ING[it.id].water);
+        if (solids.length && solids.every(it => it.progress >= 1 && it.scorch < 0.35)) { v.stew = Math.min(1, (v.stew || 0) + dt / STEW_TIME); if (v.stew >= 1) v.stewed = true; }
+      }
     });
   }
   // how a vessel's contents stand: raw / underdone / cooked / burnt, and the dish they make if any
@@ -231,7 +240,10 @@
     if (!v.items.length) return { state: 'empty' };
     const minP = Math.min(...v.items.map(it => it.progress)), burnt = v.scorch >= 0.35;
     const ids = v.items.map(it => it.id).sort().join(','), dish = DISHES.find(d => d.vessel === v.type && d.items.slice().sort().join(',') === ids);
-    return { state: burnt ? 'burnt' : minP >= 1 ? 'cooked' : minP >= 0.5 ? 'underdone' : 'raw', dish: dish && !burnt && minP >= 1 ? dish : null, possible: dish || null };
+    const pot = VESSELS[v.type].boils, stew = pot && !!v.stewed && !burnt;
+    // in a pot, a dish is a stew: it has to have come together, not just be cooked
+    const ready = !burnt && minP >= 1 && (!pot || stew);
+    return { state: burnt ? 'burnt' : stew ? 'stew' : minP >= 1 ? 'cooked' : minP >= 0.5 ? 'underdone' : 'raw', dish: dish && ready ? dish : null, possible: dish || null, stew, stewing: pot && !stew ? (v.stew || 0) : 0 };
   }
   // eat everything in a vessel: raw effects fade into cooked effects as it cooks; burnt food hurts
   function eat(c, id) {
@@ -244,8 +256,9 @@
       if (it.scorch >= 0.35) { STATS.forEach(s => { fx[s] *= 0.75; }); fx.health -= 8 * Math.min(2, it.scorch); fx.thirst += 4; }
     });
     if (j.dish) STATS.forEach(s => { fx[s] += j.dish.bonus[s] || 0; });
+    else if (j.stew) { fx.hunger -= 6; fx.thirst -= 8; fx.soul += 2; } // any stew: warm, wet, a little kinder
     applyStats(c, fx);
-    v.items = []; v.water = 0; v.scorch = 0;
+    v.items = []; v.water = 0; v.scorch = 0; v.stew = 0; v.stewed = false;
     c.log.push({ t: c.t, ate: j.dish ? j.dish.name : j.state, fx });
     return { fx, judged: j };
   }

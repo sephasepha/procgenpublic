@@ -103,7 +103,7 @@
       <div class="cf-tip" hidden aria-live="polite"></div>
       <div class="cf-dock">
       <div class="cf-ctx" hidden></div>
-      <div class="cf-larder" hidden role="group" aria-label="Larder">${LARDER.map(k => btn(k, ING[k].name, 'ing')).join('')}</div>
+      <div class="cf-larder" hidden role="group" aria-label="Larder"><div class="cf-lhead"></div>${LARDER.map(k => btn(k, ING[k].name, 'ing')).join('')}</div>
       </div>
       <nav class="cf-tray" aria-label="Camp kit">
         <div class="cf-group" role="group" aria-label="Fire">${KIT.map(k => btn(k, NAMES[k])).join('')}</div>
@@ -333,6 +333,8 @@
       b.title = artOf(k).name + (n !== undefined ? ` (${n} left)` : '') + '. ' + (artOf(k).note || '');
     });
     cv.style.cursor = st.sel ? 'crosshair' : '';
+    // the larder is icons only; the one in hand is named
+    const lh = el.querySelector('.cf-lhead'); if (lh) lh.textContent = st.sel && ING[st.sel] ? `${ING[st.sel].name} · ${c.stock[st.sel]}` : 'Larder';
   }
   const pct = v => Math.round(Math.max(0, Math.min(1, v)) * 100);
   function fireColor(s, air) { // dull red when weak, orange, then yellow-white when roaring; browner when choking
@@ -371,16 +373,19 @@
     box.hidden = false;
     const j = S.judge(v), V = VES[v.type];
     const stateOf = it => it.scorch >= 0.35 ? 'burnt' : it.progress >= 1 ? 'done' : it.progress >= 0.5 ? 'nearly' : it.progress > 0.05 ? 'cooking' : 'raw';
-    const water = v.type === 'pot' ? (v.water > 0.5 ? 'water' : v.water > 0 ? 'water nearly gone' : 'dry') : '';
-    const dish = j.dish ? `<span class="dish">${j.dish.name}</span>` : j.possible ? `<span class="dish maybe">could be ${j.possible.name}</span>` : '';
+    const water = v.type === 'pot' ? (v.water > 0.5 ? 'water' : v.water > 0 ? 'water nearly gone' : v.items.length ? 'dry: scorching' : 'dry') : '';
+    // a pot's stew: forming (once everything in it is cooked), then formed
+    const stewing = j.stewing > 0 ? '<span class="stew"></span>' : '';
+    const dish = j.dish ? `<span class="dish">${j.dish.name}</span>` : j.stew ? '<span class="dish">Stew</span>' : stewing || (j.possible ? `<span class="dish maybe">could be ${j.possible.name}</span>` : '');
     // rebuild only when something you can read changes, so the buttons stay put under your finger
     const key = [v.id, water, dish, ...v.items.map(it => it.id + stateOf(it))].join('|');
     if (box.dataset.key !== key) {
       box.dataset.key = key;
       const items = v.items.map(it => `<li class="${stateOf(it)}"><span>${ING[it.id].name}</span><i></i><em>${stateOf(it)}</em></li>`).join('');
       box.innerHTML = `<div class="hd"><b>${V.name}</b><span class="T"></span>${water ? `<span class="w">${water}</span>` : ''}${dish}</div>${items ? `<ul>${items}</ul>` : `<p>Empty. Open the larder, pick something, and tap the ${V.name.toLowerCase()}.</p>`}
-        <div class="acts"><button type="button" data-a="eat" ${v.items.length ? '' : 'disabled'}>Eat</button><button type="button" data-a="away" ${v.items.length ? 'disabled' : ''}>Put away</button><button type="button" data-a="close" aria-label="Close">✕</button></div>`;
+        <div class="acts"><button type="button" data-a="eat" ${v.items.length ? '' : 'disabled'}>Eat</button><button type="button" data-a="away" ${v.items.length ? 'disabled' : ''} aria-label="Put away">Away</button><button type="button" data-a="close" aria-label="Close">✕</button></div>`;
     }
+    const sf = box.querySelector('.stew'); if (sf) sf.textContent = `stew forming ${Math.round(j.stewing * 100)}%`;
     const T = box.querySelector('.T'); T.textContent = `${Math.round(v.T)}° · ${heatWord(v.T)}`; T.className = 'T ' + (v.T > V.burnAt ? 'hot' : v.T > 68 ? 'warm' : '');
     box.querySelectorAll('li i').forEach((i, n) => { const it = v.items[n]; if (it) { i.style.setProperty('--p', Math.min(1, it.progress).toFixed(3)); i.style.setProperty('--s', Math.min(1, it.scorch / 0.35).toFixed(3)); } });
   }
@@ -550,8 +555,12 @@
     // contents
     const n = v.items.length, iw = Math.max(3, Math.round(w * 0.28));
     if (v.type === 'pot') {
-      if (v.water > 0) { g.fillStyle = v.T >= 99 ? '#2a2a3c' : '#14141e'; g.fillRect(Math.round(x - w * 0.36), Math.round(y - h * 0.86), Math.round(w * 0.72), Math.max(1, Math.round(h * 0.12))); }
-      v.items.filter(it => !ING[it.id].water).forEach((it, k) => g.drawImage(itemSprite(it), Math.round(x - w * 0.3 + k * iw * 0.8 + Math.sin(time * 2 + k) * (v.T >= 99 ? 1 : 0)), Math.round(y - h * 0.98), iw, iw));
+      // the surface: dark water, browning as the stew comes together, then a thick stew; dry, a hot glowing floor
+      const sx0 = Math.round(x - w * 0.36), sy0 = Math.round(y - h * 0.86), sw0 = Math.round(w * 0.72), sh0 = Math.max(1, Math.round(h * 0.14)), k2 = v.stewed ? 1 : (v.stew || 0);
+      if (v.water > 0) { const a = [v.T >= 99 ? 42 : 20, v.T >= 99 ? 42 : 20, v.T >= 99 ? 60 : 30], b = [104, 64, 34]; g.fillStyle = `rgb(${a.map((q, i) => Math.round(q + (b[i] - q) * k2)).join(',')})`; g.fillRect(sx0, sy0, sw0, sh0); }
+      else if (v.items.length && v.T > 110) { g.fillStyle = `rgba(255,${v.T > 140 ? 90 : 140},40,${Math.min(0.6, (v.T - 110) / 80)})`; g.fillRect(sx0, sy0 + sh0 - 1, sw0, 1); }
+      if (v.stewed && v.water > 0) { if (v.T >= 99) { g.fillStyle = '#c08a50'; g.fillRect(Math.round(x - w * 0.15 + Math.sin(time * 3) * w * 0.15), sy0, 1, 1); } }
+      else v.items.filter(it => !ING[it.id].water).forEach((it, k) => g.drawImage(itemSprite(it), Math.round(x - w * 0.3 + k * iw * 0.8 + Math.sin(time * 2 + k) * (v.T >= 99 ? 1 : 0)), Math.round(y - h * 0.98), iw, iw));
     } else if (v.type === 'pan') v.items.forEach((it, k) => g.drawImage(itemSprite(it), Math.round(x - w * 0.36 + k * iw * 0.9), Math.round(y - h * 0.82), iw, iw));
     else v.items.forEach((it, k) => g.drawImage(itemSprite(it), Math.round(x - w * 0.2 + k * iw * 1.1), Math.round(y - h * 0.9), iw, iw));
     v.box = { x: x - w / 2 - 2, y: y - h - iw / 2 - 2, w: w + 4, h: sy(v.z) + 8 - (y - h - iw / 2 - 2) }; // down to the floor it stands on

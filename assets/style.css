@@ -285,7 +285,7 @@ html.has-screens .camp { bottom: var(--navh); }
 .cf-ctx .hd b { font-size: 0.84rem; }
 .cf-ctx .T { font: 0.64rem var(--f-mono, monospace); color: rgba(232,225,210,0.7); } .cf-ctx .T.warm { color: #f0b860; } .cf-ctx .T.hot { color: #f07a5a; }
 .cf-ctx .w { font-size: 0.62rem; color: #8ab8d8; }
-.cf-ctx .dish { color: var(--brass); font-size: 0.68rem; } .cf-ctx .dish.maybe { color: rgba(207,167,78,0.6); font-style: italic; }
+.cf-ctx .dish { color: var(--brass); font-size: 0.68rem; } .cf-ctx .stew { color: #d8a060; font: 0.64rem var(--f-mono, monospace); } .cf-ctx .dish.maybe { color: rgba(207,167,78,0.6); font-style: italic; }
 .cf-ctx ul { grid-column: 1; list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; }
 .cf-ctx li { display: grid; grid-template-columns: auto 40px auto; gap: 5px; align-items: center; }
 .cf-ctx li span { white-space: nowrap; max-width: 92px; overflow: hidden; text-overflow: ellipsis; }
@@ -298,10 +298,13 @@ html.has-screens .camp { bottom: var(--navh); }
 .cf-ctx .acts button[data-a="eat"]:not([disabled]) { border-color: var(--brass); color: var(--brass); background: rgba(207,167,78,0.14); }
 .cf-ctx .acts button[data-a="close"] { min-width: 34px; padding: 0; }
 .cf-ctx .acts button[disabled] { opacity: 0.35; cursor: default; }
-.cf-larder { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 4px; padding: 6px 10px; border-top: 1px solid var(--line); max-height: 34vh; overflow-y: auto; }
+.cf-larder { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 3px; padding: 4px 10px 6px; border-top: 1px solid var(--line); max-height: 26vh; overflow-y: auto; }
+.cf-lhead { grid-column: 1 / -1; font-size: 0.64rem; color: rgba(232,225,210,0.65); letter-spacing: 0.04em; height: 14px; line-height: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cf-larder[hidden], .cf-ctx[hidden] { display: none; }
-.cf-larder .cf-btn { width: auto; height: 46px; }
-.cf-larder .cf-btn .nm { font-size: 0.56rem; max-width: 100%; }
+.cf-larder .cf-btn { width: auto; height: 38px; border-radius: 8px; }
+.cf-larder .cf-btn .nm { display: none; }
+.cf-larder .cf-btn canvas { width: 22px; height: 22px; }
+.cf-larder .cf-btn .ct { font-size: 0.56rem; top: 1px; right: 2px; }
 
 .cf-tray { flex: none; min-height: 58px; box-sizing: border-box; display: flex; flex-wrap: wrap; align-items: center; align-content: center; justify-content: center; gap: 6px 10px; padding: 6px 10px; background: linear-gradient(#0d0c11, #09080c); border-top: 1px solid var(--line); }
 .cf-group { display: flex; gap: 4px; padding: 0 2px; }
@@ -331,12 +334,13 @@ html.has-screens .camp { bottom: var(--navh); }
   .cf-dock:not(:has(> :not([hidden]))) { display: none; }
   .cf-tray { grid-column: 1 / -1; grid-row: 3; }
   .cf-larder { max-height: none; border-top: 1px solid var(--line); }
-  .cf-ctx { grid-template-columns: 1fr; border-top: 0; } .cf-ctx .acts { grid-column: 1; grid-row: auto; } .cf-ctx .acts button { flex: 1; }
+  .cf-ctx { grid-template-columns: 1fr; border-top: 0; padding: 6px 10px; } .cf-ctx .acts { grid-column: 1; grid-row: auto; } .cf-ctx .acts button { flex: 1; height: 30px; }
+  .cf-larder { grid-template-columns: repeat(7, minmax(0, 1fr)); padding: 4px 8px 6px; } .cf-larder .cf-btn { height: 34px; }
 }
 @media (max-height: 420px) {
   .cf-btn { width: 50px; height: 46px; } .cf-blow { height: 46px; } .cf-tray { min-height: 54px; padding: 4px 10px; }
   .cf-gauge { padding-top: 5px; padding-bottom: 5px; gap: 3px 12px; }
-  .cf-larder { max-height: 30vh; } .cf-larder .cf-btn { height: 42px; }
+  .cf-larder { max-height: none; }
 }
 @media (max-width: 560px) {
   .cf-gauge { grid-template-columns: auto 1fr; }
@@ -345,5 +349,5 @@ html.has-screens .camp { bottom: var(--navh); }
   .cf-tray { gap: 6px; padding: 6px; }
   .cf-group { flex-wrap: wrap; justify-content: center; }
   .cf-group + .cf-group, .cf-blow + .cf-group { border-left: 0; padding-left: 2px; }
-  .cf-ctx { grid-template-columns: 1fr; } .cf-ctx .acts { grid-column: 1; grid-row: auto; } .cf-ctx .acts button { flex: 1; }
+  .cf-ctx { padding: 6px 10px; gap: 3px 8px; } .cf-ctx .acts button { height: 30px; min-width: 50px; padding: 0 8px; } .cf-ctx .acts button[data-a="close"] { min-width: 30px; }
 }
