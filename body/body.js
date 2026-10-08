@@ -329,6 +329,13 @@
       g.strokeStyle = '#3a2c20'; g.lineWidth = 1; g.stroke();
     });
     b.afflictions.forEach(a => mark(a, time, c));
+    // an icon on each affected part (side by side when a part has several; the head's eye sits at its mark)
+    const r = Math.max(6, c.k * 4);
+    Object.entries(PARTS).forEach(([k, p]) => {
+      const here = b.afflictions.filter(a => a.part === k); if (!here.length) return;
+      const [x0, y0, x1, y1] = C.bbox(p.shape), cx = c.ox + (x0 + x1) / 2 * c.k, cy = c.oy + (y0 + y1) / 2 * c.k;
+      here.forEach((a, i) => C.drawIcon(g, a, cx + (i - (here.length - 1) / 2) * r * 2.3, cy, r, time, B.active(a)));
+    });
     drawFlash(c);
   }
   // a flash where a tool was used: green for right, red for wrong

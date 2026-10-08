@@ -61,6 +61,31 @@
     }
     g.restore();
   }
+  // ---------- an affliction's icon: a small badge on its part, by kind. (x, y, r) in screen pixels ----------
+  // phase: active = its colour on a dark disc, stage shown by pips; healing = green ring; benign = grey and faint
+  const ICONS = {
+    specks(g, r) { [[0, -.55], [-.5, .3], [.55, .15], [.1, .6]].forEach(([x, y]) => { g.beginPath(); g.arc(x * r, y * r, r * .13, 0, 7); g.fill(); }); g.beginPath(); g.moveTo(0, -.55 * r); g.lineTo(-.5 * r, .3 * r); g.lineTo(.55 * r, .15 * r); g.stroke(); },
+    mouth(g, r) { g.beginPath(); g.ellipse(0, 0, r * .7, r * .4, 0, 0, 7); g.stroke(); g.beginPath(); g.moveTo(-.5 * r, 0); g.quadraticCurveTo(0, r * .3, .5 * r, 0); g.stroke(); },
+    glyph(g, r) { g.beginPath(); g.moveTo(-.55 * r, .5 * r); g.lineTo(0, -.6 * r); g.lineTo(.55 * r, .5 * r); g.moveTo(-.3 * r, .1 * r); g.lineTo(.3 * r, .1 * r); g.stroke(); },
+    eye(g, r) { g.beginPath(); g.moveTo(-.75 * r, 0); g.quadraticCurveTo(0, -.7 * r, .75 * r, 0); g.quadraticCurveTo(0, .7 * r, -.75 * r, 0); g.stroke(); g.beginPath(); g.arc(0, 0, r * .22, 0, 7); g.fill(); },
+    threads(g, r) { g.beginPath(); g.moveTo(0, .65 * r); g.lineTo(0, -.2 * r); g.moveTo(0, .2 * r); g.lineTo(-.45 * r, -.3 * r); g.moveTo(0, 0); g.lineTo(.5 * r, -.45 * r); g.moveTo(0, -.2 * r); g.lineTo(-.15 * r, -.65 * r); g.stroke(); },
+    burrow(g, r) { g.beginPath(); g.moveTo(-.7 * r, .3 * r); g.bezierCurveTo(-.3 * r, -.6 * r, .1 * r, .7 * r, .7 * r, -.3 * r); g.stroke(); g.beginPath(); g.arc(.7 * r, -.3 * r, r * .13, 0, 7); g.fill(); },
+    crack(g, r) { g.beginPath(); g.moveTo(-.2 * r, -.7 * r); g.lineTo(.15 * r, -.2 * r); g.lineTo(-.2 * r, .1 * r); g.lineTo(.2 * r, .7 * r); g.stroke(); },
+    water(g, r) { g.beginPath(); g.moveTo(0, -.7 * r); g.bezierCurveTo(.6 * r, .0, .6 * r, .6 * r, 0, .6 * r); g.bezierCurveTo(-.6 * r, .6 * r, -.6 * r, 0, 0, -.7 * r); g.fill(); },
+    hollow(g, r) { g.beginPath(); g.ellipse(0, 0, r * .6, r * .6, 0, 0, 7); g.stroke(); g.beginPath(); g.ellipse(0, 0, r * .28, r * .28, 0, 0, 7); g.fill(); },
+    fade(g, r) { for (let i = 0; i < 3; i++) { g.globalAlpha *= .8; g.beginPath(); g.moveTo(-.65 * r, (-.4 + i * .4) * r); g.lineTo((.65 - i * .2) * r, (-.4 + i * .4) * r); g.stroke(); } },
+  };
+  function drawIcon(g, a, x, y, r, time, active) {
+    const A = AIL[a.key], healing = a.phase === 'healing', benign = a.phase === 'benign';
+    const col = benign ? '#a89f8a' : healing ? '#8fd29a' : A.mark, pulse = active ? 0.85 + 0.15 * Math.sin(time * 4 + a.id) : 1;
+    g.save(); g.translate(Math.round(x), Math.round(y)); g.globalAlpha = benign ? 0.55 : 1;
+    g.fillStyle = benign ? 'rgba(40,34,28,0.55)' : 'rgba(10,8,14,0.85)'; g.beginPath(); g.arc(0, 0, r * pulse, 0, 7); g.fill();
+    g.strokeStyle = col; g.fillStyle = col; g.lineWidth = Math.max(1, r * .12); g.lineCap = 'round'; g.lineJoin = 'round';
+    g.beginPath(); g.arc(0, 0, r * pulse, 0, 7); g.stroke();
+    g.lineWidth = Math.max(1, r * .14); (ICONS[A.kind] || ICONS.hollow)(g, r * .72);
+    if (active) { g.globalAlpha = 1; for (let i = 0; i <= a.stage; i++) { g.beginPath(); g.arc((i - a.stage / 2) * r * .5, r * 1.35, Math.max(1, r * .14), 0, 7); g.fill(); } }
+    g.restore();
+  }
   // where on the part an affliction's mark centres (chart space), for the X-ray's reticle
   function markCentre(a) {
     const A = AIL[a.key], [x0, y0, x1, y1] = bbox(PARTS[a.part].shape);
@@ -108,5 +133,5 @@
     g.fillStyle = 'rgba(2,12,14,0.9)'; [[47.2, 12.8], [52.8, 12.8]].forEach(([x, y]) => { g.beginPath(); g.ellipse(X(x), Y(y), 1.7 * k, 1.5 * k, 0, 0, 7); g.fill(); });
   }
 
-  root.BodyChart = { inShape, partAt, shapePath, bbox, drawMark, markCentre, drawBones };
+  root.BodyChart = { inShape, partAt, shapePath, bbox, drawMark, drawIcon, markCentre, drawBones };
 })(window);

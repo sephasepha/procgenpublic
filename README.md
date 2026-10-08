@@ -312,6 +312,7 @@ thirst and fatigue.
   minutes, then is gone (`HEAL` in `body/sim.js`). Only active afflictions drain you or count on the Body tab.
 - **Test buttons.** Top right of the Body screen: **Full heal** sets HP and SOUL to 100 and hunger, thirst and
   exhaustion to 0; **+ Wound** rolls a random new affliction.
+- **Icons on the chart.** Each affected part wears a small badge per affliction, drawn by kind (`drawIcon` in `body/chart.js`): its colour with stage pips while active, green while healing, grey and faint when benign.
 - **Twelve tools**: knife, tweezers, cautery, hymnal and blindfold, plus limited spirits, salt, moss, thread, wax,
   splint and gauze (tally notches show how many are left).
 - **The omen bones** roll on the ailment table. **The hourglass** lets five minutes pass for both the body and the camp.
