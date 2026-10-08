@@ -142,7 +142,6 @@
     const vs = V.hitVessel(p), pc = st.mode === 'fire' ? V.hitPiece(p) : null;
     // where both are under the finger, the one drawn in front (nearer) is the one touched
     const hit = vs && pc && V.inBox(p, pc.obj.box) && pc.obj.z < vs.obj.z ? pc : vs || pc;
-    if (hit && hit.type === 'vessel' && st.mode === 'fire') setMode('cook');
     if (hit) { // take hold of it where you touched it
       const f = V.toFloor(p.x, p.y + 3);
       // what has burnt down (embers, coals, ash) stays where it lies: touching it is only ever a tap
@@ -163,7 +162,7 @@
   function up(e) {
     const d = V.drag; if (!d || d.btn) return;
     const p = V.P(e), L = V.st.L, c = V.st.c; V.drag = null;
-    if (!d.moved) return tap(d, p);
+    if (!d.moved) { if (d.from === 'vessel' && V.st.mode === 'fire') setMode('cook'); return tap(d, p); } // touching a vessel (not moving it) starts cooking
     if (d.from === 'piece') { // dropped on the tray: gather what it left, or take it back if it is cold
       if (overTray(e)) { if (hasResidue(d.obj)) gather(d.obj, p); else if (S.removePiece(c, d.obj.id) === false) UI.note('Too hot to pick up.', p.x, p.y, 1400); UI.refresh(); }
       return;
