@@ -6,12 +6,12 @@
 (function (root) {
   // parts on the anatomical chart (chart space 100 x 140, the body seen from the front), and what touches what
   const PARTS = {
-    head: { name: 'Head', adj: ['torso'], shape: { e: [50, 15, 9, 11] } },
-    torso: { name: 'Torso', adj: ['head', 'armL', 'armR', 'legL', 'legR'], shape: { p: [[37, 27], [63, 27], [66, 70], [34, 70]] } },
-    armL: { name: 'Left arm', adj: ['torso'], shape: { p: [[64, 28], [71, 30], [80, 70], [73, 72], [65, 42]] } },
-    armR: { name: 'Right arm', adj: ['torso'], shape: { p: [[36, 28], [29, 30], [20, 70], [27, 72], [35, 42]] } },
-    legL: { name: 'Left leg', adj: ['torso', 'legR'], shape: { p: [[51, 71], [66, 71], [64, 132], [54, 132]] } },
-    legR: { name: 'Right leg', adj: ['torso', 'legL'], shape: { p: [[34, 71], [49, 71], [46, 132], [36, 132]] } },
+    head: { name: 'Head', site: 'head', adj: ['torso'], shape: { e: [50, 15, 9, 11] } },
+    torso: { name: 'Torso', site: 'chest', adj: ['head', 'armL', 'armR', 'legL', 'legR'], shape: { p: [[37, 27], [63, 27], [66, 70], [34, 70]] } },
+    armL: { name: 'Left arm', site: 'left arm', adj: ['torso'], shape: { p: [[64, 28], [71, 30], [80, 70], [73, 72], [65, 42]] } },
+    armR: { name: 'Right arm', site: 'right arm', adj: ['torso'], shape: { p: [[36, 28], [29, 30], [20, 70], [27, 72], [35, 42]] } },
+    legL: { name: 'Left leg', site: 'left leg', adj: ['torso', 'legR'], shape: { p: [[51, 71], [66, 71], [64, 132], [54, 132]] } },
+    legR: { name: 'Right leg', site: 'right leg', adj: ['torso', 'legL'], shape: { p: [[34, 71], [49, 71], [46, 132], [36, 132]] } },
   };
 
   // the surgeon's roll: 8x8 art; uses: how many (Infinity for instruments)
@@ -97,6 +97,20 @@
     ] },
   };
 
-  const api = { BODY_PARTS: PARTS, BODY_TOOLS: TOOLS, BODY_AILMENTS: AILMENTS };
+  // what can happen to you: each cause lists the ailments it may leave, by weight. Where it lands decides which
+  // (a blow breaks a limb's bone but bruises a lung through the chest). The medical history records cause and site.
+  const CAUSES = {
+    blunt: { name: 'Blunt impact', results: { boneChoir: 3, tideLung: 3, fade: 0.4 } },
+    thorns: { name: 'Thorn bite', results: { leech: 1 } },
+    spores: { name: 'Spore cloud', results: { bloom: 2, tideLung: 1 } },
+    starlight: { name: 'Starlight exposure', results: { starRot: 3, gaze: 1 } },
+    ward: { name: 'Ward backlash', results: { glyphBurn: 1 } },
+    whispers: { name: 'Whispering voices', results: { cyst: 1 } },
+    hunger: { name: 'Long hunger', results: { hunger: 2, fade: 1 } },
+    spread: { name: 'Spread', results: {} },
+    unknown: { name: 'Unknown cause', results: {} },
+  };
+
+  const api = { BODY_PARTS: PARTS, BODY_TOOLS: TOOLS, BODY_AILMENTS: AILMENTS, BODY_CAUSES: CAUSES };
   if (typeof module !== 'undefined' && module.exports && typeof window === 'undefined') module.exports = api; else Object.assign(root, api);
 })(typeof window !== 'undefined' ? window : globalThis);

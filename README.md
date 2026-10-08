@@ -313,6 +313,7 @@ thirst and fatigue.
 - **Test buttons.** Top right of the Body screen: **Full heal** sets HP and SOUL to 100 and hunger, thirst and
   exhaustion to 0; **+ Wound** rolls a random new affliction.
 - **Icons on the chart.** Each affected part wears a small badge per affliction, drawn by kind (`drawIcon` in `body/chart.js`): its colour with stage pips while active, green while healing, grey and faint when benign.
+- **Causes and medical history.** Wounds have causes (`BODY_CAUSES`, `BodySim.injure`): a blunt impact breaks a limb's bone or bruises a lung through the chest, a thorn bite leaves a leech burrow, spores a bloom, and so on; where it lands decides which. The **History** button (top right) opens the medical history: one entry per wound, newest first, such as "Blunt impact, chest", with what it was (once you have worked it out), the worst stage it reached, and whether it is untreated, healing, benign or healed (and what it left). Spread wounds read "Spread from left arm, chest". The omen bones and + Wound use `injure`.
 - **Twelve tools**: knife, tweezers, cautery, hymnal and blindfold, plus limited spirits, salt, moss, thread, wax,
   splint and gauze (tally notches show how many are left).
 - **The omen bones** roll on the ailment table. **The hourglass** lets five minutes pass for both the body and the camp.

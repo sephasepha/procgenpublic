@@ -16,16 +16,23 @@
 (function (root) {
   const isNode = typeof module !== 'undefined' && module.exports && typeof window === 'undefined';
   const D = isNode ? require('./data.js') : root;
-  const PARTS = D.BODY_PARTS, TOOLS = D.BODY_TOOLS, AIL = D.BODY_AILMENTS;
+  const PARTS = D.BODY_PARTS, TOOLS = D.BODY_TOOLS, AIL = D.BODY_AILMENTS, CAUSES = D.BODY_CAUSES;
   const clamp = v => Math.max(0, Math.min(100, v));
   const HEAL = { stage: 1.5, benign: 3 }; // minutes: to heal back one stage; as the benign form before it is gone
   const active = a => !a.phase;
 
   function createBody(seed) {
-    return { t: 0, seed: seed || 7, n: 0, nextId: 1, afflictions: [], tools: Object.fromEntries(Object.entries(TOOLS).map(([k, t]) => [k, t.uses === Infinity ? -1 : t.uses])), log: [], known: {}, tried: {} };
+    return { t: 0, seed: seed || 7, n: 0, nextId: 1, afflictions: [], tools: Object.fromEntries(Object.entries(TOOLS).map(([k, t]) => [k, t.uses === Infinity ? -1 : t.uses])), log: [], history: [], known: {}, tried: {} };
   }
   // a body saved before discovery existed: everything is unknown
-  function upgrade(b) { b.known = b.known || {}; b.tried = b.tried || {}; return b; }
+  function upgrade(b) {
+    b.known = b.known || {}; b.tried = b.tried || {}; b.history = b.history || [];
+    b.afflictions.forEach(a => { if (!b.history.some(h => h.id === a.id)) b.history.push({ id: a.id, t: a.born || 0, cause: 'unknown', key: a.key, part: a.part, peak: a.stage, status: a.phase || 'active', end: null }); });
+    return b;
+  }
+  // the medical history: one record per affliction, newest first in chart order; kept after it is gone
+  const record = (b, a) => b.history.find(h => h.id === a.id);
+  const note = (b, a, patch) => { const h = record(b, a); if (h) Object.assign(h, patch); };
   function rnd(b) { // deterministic from the seed and how many rolls have been made
     let h = Math.imul(b.seed ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(++b.n, 0xc2b2ae35); h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12;
     return (h >>> 0) / 4294967296;
@@ -34,7 +41,7 @@
   const has = (b, key, part) => b.afflictions.some(a => a.key === key && a.part === part);
 
   // roll on the ailment table: a new affliction at its first stage, somewhere it can take hold
-  function roll(b, key, part) {
+  function roll(b, key, part, cause, from) {
     const keys = Object.keys(AIL);
     for (let tries = 0; tries < 20; tries++) {
       const k = key || keys[Math.floor(rnd(b) * keys.length)];
@@ -43,7 +50,24 @@
       const p = part && free.includes(part) ? part : free[Math.floor(rnd(b) * free.length)];
       const a = { id: b.nextId++, key: k, part: p, stage: 0, progress: 0, step: 0, born: b.t };
       b.afflictions.push(a); b.log.push({ t: b.t, took: k, part: p });
+      b.history.push({ id: a.id, t: b.t, cause: cause || 'unknown', from: from || null, key: k, part: p, peak: 0, status: 'active', end: null });
       return a;
+    }
+    return null;
+  }
+
+  // something happens to you: a cause (random if not given) leaves an affliction on a part (random if not given, or
+  // another if it cannot take hold there). Returns the affliction, or null when nothing more can.
+  function injure(b, cause, part) {
+    const keys = Object.keys(CAUSES).filter(k => Object.keys(CAUSES[k].results).length);
+    for (let tries = 0; tries < 12; tries++) {
+      const c = cause && CAUSES[cause] && Object.keys(CAUSES[cause].results).length ? cause : keys[Math.floor(rnd(b) * keys.length)];
+      const parts = part ? [part] : Object.keys(PARTS), p = parts[Math.floor(rnd(b) * parts.length)];
+      const opts = Object.entries(CAUSES[c].results).filter(([k, w]) => partsFor(k).includes(p) && !has(b, k, p));
+      if (!opts.length) { if (cause && part) return null; continue; }
+      let r = rnd(b) * opts.reduce((s, o) => s + o[1], 0), pick = opts[0][0];
+      for (const [k, w] of opts) { if ((r -= w) < 0) { pick = k; break; } }
+      return roll(b, pick, p, c);
     }
     return null;
   }
@@ -54,8 +78,8 @@
     if (a.heal < 1) return true;
     a.heal = 0;
     if (a.phase === 'healing' && a.stage > 0) { a.stage--; b.log.push({ t: b.t, mending: a.key, part: a.part, stage: a.stage }); return true; }
-    if (a.phase === 'healing') { a.phase = 'benign'; b.log.push({ t: b.t, benign: a.key, part: a.part }); return true; }
-    b.log.push({ t: b.t, healed: a.key, part: a.part });
+    if (a.phase === 'healing') { a.phase = 'benign'; note(b, a, { status: 'benign' }); b.log.push({ t: b.t, benign: a.key, part: a.part }); return true; }
+    note(b, a, { status: 'healed', end: b.t }); b.log.push({ t: b.t, healed: a.key, part: a.part });
     return false;
   }
 
@@ -70,7 +94,7 @@
       const A = AIL[a.key], st = A.stages[a.stage];
       if (st.minutes > 0) {
         a.progress += m / st.minutes;
-        if (a.progress >= 1 && a.stage < A.stages.length - 1) { a.stage++; a.progress = 0; a.step = 0; b.log.push({ t: b.t, worse: a.key, part: a.part, stage: a.stage }); }
+        if (a.progress >= 1 && a.stage < A.stages.length - 1) { a.stage++; a.progress = 0; a.step = 0; note(b, a, { peak: a.stage }); b.log.push({ t: b.t, worse: a.key, part: a.part, stage: a.stage }); }
       }
       if (stats) Object.entries(st.drain).forEach(([s, v]) => { stats[s] = clamp(stats[s] + v * m); });
       if (st.spread > 0 && rnd(b) < st.spread * m) {
@@ -78,7 +102,7 @@
         if (to.length) born.push({ key: a.key, part: to[Math.floor(rnd(b) * to.length)], from: a.part });
       }
     });
-    born.forEach(n => { const a = roll(b, n.key, n.part); if (a) b.log.push({ t: b.t, spread: n.key, from: n.from, to: n.part }); });
+    born.forEach(n => { const a = roll(b, n.key, n.part, 'spread', n.from); if (a) b.log.push({ t: b.t, spread: n.key, from: n.from, to: n.part }); });
   }
 
   // what you know of an ailment's stage
@@ -108,7 +132,7 @@
     steps[step] = true; b.known[a.key].named = true;
     a.step++;
     if (a.step >= st.treat.length) { // treated: from now on it heals
-      a.phase = 'healing'; a.heal = 0; a.progress = 0;
+      a.phase = 'healing'; a.heal = 0; a.progress = 0; note(b, a, { status: 'healing', treatedAt: b.t });
       b.log.push({ t: b.t, cured: a.key, part, stage: a.stage });
       return { ok: true, cured: true, affliction: a, step, discovered };
     }
@@ -137,6 +161,19 @@
     };
   }
 
-  const api = { HEAL, createBody, upgrade, roll, step, apply, chart, active };
+  // the medical history for reading: newest first, "Blunt impact, chest", what it became and how it stands. An affliction
+  // you have not yet worked out is only "Unknown affliction"; once treated its name is known.
+  function history(b) {
+    upgrade(b);
+    return b.history.slice().reverse().map(h => {
+      const A = AIL[h.key], k = b.known[h.key], named = !!(k && k.named) || h.status !== 'active', C = CAUSES[h.cause] || CAUSES.unknown;
+      const text = h.cause === 'spread' && h.from ? `Spread from ${PARTS[h.from].site}, ${PARTS[h.part].site}` : h.cause === 'unknown' ? `Unknown cause, ${PARTS[h.part].site}` : `${C.name}, ${PARTS[h.part].site}`;
+      const live = b.afflictions.find(a => a.id === h.id);
+      return { id: h.id, t: h.t, text, status: h.status, end: h.end, treatedAt: h.treatedAt || null, peak: h.peak, stages: A.stages.length,
+        name: named ? (h.status === 'benign' ? A.benign.name : A.name) : null, became: named && h.status !== 'active' ? A.benign.name : null, stage: live ? live.stage : null };
+    });
+  }
+
+  const api = { history, HEAL, createBody, upgrade, roll, injure, step, apply, chart, active };
   if (isNode) module.exports = api; else root.BodySim = api;
 })(typeof window !== 'undefined' ? window : globalThis);

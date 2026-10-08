@@ -35,16 +35,18 @@
     el = document.createElement('div'); el.className = 'camp body-screen'; el.hidden = true;
     el.innerHTML = `<canvas aria-label="Treatment: touch an afflicted part to examine it; drag a tool from the roll onto it to use it"></canvas>
       <div class="bx-needs" role="group" aria-label="Your needs">${NEEDS.map(n => `<div class="need ${n.big ? 'big' : 'sm'}" data-s="${n.k}"><b>${n.label}</b><div class="bar" role="meter" aria-label="${n.label}" aria-valuemin="0" aria-valuemax="100"><i></i></div>${n.big ? '<span class="v"></span><span class="dr" aria-hidden="true"></span>' : ''}</div>`).join('')}
-        <div class="bx-dev" role="group" aria-label="Testing"><button type="button" data-dev="heal" title="Restore HP and SOUL to full and clear hunger, thirst and fatigue">Full heal</button><button type="button" data-dev="wound" title="A random wound takes hold">+ Wound</button></div></div>
+        <div class="bx-dev" role="group" aria-label="Medical history and testing"><button type="button" data-dev="history" title="Read your medical history">History</button><button type="button" data-dev="heal" title="Restore HP and SOUL to full and clear hunger, thirst and fatigue">Full heal</button><button type="button" data-dev="wound" title="A random wound takes hold">+ Wound</button></div></div>
       <section class="bx-panel" hidden aria-live="polite"></section>
+      <section class="bx-hist" hidden role="dialog" aria-label="Medical history"></section>
       <div class="camp-note" hidden></div>`;
     document.body.appendChild(el);
     cv = el.querySelector('canvas'); g = cv.getContext('2d');
     cv.addEventListener('pointerdown', down); cv.addEventListener('pointermove', mv); cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', () => { drag = null; });
     el.querySelector('.bx-panel').addEventListener('click', panelClick);
     el.querySelector('.bx-dev').addEventListener('click', devClick);
+    el.querySelector('.bx-hist').addEventListener('click', e => { if (e.target.closest('[data-a="close"]')) history(false); });
     window.addEventListener('resize', () => { if (!el.hidden) size(); });
-    window.addEventListener('keydown', e => { if (el.hidden || e.key !== 'Escape') return; if (st.exam) examine(null); else leave(); });
+    window.addEventListener('keydown', e => { if (el.hidden || e.key !== 'Escape') return; if (!el.querySelector('.bx-hist').hidden) history(false); else if (st.exam) examine(null); else leave(); });
   }
   function size() {
     const r = el.getBoundingClientRect(), aspect = r.width / Math.max(1, r.height);
@@ -169,13 +171,26 @@
   function devClick(e) {
     const btn = e.target.closest('[data-dev]'); if (!btn) return;
     const c = camp();
+    if (btn.dataset.dev === 'history') return history(el.querySelector('.bx-hist').hidden);
     if (btn.dataset.dev === 'heal') {
       if (c) { Object.assign(c.stats, { health: 100, soul: 100, hunger: 0, thirst: 0, exhaustion: 0 }); if (root.Camp) Camp.save(); }
       needs(); btn.classList.remove('done'); void btn.offsetWidth; btn.classList.add('done');
     } else {
-      const a = B.roll(st.b); save();
+      const a = B.injure(st.b); save();
       if (a) examine(a.part, a.id); else note('Nothing more can take hold of you.', LW / 2, LH / 2);
     }
+  }
+  // the medical history: every wound you have had, newest first, "Blunt impact, chest", and how it went
+  const mins = t => { const m = Math.floor(t / 60); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : `${Math.floor(m / 60)} h ${m % 60} min ago`; };
+  function historyHtml() {
+    const rows = B.history(st.b), roman = ['I', 'II', 'III'], esc = x => String(x).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    const how = r => r.status === 'healed' ? `Healed${r.became ? `, leaving ${esc(r.became).toLowerCase()}` : ''}` : r.status === 'benign' ? `Now ${esc(r.name).toLowerCase()}, fading` : r.status === 'healing' ? 'Treated, healing' : `Untreated, stage ${roman[r.stage] || r.stage + 1}`;
+    return `<header><h3>Medical history</h3><button type="button" class="back" data-a="close" aria-label="Close">✕</button></header>
+      ${rows.length ? `<ol>${rows.map(r => `<li class="${r.status}"><b>${esc(r.text)}</b><span class="w">${r.name ? esc(r.name) : 'Unknown affliction'}${r.peak ? ` · worst stage ${roman[r.peak]}` : ''}</span><span class="s">${how(r)}</span><time>${mins(st.b.t - r.t)}</time></li>`).join('')}</ol>` : '<p class="none">Nothing has ever happened to you. Yet.</p>'}`;
+  }
+  function history(open) {
+    const h = el.querySelector('.bx-hist'); h.hidden = !open; if (open) { h.style.top = Math.ceil(el.querySelector('.bx-needs').getBoundingClientRect().bottom - el.getBoundingClientRect().top + 6) + 'px'; h.innerHTML = historyHtml(); st.histAt = performance.now(); }
+    el.querySelector('[data-dev="history"]').setAttribute('aria-pressed', open);
   }
   function panelClick(e) {
     const b = e.target.closest('button'); if (!b) return;
@@ -231,8 +246,8 @@
       return;
     }
     if (inBox(p, st.bones)) {
-      const a = B.roll(b); save();
-      return note(a ? `The bones fall. Something takes your ${PARTS[a.part].name.toLowerCase()}.` : 'The bones fall, and say nothing new.', p.x - 40, p.y + 60, 3500);
+      const a = B.injure(b); save();
+      return note(a ? `The bones fall. ${root.BODY_CAUSES[b.history[b.history.length - 1].cause].name}: your ${PARTS[a.part].site}.` : 'The bones fall, and say nothing new.', p.x - 40, p.y + 60, 3500);
     }
     if (inBox(p, st.glass)) { const cc = camp(); for (let k = 0; k < 300; k++) { B.step(b, 1, cc ? cc.stats : null); advanceCamp(1); } save(); return note('You turn the glass and wait. Time passes; nothing waits with you.', p.x - 60, p.y + 60, 3200); }
     if (inBox(p, st.ear)) return leave();
@@ -271,7 +286,7 @@
     const c = camp();
     B.step(st.b, dt, c ? c.stats : null);
     advanceCamp(dt); // the fire keeps burning while you see to yourself
-    if (t - st.uiAt > 200) { st.uiAt = t; needs(); if (st.exam) { if (examined()) panel(); else examine(st.exam.part); } }
+    if (t - st.uiAt > 200) { st.uiAt = t; needs(); { const h = el.querySelector('.bx-hist'); if (!h.hidden && t - st.histAt > 1000) { st.histAt = t; const y = h.scrollTop; h.innerHTML = historyHtml(); h.scrollTop = y; } } if (st.exam) { if (examined()) panel(); else examine(st.exam.part); } }
     if (t - st.saveAt > 5000) { st.saveAt = t; save(); }
     draw(t / 1000);
   }

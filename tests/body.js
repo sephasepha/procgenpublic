@@ -72,6 +72,29 @@ Object.entries(D.BODY_AILMENTS).forEach(([k, A]) => {
 check(Object.keys(D.BODY_AILMENTS).length >= 10, 'at least ten ailments');
 Object.entries(tools).forEach(([k, t]) => check(t.px.length === 8 && t.px.every(r => r.length === 8) && t.px.join('').split('').every(c => c === '.' || t.pal[c]), `${k}: art is 8x8 in its palette`));
 
+console.log('Causes and medical history');
+{
+  const b = B.createBody(9), a = B.injure(b, 'blunt', 'torso');
+  check(a && a.part === 'torso' && a.key === 'tideLung', 'a blow to the chest bruises the lung');
+  check(B.injure(b, 'blunt', 'armL').key === 'boneChoir', 'a blow to an arm breaks the bone');
+  check(B.injure(b, 'thorns', 'torso') === null, 'a thorn cannot bite where it cannot take hold');
+  let h = B.history(b);
+  check(h.length === 2 && h[0].text === 'Blunt impact, left arm' && h[1].text === 'Blunt impact, chest', 'history reads "Blunt impact, chest", newest first');
+  check(h[0].name === null, 'an affliction not yet worked out is unnamed in the history');
+  check(Object.keys(D.BODY_PARTS).every(k => D.BODY_PARTS[k].site), 'every part has a site name');
+  const r = B.injure(createRandom(), null, null); check(r && B.history(r.__b || createRandom()), 'a random cause works');
+  const c = B.createBody(2), x = B.injure(c, 'blunt', 'armL'), s = stats();
+  for (let t = 0; t < 40 * 60; t++) B.step(c, 1, s);
+  check(B.history(c).find(e => e.id === x.id).peak === 2, 'the history keeps the worst stage reached');
+  check(B.history(c).some(e => e.text.startsWith('Spread from')), 'spread wounds are recorded as spread');
+  const d = B.createBody(4), y = B.roll(d, 'cyst', 'torso', 'whispers'); d.known.cyst = { named: true, stages: {} };
+  y.phase = 'healing'; y.heal = 0; y.stage = 0; for (let t = 0; t < 60 * 20; t++) B.step(d, 1, stats());
+  h = B.history(d); check(!d.afflictions.length && h.length === 1 && h[0].status === 'healed' && h[0].became === 'Quiet Scar', 'a healed wound stays in the history, with what it left');
+  const old = { t: 0, afflictions: [{ id: 1, key: 'fade', part: 'head', stage: 0, progress: 0, step: 0, born: 0 }], log: [], tools: {} };
+  check(B.history(B.upgrade(old))[0].text === 'Unknown cause, head', 'an old save gets history for what it already had');
+}
+function createRandom() { const b = B.createBody(6); B.injure(b); return b; }
+
 console.log(`\n${checks} checks`);
 if (failures) { console.log(`${failures} FAILED`); process.exit(1); }
 console.log('All passed');
