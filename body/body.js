@@ -240,7 +240,12 @@
     if (!drag) return; const d = drag, p = P(e), b = st.b; drag = null;
     if (d.tool && d.moved) return use(d.tool, target(p, e), p);
     if (d.moved) return;
-    if (d.tool) { const T = TOOLS[d.tool], left = b.tools[d.tool]; return note(`${T.name}${left >= 0 ? ` (${left} left)` : ''}. ${T.note}`, p.x, p.y - 20, 3600); }
+    if (d.tool) { // a tap tries the tool, as if dragged: on the wound being examined, else the one most in need (treated furthest, then worst)
+      const T = TOOLS[d.tool], left = b.tools[d.tool], at = p.x, ay = p.y - 20;
+      const a = st.exam && examined() ? examined() : b.afflictions.filter(B.active).sort((x, y) => (y.step > 0) - (x.step > 0) || y.stage - x.stage || x.born - y.born)[0];
+      if (!a) return note(`${T.name}${left >= 0 ? ` (${left} left)` : ''}. Nothing has taken you; there is nothing to try it on.`, at, ay, 3000);
+      return use(d.tool, { part: a.part, id: a.id }, { x: at, y: ay });
+    }
     if (st.exam) { // in the X-ray: another afflicted part shown there is examined in turn
       const t = target(p, e); if (t && t.part !== st.exam.part && b.afflictions.some(a => a.part === t.part)) examine(t.part);
       return;

@@ -296,7 +296,7 @@ thirst and fatigue.
   status beside it: the ailment's name, its stage, how close it is to worsening, its **condition** (what it looks
   like) and its **cure**, step by step, the current step marked. Several afflictions on one part get tabs; touching
   another afflicted part in the X-ray examines it; ◂ or Escape goes back to the chart.
-- **Treat by trying.** Drag a tool onto the X-ray or the panel to use it on that wound (or onto the chart, for the
+- **Treat by trying.** Tap a tool to try it as if dragged (on the wound being examined, else the worst active one), or drag a tool onto the X-ray or the panel to use it on that wound (or onto the chart, for the
   worst on that part). You do not know any treatment at first: an ailment is **???** and each step **?** until you
   find the right tool for it. The right tool does the step and reveals it, and the ailment's name with it; a wrong
   one hurts (health and SOUL) but is not used up, and stays listed, crossed out, beside the step you tried it on.
