@@ -66,6 +66,9 @@
     burntThirst: 4,     // ...and leaves you this much thirstier
     overdoneKeep: 0.85, // overdone food keeps this share of what it does...
     overdoneDish: 0.75, // ...and a dish with anything overdone in it this share of its bonus
+    // what a cooked meal sells for: each ingredient's price, by how well it was cooked (nothing for raw, the most when it is
+    // just done), a dish worth more than its parts (and more for a stronger bonus), a stew by its richness, and what is spoiled worth little
+    worth: { raw: 0.1, underdone: 0.4, done: 1, best: 0.15, overdone: 0.6, burnt: 0.08, scorch: 0.3, dish: 1.5, dishPer: 0.5, stewBase: 0.7, stewPer: 0.3 },
     stewBonus: { hunger: -6, thirst: -8, soul: 2 }, // any stew, scaled by its richness...
     richHealth: 3,      // ...and a rich one mends a little
   };
@@ -190,11 +193,65 @@
       richness: rich ? rich.name : null, quality: rich ? rich.q : 1, waters,
     };
   }
+  // how much a vessel's meal would sell for (coin), with its parts. Only food that is cooked through is worth selling.
+  function worth(v, j) {
+    j = j || judge(v); const W = COOK.worth, parts = [];
+    if (j.state === 'empty') return { value: 0, parts, ready: false, grade: null };
+    let base = 0, sum = 0;
+    v.items.forEach(it => {
+      const I = ING[it.id]; base += I.price;
+      const st = foodState(it), win = texture(it).window;
+      const q = st === 'burnt' ? W.burnt : st === 'overdone' ? W.overdone : st === 'done' ? W.done + W.best * (1 - Math.min(1, (it.progress - 1) / win)) * (1 - it.scorch / COOK.burnt * W.scorch)
+        : st === 'nearly' || st === 'cooking' ? W.underdone * Math.min(1, it.progress) : W.raw * Math.min(1, it.progress);
+      const val = I.price * (I.water ? Math.max(W.done, q) : q); sum += val; parts.push({ id: it.id, state: st, value: val });
+    });
+    let value = sum, kind = 'meal';
+    if (j.dish) { const bonus = Object.values(j.dish.bonus).reduce((a, b) => a + Math.abs(b), 0); value = sum * W.dish + bonus * W.dishPer * (j.overdone ? COOK.overdoneDish : 1); kind = 'dish'; }
+    if (j.stew) { value *= W.stewBase + W.stewPer * j.quality; if (kind === 'meal') kind = 'stew'; }
+    const spoiled = j.state === 'burnt' || v.items.some(it => foodState(it) === 'burnt'); // any one item burnt spoils the meal
+    if (spoiled) value = Math.min(value, base * W.burnt);
+    value = Math.round(value);
+    const ratio = base ? value / base : 0, ready = spoiled || j.state === 'cooked' || j.state === 'overdone' || j.state === 'stew';
+    const grade = spoiled ? 'Spoiled' : !ready ? 'Unfinished' : j.overdone ? 'Dry' : ratio < 1 ? 'Plain' : ratio < 1.6 ? 'Good' : ratio < 2.4 ? 'Fine' : 'Superb';
+    return { value, parts, ready, kind, grade, name: ready ? mealName(v, j, grade) : null, sellable: ready && !spoiled && value > 0 };
+  }
+  // a name for a meal, made from what is in it, the vessel, how it was cooked and how well. The same contents always
+  // get the same name (it comes from a hash of them); a known dish keeps its own name, with a word of quality.
+  const stem = n => (n.includes('-') ? n : n.split(' ').pop());
+  const NAME = {
+    adj: { Spoiled: ['Charred', 'Blackened', 'Ruined'], Dry: ['Dried-out', 'Leathery', 'Over-long'], Plain: ['Plain', 'Humble', 'Simple'], Good: ['Hearty', 'Honest', 'Savoury'], Fine: ['Fine', 'Golden', 'Rich'], Superb: ['Exquisite', 'Pilgrim-King\'s', 'Radiant'] },
+    method: { pot: ['Stewed', 'Simmered', 'Potted'], pan: ['Fried', 'Pan-seared', 'Sizzled'], skewer: ['Spit-roasted', 'Skewered', 'Flame-licked'] },
+    dish: { pot: ['Stew', 'Pottage', 'Broth'], pan: ['Fry', 'Hash', 'Sizzle'], skewer: ['Skewer', 'Spit', 'Brochette'] },
+  };
+  const hash = str => { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+  function mealName(v, j, grade) {
+    const ids = v.items.filter(it => !ING[it.id].water).sort((a, b) => ING[b.id].price - ING[a.id].price).map(it => it.id).filter((id, i, a) => a.indexOf(id) === i);
+    const h = hash(ids.slice().sort().join() + v.type), pick = (a, k) => a[(h >>> (k * 3)) % a.length];
+    const adj = pick(NAME.adj[grade] || NAME.adj.Plain, 1), quality = grade === 'Plain' || grade === 'Unfinished' ? '' : adj + ' ';
+    if (j.dish) return (grade === 'Good' || grade === 'Fine' || grade === 'Superb' || grade === 'Dry' || grade === 'Spoiled' ? quality : '') + j.dish.name;
+    if (!ids.length) return 'Water, boiled';
+    const main = stem(ING[ids[0]].name), second = ids[1] && stem(ING[ids[1]].name), more = ids.length > 2;
+    const kind = j.stew ? (j.richness === 'rich' ? 'Pottage' : j.richness === 'watery' ? 'Gruel' : pick(['Stew', 'Broth'], 2)) : pick(NAME.dish[v.type], 2);
+    const form = h % 3;
+    if (form === 0 || !second) return `${quality}${j.stew ? '' : pick(NAME.method[v.type], 0) + ' '}${main}${j.stew ? ' ' + kind : ''}${second ? ' with ' + second : ''}`;
+    if (form === 1) return `${quality}${main} and ${second}${more ? ' ' + kind : ' ' + kind}`;
+    return `${quality}${main} & ${second} ${kind}`;
+  }
+  // sell a vessel's meal: it is emptied and you are paid
+  function sell(c, id) {
+    const v = c.vessels.find(q => q.id === id); if (!v) return null;
+    const j = judge(v), w = worth(v, j); if (!w.sellable) return null;
+    c.coin = (c.coin || 0) + w.value; c.sold = (c.sold || 0) + 1;
+    v.items = []; v.water = 0; v.scorch = 0; v.stew = 0; v.stewed = false;
+    return { value: w.value, worth: w, judged: j };
+  }
+
   // what eating a vessel's contents does to you: raw effects fade into cooked ones as it cooks, burnt food hurts,
   // and a dish or any stew adds its bonus, worth more the richer it is. Empties the vessel; the camp applies fx.
   function eat(c, id) {
     const v = c.vessels.find(q => q.id === id); if (!v) return null;
     const j = judge(v); if (j.state === 'empty') return null;
+    const name = worth(v, j).name;
     const fx = Object.fromEntries(STATS.map(s => [s, 0]));
     v.items.forEach(it => { // each item on its own: overdone food does a little less, burnt food less and hurts
       const I = ING[it.id], w = Math.max(0, Math.min(1, it.progress)), burnt = it.scorch >= COOK.burnt;
@@ -209,9 +266,9 @@
       if (j.richness === 'rich') fx.health += COOK.richHealth;
     }
     v.items = []; v.water = 0; v.scorch = 0; v.stew = 0; v.stewed = false;
-    return { fx, judged: j };
+    return { fx, judged: j, name };
   }
 
-  const api = { TUNING: COOK, placeVessel, moveVessel, removeVessel, addToVessel, tend, stepVessels, foodState, windowOf, judge, eat };
+  const api = { TUNING: COOK, placeVessel, moveVessel, removeVessel, addToVessel, tend, stepVessels, foodState, windowOf, judge, worth, sell, eat };
   if (isNode) module.exports = api; else root.CampCooking = api;
 })(typeof window !== 'undefined' ? window : globalThis);

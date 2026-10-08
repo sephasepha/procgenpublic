@@ -106,6 +106,8 @@
     slow: { name: 'Slow', note: 'Wants long, patient heat.', max: Infinity, mark: '#e08a6a' },
     water: { name: 'Water', note: 'Boils; does not burn the way food does.', mark: '#7aa8d8' },
   };
+  // what an ingredient is worth raw, in coin: dearer the longer it takes to cook (the hard-won, the strange)
+  Object.values(INGREDIENTS).forEach(i => { i.price = i.water ? 1 : Math.round(3 + i.cook * 0.8); });
   Object.values(INGREDIENTS).forEach(i => { i.cls = i.water ? 'water' : Object.keys(CLASSES).find(k => i.cook <= CLASSES[k].max); });
 
   // dishes: a vessel and exactly these ingredients, all cooked and not burnt, earn the dish's bonus on top

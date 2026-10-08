@@ -76,6 +76,18 @@ function hold(T, items, flipEvery, secs, type) {
 { const d = hold(170, ['choirEgg'], 3), t = hold(170, ['saintsFinger'], 3); check(d.at.burnt - d.at.done < t.at.burnt - t.at.done, `delicate food burns sooner after it is done than tough food (egg ${(d.at.burnt - d.at.done).toFixed(1)}s, root ${(t.at.burnt - t.at.done).toFixed(1)}s)`); }
 { const a = hold(180, ['starGristle'], 0), b = hold(180, ['starGristle', 'moonlard'], 0); check(b.stick < a.stick * 0.6 && b.at.burnt > a.at.burnt, `fat greases the pan: food sticks and burns less (stuck ${a.stick.toFixed(2)} vs ${b.stick.toFixed(2)})`); }
 { const r = hold(180, ['starGristle'], 0, 6); const T0 = r.v.T, f = S.tend(r.c, r.v.id); check(f && f.freed > 0.4 && r.v.items[0].stick === 0 && r.v.T < T0, 'a flip frees what was sticking and costs a little heat'); }
+
+console.log('Meals: worth and names');
+{ const mk = (type, items, prog, x) => { const c = camp(() => {}); const v = S.placeVessel(c, type, x || 0, 2); items.forEach(k => S.addToVessel(c, v.id, k)); v.items.forEach(it => { it.progress = prog; }); return { c, v }; };
+  const raw = mk('pan', ['starGristle', 'veinMoss'], 0.1), ok = mk('pan', ['starGristle', 'veinMoss'], 1.05), dry = mk('pan', ['starGristle', 'veinMoss'], 1.05); dry.v.items.forEach(it => { it.dried = true; }); const burnt = mk('pan', ['starGristle', 'veinMoss'], 1.05); burnt.v.items.forEach(it => { it.scorch = 0.5; });
+  const w = x => S.worth(x.v), wr = w(raw), wo = w(ok), wd = w(dry), wb = w(burnt);
+  check(!wr.sellable && wo.sellable && wo.value > 0, 'only a cooked meal can be sold');
+  check(wo.value > wd.value && wd.value > wr.value && wo.value > wb.value && !wb.sellable, 'worth falls with overdone, burnt and raw');
+  const better = mk('pan', ['starGristle', 'veinMoss'], 1.0), later = mk('pan', ['starGristle', 'veinMoss'], 1.28); check(w(better).value >= w(later).value, 'just done is worth the most');
+  const dish = mk('pan', ['starGristle', 'moonlard'], 1.05), plain = mk('pan', ['starGristle', 'hardtack'], 1.05); check(w(dish).value > w(plain).value && w(dish).name.includes('Gristle Fry'), 'a dish is worth more than a plain meal, and keeps its name');
+  const n1 = w(ok).name, n2 = w(mk('pan', ['starGristle', 'veinMoss'], 1.05)).name; check(n1 === n2 && n1.includes('Gristle'), `a meal is named from what is in it, the same every time ("${n1}")`);
+  check(w(mk('skewer', ['hymnGrub', 'emberBeetle'], 1.05)).name !== w(mk('pot', ['hymnGrub', 'emberBeetle'], 1.05)).name, 'the vessel changes the name');
+  const before = ok.c.coin || 0, r = S.sell(ok.c, ok.v.id); check(r && ok.c.coin === before + r.value && ok.v.items.length === 0, 'selling pays you and empties the vessel'); check(S.sell(raw.c, raw.v.id) === null && raw.v.items.length === 2, 'raw food cannot be sold'); }
 { const c = camp(() => {}); const v = S.placeVessel(c, 'pot', 0, 2); ['hardtack', 'starGristle', 'blackWater'].forEach(k => S.addToVessel(c, v.id, k)); v.items[0].progress = 1.2; v.items[1].progress = 0.2; v.items[0].scorch = 0.1; const sum = v.items[0].progress + v.items[1].progress;
   const r = S.tend(c, v.id); check(r.mixed && v.items[0].progress < 1.2 && v.items[1].progress > 0.2 && Math.abs(v.items[0].progress + v.items[1].progress - sum) < 1e-9, 'stirring a pot passes cooking from the far-ahead to the far-behind, keeping the total'); check(v.items[0].scorch === 0.1 && v.items[2].progress === 0, 'it moves no scorch, and water takes no part');
   const p = S.placeVessel(c, 'pan', 1, 2); ['hardtack', 'starGristle'].forEach(k => S.addToVessel(c, p.id, k)); p.items[0].progress = 1; check(!S.tend(c, p.id).mixed && p.items[1].progress === 0, 'flipping a pan does not share cooking'); }

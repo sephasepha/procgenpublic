@@ -10,6 +10,7 @@
 //   stats                    health, soul, hunger, thirst, exhaustion (0..100)
 //   stock                    what you carry: fire supplies, ingredients, ash and char
 //   unlimitedFire            prototype setting: tinder, kindling and fuel never run out
+//   coin                     what you have earned selling meals
 //   log[]                    what you ate
 (function (root) {
   const isNode = typeof module !== 'undefined' && module.exports && typeof window === 'undefined';
@@ -35,7 +36,7 @@
       t: 0, seed: seed || 1, pieces: [], vessels: [], sparks: [],
       stats: { health: 82, soul: 64, hunger: 46, thirst: 42, exhaustion: 38 },
       stock: { tinder: 6, kindling: 12, fuel: 6, ash: 0, char: 0, ...Object.fromEntries(Object.keys(ING).map(k => [k, 2])) },
-      log: [], nextId: 1,
+      log: [], nextId: 1, coin: 0,
     };
   }
   function applyStats(c, fx) { STATS.forEach(s => { c.stats[s] = Math.max(0, Math.min(100, c.stats[s] + (fx[s] || 0))); }); }
@@ -82,7 +83,7 @@
     strike: F.strike, heatAt: F.heatAt, fireOutput: F.fireOutput, burning: F.burning, preview: F.preview, fireState: F.fireState,
     // the vessels
     placeVessel: K.placeVessel, moveVessel: K.moveVessel, removeVessel: K.removeVessel, addToVessel: K.addToVessel, tend: K.tend,
-    judge: K.judge, foodState: K.foodState, windowOf: K.windowOf,
+    judge: K.judge, worth: K.worth, sell: K.sell, foodState: K.foodState, windowOf: K.windowOf,
   };
   if (isNode) module.exports = api; else root.CampSim = api;
 })(typeof window !== 'undefined' ? window : globalThis);

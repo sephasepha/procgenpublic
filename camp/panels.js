@@ -145,10 +145,15 @@
       // (done to good), and it darkens as it scorches
       const items = v.items.map(it => { const w = S.windowOf(it), wet = ING[it.id].water;
         return `<li class="${stateOf(it)}"><span style="--m:${CLS[ING[it.id].cls].mark}" title="${CLS[ING[it.id].cls].name}">${ING[it.id].name}</span><i${wet ? '' : ` style="--a:${(w.from / BAR).toFixed(3)};--b:${(w.to / BAR).toFixed(3)}"`}></i><em>${stateOf(it)}</em></li>`; }).join('');
-      box.innerHTML = `<div class="hd"><b>${Vt.name}</b><span class="T"></span>${water ? `<span class="w">${water}</span>` : ''}${dish}</div>${items ? `<ul>${items}</ul>${uneven(v)}` : `<p>Empty. Open the larder, pick something, and tap the ${Vt.name.toLowerCase()}.</p>`}
-        <div class="acts"><button type="button" data-a="tend" ${v.items.some(it => !ING[it.id].water) ? '' : 'disabled'}>${Vt.tend}</button><button type="button" data-a="eat" ${v.items.length ? '' : 'disabled'}>Eat</button><button type="button" data-a="away" ${v.items.length ? 'disabled' : ''} aria-label="Put away">Away</button><button type="button" data-a="close" aria-label="Close">✕</button></div>`;
+      box.innerHTML = `<div class="hd"><b>${Vt.name}</b><span class="T"></span><span class="worth" hidden></span>${water ? `<span class="w">${water}</span>` : ''}${dish}</div>${items ? `<p class="meal" hidden></p><ul>${items}</ul>${uneven(v)}` : `<p>Empty. Open the larder, pick something, and tap the ${Vt.name.toLowerCase()}.</p>`}
+        <div class="acts"><button type="button" data-a="tend" ${v.items.some(it => !ING[it.id].water) ? '' : 'disabled'}>${Vt.tend}</button><button type="button" data-a="sell" disabled>Sell</button><button type="button" data-a="eat" ${v.items.length ? '' : 'disabled'}>Eat</button><button type="button" data-a="away" ${v.items.length ? 'disabled' : ''} aria-label="Put away">Away</button><button type="button" data-a="close" aria-label="Close">✕</button></div>`;
     }
     // what changes every moment: stew forming, water left, temperature, each item's cooking and scorching
+    // what the meal would sell for, and the coin you have
+    const W = S.worth(v, j), wl = box.querySelector('.worth'), sb = box.querySelector('[data-a="sell"]');
+    if (wl) { wl.hidden = !W.ready; wl.textContent = W.sellable ? `${W.value} coin` : W.ready ? 'worthless' : ''; wl.className = 'worth ' + (W.grade || '').toLowerCase(); }
+    const mn = box.querySelector('.meal'); if (mn) { mn.hidden = !W.name; mn.textContent = W.name ? `${W.name}` : ''; mn.dataset.grade = W.grade || ''; }
+    if (sb) { sb.disabled = !W.sellable; sb.textContent = W.sellable ? `Sell ${W.value}` : 'Sell'; }
     const sf = box.querySelector('.stew'); if (sf) sf.textContent = `stew forming ${Math.round(j.stewing * 100)}%`;
     const wb = box.querySelector('.wbar i'); if (wb) { const f = Math.max(0, Math.min(1, v.water / Math.max(1, j.waters))); wb.style.width = Math.round(f * 100) + '%'; wb.parentNode.classList.toggle('low', f < 0.3); }
     const T = box.querySelector('.T'); T.textContent = `${Math.round(v.T)}° · ${heatWord(v.T)}`; T.className = 'T ' + (v.T > Vt.burnAt ? 'hot' : v.T > 68 ? 'warm' : '');
