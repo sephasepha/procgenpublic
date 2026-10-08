@@ -160,6 +160,8 @@ Object.entries(ING).forEach(([k, I]) => {
   check(Object.values(I.raw).some(v => v < 0) || I.raw.health < 0 || I.raw.soul < 0, `${k}: dangerous raw`);
   check(I.cook > 0 && Object.keys(I.cooked).length > 0, `${k}: cooks into something`);
 });
+Object.entries(ING).forEach(([k, i]) => check(D.CAMP_CLASSES[i.cls], `${k}: has a cooking-speed class`));
+check(Math.max(...Object.values(ING).filter(i => i.cls === 'quick').map(i => i.cook)) < Math.min(...Object.values(ING).filter(i => i.cls === 'steady').map(i => i.cook)) && Math.max(...Object.values(ING).filter(i => i.cls === 'steady').map(i => i.cook)) < Math.min(...Object.values(ING).filter(i => i.cls === 'slow').map(i => i.cook)), 'quick cooks faster than steady, which cooks faster than slow');
 [...Object.values(D.CAMP_FIRE), D.CAMP_STRIKER, ...Object.values(D.CAMP_VESSELS)].forEach(o => check(o.px.length === 8 && o.px.every(r => r.length === 8) && o.px.join('').split('').every(ch => ch === '.' || o.pal[ch]), `${o.name}: art is 8x8 in its palette`));
 check(D.CAMP_DISHES.length >= 8, `at least 8 dishes (${D.CAMP_DISHES.length})`);
 D.CAMP_DISHES.forEach(d => { check(d.items.every(i => ING[i]) && d.items.length <= D.CAMP_VESSELS[d.vessel].cap, `${d.name}: real ingredients that fit its vessel`); check(d.items.every(i => !ING[i].only || ING[i].only.includes(d.vessel)), `${d.name}: every ingredient may go in a ${d.vessel}`); });

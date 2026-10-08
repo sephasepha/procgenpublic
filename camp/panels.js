@@ -3,7 +3,7 @@
 // vessel's panel, the tray of buttons, the larder drawer, and the notes (scraps of paper, the only words in the
 // scene). Builds the screen's markup and keeps it up to date from the camp's state; camp/camp.js wires the input.
 (function (root) {
-  const V = root.CampView, { S, RES, FIRE, VES, ING, COOK } = V;
+  const V = root.CampView, { S, RES, FIRE, VES, ING, CLS, COOK } = V;
 
   // ---------- the screen's markup: gauge strip, scene, dock (vessel panel, larder), tray ----------
   function markup() {
@@ -19,7 +19,7 @@
       <div class="camp-note" hidden></div>
       <div class="cf-dock">
       <div class="cf-ctx" hidden></div>
-      <div class="cf-larder" hidden role="group" aria-label="Larder"><div class="cf-lhead"></div>${V.LARDER.map(k => btn(k, ING[k].name, 'ing')).join('')}<div class="cf-lhead kept">Kept from the fire</div>${Object.keys(RES).map(k => `<div class="cf-btn cf-res" data-r="${k}" title="${RES[k].name}" role="img" aria-label="${RES[k].name}"><canvas width="8" height="8" aria-hidden="true"></canvas><span class="nm">${RES[k].name}</span><span class="ct"></span></div>`).join('')}</div>
+      <div class="cf-larder" hidden role="group" aria-label="Larder"><div class="cf-lhead"></div>${Object.entries(CLS).map(([c, C]) => { const ks = V.LARDER.filter(k => ING[k].cls === c).sort((a, b) => ING[a].cook - ING[b].cook); return ks.length ? `<div class="cf-lhead grp" style="--m:${C.mark}">${C.name} <small>${c === 'water' ? '' : 'cooks in about the same time'}</small></div>${ks.map(k => btn(k, ING[k].name, 'ing')).join('')}` : ''; }).join('')}<div class="cf-lhead kept">Kept from the fire</div>${Object.keys(RES).map(k => `<div class="cf-btn cf-res" data-r="${k}" title="${RES[k].name}" role="img" aria-label="${RES[k].name}"><canvas width="8" height="8" aria-hidden="true"></canvas><span class="nm">${RES[k].name}</span><span class="ct"></span></div>`).join('')}</div>
       </div>
       <nav class="cf-tray" aria-label="Camp kit">
         <div class="cf-mode" role="tablist" aria-label="Tend the fire or cook">
@@ -72,7 +72,8 @@
       b.querySelector('.ct').textContent = inf ? '∞' : n === undefined ? (out ? 'out' : '') : String(n);
       b.classList.toggle('empty', !inf && n === 0); b.classList.toggle('out', !!out);
       const on = st.sel === k; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
-      b.title = V.artOf(k).name + (n !== undefined ? ` (${n} left)` : '') + '. ' + (V.artOf(k).note || '');
+      if (ING[k]) b.style.setProperty('--m', CLS[ING[k].cls].mark);
+      b.title = V.artOf(k).name + (n !== undefined ? ` (${n} left)` : '') + '. ' + (V.artOf(k).note || '') + (ING[k] ? ` ${CLS[ING[k].cls].name} to cook.` : '');
     });
     cv.style.cursor = st.sel ? 'crosshair' : '';
     el.querySelectorAll('.cf-res').forEach(b => { const n = c.stock[b.dataset.r] || 0; b.querySelector('.ct').textContent = String(n); b.classList.toggle('empty', !n); });
@@ -119,6 +120,12 @@
   // ---------- the selected vessel: what is in it, how hot, and what you can do with it ----------
   const BAR = 1.9, STUCK = 0.5; // an item's bar runs to this much cooking; stuck past this, it says so
   const heatWord = T => T >= 99 ? (T > 160 ? 'searing' : 'boiling hot') : T > 68 ? 'cooking' : T > 40 ? 'warming' : 'cold';
+  // food that cooks at different speeds in one vessel: the quick will be done, and burn, before the slow is ready
+  function uneven(v) {
+    if (v.water > 0) return ''; // boiling food does not burn, whatever its speed
+    const cs = [...new Set(v.items.filter(it => !ING[it.id].water && ING[it.id].texture !== 'fat').map(it => ING[it.id].cls))];
+    return cs.length > 1 ? `<p class="uneven">Cooks unevenly: ${cs.map(c => CLS[c].name.toLowerCase()).join(' with ')}</p>` : '';
+  }
   function ctx() {
     const { el, st } = V, box = el.querySelector('.cf-ctx'), v = st.vsel && st.c.vessels.find(q => q.id === st.vsel);
     if (!v) { st.vsel = null; box.hidden = true; box.dataset.key = ''; return; }
@@ -131,14 +138,14 @@
     const stewing = j.stewing > 0 ? '<span class="stew"></span>' : '';
     const dish = (j.dish ? `<span class="dish">${j.dish.name}</span>` : j.stew ? '<span class="dish">Stew</span>' : stewing || (j.possible ? `<span class="dish maybe">could be ${j.possible.name}</span>` : '')) + rich;
     // rebuild only when something you can read changes, so the buttons stay put under your finger
-    const key = [v.id, water, dish, ...v.items.map(it => it.id + stateOf(it))].join('|');
+    const key = [v.id, water, dish, v.items.map(it => ING[it.id].cls).join(), ...v.items.map(it => it.id + stateOf(it))].join('|');
     if (box.dataset.key !== key) {
       box.dataset.key = key;
       // each item's bar runs from raw to past its window: the fill is how cooked it is, the green band its window
       // (done to good), and it darkens as it scorches
       const items = v.items.map(it => { const w = S.windowOf(it), wet = ING[it.id].water;
-        return `<li class="${stateOf(it)}"><span>${ING[it.id].name}</span><i${wet ? '' : ` style="--a:${(w.from / BAR).toFixed(3)};--b:${(w.to / BAR).toFixed(3)}"`}></i><em>${stateOf(it)}</em></li>`; }).join('');
-      box.innerHTML = `<div class="hd"><b>${Vt.name}</b><span class="T"></span>${water ? `<span class="w">${water}</span>` : ''}${dish}</div>${items ? `<ul>${items}</ul>` : `<p>Empty. Open the larder, pick something, and tap the ${Vt.name.toLowerCase()}.</p>`}
+        return `<li class="${stateOf(it)}"><span style="--m:${CLS[ING[it.id].cls].mark}" title="${CLS[ING[it.id].cls].name}">${ING[it.id].name}</span><i${wet ? '' : ` style="--a:${(w.from / BAR).toFixed(3)};--b:${(w.to / BAR).toFixed(3)}"`}></i><em>${stateOf(it)}</em></li>`; }).join('');
+      box.innerHTML = `<div class="hd"><b>${Vt.name}</b><span class="T"></span>${water ? `<span class="w">${water}</span>` : ''}${dish}</div>${items ? `<ul>${items}</ul>${uneven(v)}` : `<p>Empty. Open the larder, pick something, and tap the ${Vt.name.toLowerCase()}.</p>`}
         <div class="acts"><button type="button" data-a="tend" ${v.items.some(it => !ING[it.id].water) ? '' : 'disabled'}>${Vt.tend}</button><button type="button" data-a="eat" ${v.items.length ? '' : 'disabled'}>Eat</button><button type="button" data-a="away" ${v.items.length ? 'disabled' : ''} aria-label="Put away">Away</button><button type="button" data-a="close" aria-label="Close">✕</button></div>`;
     }
     // what changes every moment: stew forming, water left, temperature, each item's cooking and scorching

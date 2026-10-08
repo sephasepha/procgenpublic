@@ -284,6 +284,8 @@ was just earned beside it; it lights up on a new level. Levels need 30 experienc
 The amounts are in `Skills.XP`. Camp time runs through `Camp.advance`, so food cooking and the fire catching earn
 experience whichever screen is open. `tests/skills.js` covers levelling.
 
+- **Cooking speed classes.** Ingredients are grouped by how long they take to cook (`CAMP_CLASSES` in `camp/data.js`): **Quick** (up to 13), **Steady** (14 to 25), **Slow** (26 and over), and Water. The larder is laid out in those groups, each item carries its class colour, and a dry vessel mixing classes says "Cooks unevenly": the quick will burn before the slow is done, so fry like with like (or flip and move things along).
+
 ## Body: afflictions and treatment
 
 The ✚ Body screen: a table by candlelight with **The Pilgrim's Body**, an anatomical chart on which whatever has

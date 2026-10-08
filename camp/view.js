@@ -10,7 +10,7 @@
   // thresholds come from the simulation, so what the screen shows always agrees with what the fire does
   const S = root.CampSim;
   const V = {
-    S, RES: root.CAMP_RESIDUE, FIRE: root.CAMP_FIRE, STRIKER: root.CAMP_STRIKER, VES: root.CAMP_VESSELS, ING: root.CAMP_INGREDIENTS, STATS: root.CAMP_STATS,
+    S, RES: root.CAMP_RESIDUE, FIRE: root.CAMP_FIRE, STRIKER: root.CAMP_STRIKER, VES: root.CAMP_VESSELS, ING: root.CAMP_INGREDIENTS, CLS: root.CAMP_CLASSES, STATS: root.CAMP_STATS,
     CHOKE: S.CAMP_TUNING.chokeAir, SMOULDER: S.CAMP_TUNING.smokeAt, COOK: S.CAMP_COOK, PIT: S.CAMP_PIT,
     H_CAM: 1.3, // the eye's height above the floor (m)
     // live state, set by camp/camp.js

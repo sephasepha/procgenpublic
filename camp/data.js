@@ -98,6 +98,16 @@
   const TEXTURE_OF_TAG = { egg: 'delicate', green: 'delicate', sweet: 'delicate', fruit: 'delicate', fish: 'delicate', root: 'tough', bone: 'tough', salt: 'tough', fat: 'fat' };
   Object.values(INGREDIENTS).forEach(i => { if (!i.texture) i.texture = (i.tags || []).map(t => TEXTURE_OF_TAG[t]).find(Boolean) || 'usual'; });
 
+  // cooking speed, by how long an ingredient takes to cook: things of one class are done at about the same time, so
+  // they fry together; a quick thing with a slow thing is burnt before the slow one is done. Water is its own.
+  const CLASSES = {
+    quick: { name: 'Quick', note: 'Done in moments.', max: 13, mark: '#f0c060' },
+    steady: { name: 'Steady', note: 'Takes its time, not too long.', max: 25, mark: '#8fd29a' },
+    slow: { name: 'Slow', note: 'Wants long, patient heat.', max: Infinity, mark: '#e08a6a' },
+    water: { name: 'Water', note: 'Boils; does not burn the way food does.', mark: '#7aa8d8' },
+  };
+  Object.values(INGREDIENTS).forEach(i => { i.cls = i.water ? 'water' : Object.keys(CLASSES).find(k => i.cook <= CLASSES[k].max); });
+
   // dishes: a vessel and exactly these ingredients, all cooked and not burnt, earn the dish's bonus on top
   const D = (name, vessel, items, bonus, note) => ({ name, vessel, items, bonus, note });
   const DISHES = [
@@ -121,6 +131,6 @@
     char: { name: 'Char', note: 'A lump of charcoal from a log that burnt down to coals and went cold. Light, black, and it burns hot again.',
       px: ['........', '...cC...', '..cCsc..', '.ccccCc.', '.cCcccs.', '..cccC..', '...cc...', '........'], pal: { c: '#2a272e', C: '#7a7484', s: '#c8c2d0' } },
   };
-  const api = { CAMP_FIRE: FIRE, CAMP_RESIDUE: RESIDUE, CAMP_STRIKER: STRIKER, CAMP_VESSELS: VESSELS, CAMP_INGREDIENTS: INGREDIENTS, CAMP_TEXTURES: TEXTURES, CAMP_DISHES: DISHES, CAMP_STATS: STATS };
+  const api = { CAMP_FIRE: FIRE, CAMP_RESIDUE: RESIDUE, CAMP_STRIKER: STRIKER, CAMP_VESSELS: VESSELS, CAMP_INGREDIENTS: INGREDIENTS, CAMP_TEXTURES: TEXTURES, CAMP_CLASSES: CLASSES, CAMP_DISHES: DISHES, CAMP_STATS: STATS };
   if (typeof module !== 'undefined' && module.exports && typeof window === 'undefined') module.exports = api; else Object.assign(root, api);
 })(typeof window !== 'undefined' ? window : globalThis);

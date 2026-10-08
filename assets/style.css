@@ -496,3 +496,8 @@ html.has-screens .camp { bottom: var(--navh); }
 .bx-hist li .w, .bx-hist li .s { font-size: 0.78rem; color: rgba(216,242,240,0.75); }
 .bx-hist li .s { color: rgba(216,242,240,0.55); }
 .bx-hist .none { color: rgba(216,242,240,0.6); font-style: italic; }
+.cf-lhead.grp { color: var(--m); margin-top: 2px; }
+.cf-lhead.grp small { color: rgba(232,225,210,0.4); font-size: 0.56rem; }
+.cf-larder .cf-btn.ing { box-shadow: inset 0 -2px 0 var(--m, transparent); }
+.cf-ctx li span { border-left: 3px solid var(--m, transparent); padding-left: 4px; }
+.cf-ctx .uneven { grid-column: 1; margin: 2px 0 0; font-size: 0.62rem; color: #f0b080; letter-spacing: 0.03em; }
