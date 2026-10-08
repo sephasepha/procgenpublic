@@ -7,11 +7,19 @@
 //   tried['ailment:stage:step'] = [tools]                                 the wrong tools tried there
 // An ailment is named once any step of it is known; a stage's pilgrims' note once all its steps are. chart() says
 // what the screen may show of an affliction.
+//
+// Treatment does not make a wound vanish: it turns it round. An affliction's phase is
+//   active    (no phase)  it advances a stage at a time, drains you and spreads, until treated
+//   healing   treated: it goes back down through its stages, a stage every HEAL.stage minutes, draining nothing
+//   benign    healed past its first stage: its benign form (a scar, an ache) for HEAL.benign minutes, then gone
+// heal is how far through the current healing stage or the benign form it is (0..1).
 (function (root) {
   const isNode = typeof module !== 'undefined' && module.exports && typeof window === 'undefined';
   const D = isNode ? require('./data.js') : root;
   const PARTS = D.BODY_PARTS, TOOLS = D.BODY_TOOLS, AIL = D.BODY_AILMENTS;
   const clamp = v => Math.max(0, Math.min(100, v));
+  const HEAL = { stage: 1.5, benign: 3 }; // minutes: to heal back one stage; as the benign form before it is gone
+  const active = a => !a.phase;
 
   function createBody(seed) {
     return { t: 0, seed: seed || 7, n: 0, nextId: 1, afflictions: [], tools: Object.fromEntries(Object.entries(TOOLS).map(([k, t]) => [k, t.uses === Infinity ? -1 : t.uses])), log: [], known: {}, tried: {} };
@@ -40,11 +48,25 @@
     return null;
   }
 
-  // time passes: each affliction advances, drains the body, and from its later stages spreads to neighbouring parts
+  // a treated affliction heals: back down a stage at a time, then its benign form, then gone (returns false when gone)
+  function heal(b, a, m) {
+    a.heal += m / (a.phase === 'benign' ? HEAL.benign : HEAL.stage);
+    if (a.heal < 1) return true;
+    a.heal = 0;
+    if (a.phase === 'healing' && a.stage > 0) { a.stage--; b.log.push({ t: b.t, mending: a.key, part: a.part, stage: a.stage }); return true; }
+    if (a.phase === 'healing') { a.phase = 'benign'; b.log.push({ t: b.t, benign: a.key, part: a.part }); return true; }
+    b.log.push({ t: b.t, healed: a.key, part: a.part });
+    return false;
+  }
+
+  // time passes: each affliction advances, drains the body, and from its later stages spreads to neighbouring parts;
+  // each treated one heals
   function step(b, dt, stats) {
     b.t += dt;
     const m = dt / 60, born = [];
+    b.afflictions = b.afflictions.filter(a => active(a) || heal(b, a, m));
     b.afflictions.forEach(a => {
+      if (!active(a)) return;
       const A = AIL[a.key], st = A.stages[a.stage];
       if (st.minutes > 0) {
         a.progress += m / st.minutes;
@@ -68,8 +90,8 @@
   // used up: you find out it does not fit), and you remember you tried it there.
   function apply(b, part, tool, ctx, stats, id) {
     const T = TOOLS[tool]; if (!T || !PARTS[part]) return { ok: false, why: 'nothing' };
-    const here = b.afflictions.filter(a => a.part === part);
-    if (!here.length) return { ok: false, why: 'healthy' };
+    const all = b.afflictions.filter(a => a.part === part), here = all.filter(active);
+    if (!here.length) return { ok: false, why: all.length ? 'healing' : 'healthy' };
     if (b.tools[tool] === 0) return { ok: false, why: 'none left' };
     if (T.needsFire && !(ctx && ctx.fireHot)) return { ok: false, why: 'cold' };
     const a = here.find(x => x.id === id) || here.find(x => x.step > 0) || here.slice().sort((x, y) => y.stage - x.stage || x.born - y.born)[0];
@@ -85,8 +107,8 @@
     const step = a.step, discovered = !steps[step];
     steps[step] = true; b.known[a.key].named = true;
     a.step++;
-    if (a.step >= st.treat.length) {
-      b.afflictions.splice(b.afflictions.indexOf(a), 1);
+    if (a.step >= st.treat.length) { // treated: from now on it heals
+      a.phase = 'healing'; a.heal = 0; a.progress = 0;
       b.log.push({ t: b.t, cured: a.key, part, stage: a.stage });
       return { ok: true, cured: true, affliction: a, step, discovered };
     }
@@ -96,9 +118,18 @@
   // what may be shown of an affliction: its name if known, the look of it (you can see that), each step of its
   // treatment (the tool if known, which are done, which is next, the wrong tools tried there), and the pilgrims'
   // note once the whole stage is known
+  // A healing affliction also says how far it has healed and how long it has left; a benign one shows its benign form.
   function chart(b, a) {
     const A = AIL[a.key], st = A.stages[a.stage], k = upgrade(b).known[a.key], steps = (k && k.stages[a.stage]) || st.treat.map(() => false);
-    return {
+    if (!active(a)) {
+      const left = a.phase === 'benign' ? (1 - a.heal) * HEAL.benign : (a.stage + 1 - a.heal) * HEAL.stage + HEAL.benign;
+      return {
+        id: a.id, key: a.key, part: a.part, phase: a.phase, named: true, name: a.phase === 'benign' ? A.benign.name : A.name,
+        stage: a.stage, stages: A.stages.length, stageName: st.name, look: a.phase === 'benign' ? A.benign.look : st.look,
+        progress: a.heal, worsens: false, minutesLeft: left, steps: [], lore: null,
+      };
+    }
+    return { phase: 'active',
       id: a.id, key: a.key, part: a.part, named: !!(k && k.named), name: k && k.named ? A.name : null,
       stage: a.stage, stages: A.stages.length, stageName: st.name, look: st.look, progress: a.progress, worsens: st.minutes > 0,
       steps: st.treat.map((tool, i) => ({ tool: steps[i] ? tool : null, done: i < a.step, now: i === a.step, tried: b.tried[`${a.key}:${a.stage}:${i}`] || [] })),
@@ -106,6 +137,6 @@
     };
   }
 
-  const api = { createBody, upgrade, roll, step, apply, chart };
+  const api = { HEAL, createBody, upgrade, roll, step, apply, chart, active };
   if (isNode) module.exports = api; else root.BodySim = api;
 })(typeof window !== 'undefined' ? window : globalThis);

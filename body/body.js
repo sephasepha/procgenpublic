@@ -34,13 +34,15 @@
     if (el) return;
     el = document.createElement('div'); el.className = 'camp body-screen'; el.hidden = true;
     el.innerHTML = `<canvas aria-label="Treatment: touch an afflicted part to examine it; drag a tool from the roll onto it to use it"></canvas>
-      <div class="bx-needs" role="group" aria-label="Your needs">${NEEDS.map(n => `<div class="need ${n.big ? 'big' : 'sm'}" data-s="${n.k}"><b>${n.label}</b><div class="bar" role="meter" aria-label="${n.label}" aria-valuemin="0" aria-valuemax="100"><i></i></div>${n.big ? '<span class="v"></span><span class="dr" aria-hidden="true"></span>' : ''}</div>`).join('')}</div>
+      <div class="bx-needs" role="group" aria-label="Your needs">${NEEDS.map(n => `<div class="need ${n.big ? 'big' : 'sm'}" data-s="${n.k}"><b>${n.label}</b><div class="bar" role="meter" aria-label="${n.label}" aria-valuemin="0" aria-valuemax="100"><i></i></div>${n.big ? '<span class="v"></span><span class="dr" aria-hidden="true"></span>' : ''}</div>`).join('')}
+        <div class="bx-dev" role="group" aria-label="Testing"><button type="button" data-dev="heal" title="Restore HP and SOUL to full and clear hunger, thirst and fatigue">Full heal</button><button type="button" data-dev="wound" title="A random wound takes hold">+ Wound</button></div></div>
       <section class="bx-panel" hidden aria-live="polite"></section>
       <div class="camp-note" hidden></div>`;
     document.body.appendChild(el);
     cv = el.querySelector('canvas'); g = cv.getContext('2d');
     cv.addEventListener('pointerdown', down); cv.addEventListener('pointermove', mv); cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', () => { drag = null; });
     el.querySelector('.bx-panel').addEventListener('click', panelClick);
+    el.querySelector('.bx-dev').addEventListener('click', devClick);
     window.addEventListener('resize', () => { if (!el.hidden) size(); });
     window.addEventListener('keydown', e => { if (el.hidden || e.key !== 'Escape') return; if (st.exam) examine(null); else leave(); });
   }
@@ -106,7 +108,8 @@
     if (!part) { st.exam = null; panel(); return; }
     const here = st.b.afflictions.filter(a => a.part === part);
     if (!here.length) { st.exam = null; panel(); return; }
-    const a = here.find(x => x.id === id) || here.find(x => x.step > 0) || here.slice().sort((x, y) => y.stage - x.stage || x.born - y.born)[0];
+    const live = here.filter(B.active), pick = live.length ? live : here; // what is still active first
+    const a = here.find(x => x.id === id) || pick.find(x => x.step > 0) || pick.slice().sort((x, y) => y.stage - x.stage || x.born - y.born)[0];
     st.exam = { part, id: a.id }; panel();
   }
   // the X-ray's transform: the part, with some of what is around it, filling the X-ray
@@ -120,14 +123,15 @@
   const toolIcon = k => `<canvas width="8" height="8" data-t="${k}" aria-hidden="true"></canvas>`;
   function panel(force) {
     const P = el.querySelector('.bx-panel'), a = examined();
-    if (!a) { if (st.exam && st.exam.cured) return; st.exam = null; P.hidden = true; P.dataset.key = ''; el.classList.remove('examining'); return; }
+    if (!a) { st.exam = null; P.hidden = true; P.dataset.key = ''; el.classList.remove('examining'); return; }
     el.classList.add('examining'); P.hidden = false;
     const ch = B.chart(st.b, a), here = st.b.afflictions.filter(x => x.part === a.part);
     // rebuild only when what you can read changes, so it holds still under your finger
-    const { progress, ...still } = ch, key = JSON.stringify([still, here.map(x => x.id + ':' + (B.chart(st.b, x).name || '?'))]);
+    const { progress, minutesLeft, ...still } = ch, key = JSON.stringify([still, here.map(x => x.id + ':' + (B.chart(st.b, x).name || '?') + x.phase)]);
     if (P.dataset.key === key && !force) return liveBits(P, ch);
     P.dataset.key = key;
-    const A = AIL[a.key], tabs = here.length > 1 ? `<div class="tabs" role="tablist">${here.map(x => { const n = B.chart(st.b, x).name || '???'; return `<button type="button" role="tab" data-id="${x.id}" aria-selected="${x.id === a.id}" style="--m:${AIL[x.key].mark}">${n}</button>`; }).join('')}</div>` : '';
+    const A = AIL[a.key], tabs = here.length > 1 ? `<div class="tabs" role="tablist">${here.map(x => { const n = B.chart(st.b, x).name || '???'; return `<button type="button" role="tab" data-id="${x.id}" aria-selected="${x.id === a.id}" class="${x.phase || ''}" style="--m:${AIL[x.key].mark}">${n}</button>`; }).join('')}</div>` : '';
+    if (ch.phase !== 'active') return recovery(P, a, ch, tabs);
     const steps = ch.steps.map((s, i) => `<li class="${s.done ? 'done' : s.now ? 'now' : ''} ${s.tool ? 'known' : 'unknown'}" data-i="${i}">
         <span class="n">${i + 1}</span>${s.tool ? toolIcon(s.tool) : '<span class="q">?</span>'}<span class="t">${s.tool ? TOOLS[s.tool].name : '???'}</span>
         ${s.now && s.tried.length ? `<span class="tried" title="Tried here: ${s.tried.map(t => TOOLS[t].name).join(', ')}">${s.tried.map(toolIcon).join('')}</span>` : ''}</li>`).join('');
@@ -141,8 +145,38 @@
     P.querySelectorAll('canvas[data-t]').forEach(c => c.getContext('2d').drawImage(sprite(c.dataset.t, TOOLS[c.dataset.t]), 0, 0));
     liveBits(P, ch);
   }
-  // what changes moment to moment: how close it is to worsening
-  function liveBits(P, ch) { const w = P.querySelector('.worse .bar i'); if (w) { w.style.width = Math.round(Math.min(1, ch.progress) * 100) + '%'; w.parentNode.classList.toggle('near', ch.progress > 0.75); } }
+  // a treated wound: how it is healing, the way back down its stages to its benign form and then gone (the reverse of
+  // how it worsened), and how long that has left
+  function recovery(P, a, ch, tabs) {
+    const A = AIL[a.key], benign = ch.phase === 'benign';
+    const way = [...A.stages.map((s, i) => ({ name: s.name, i })).slice(0, a.phase === 'benign' ? 0 : a.stage + 1).reverse()];
+    const track = [...way.map((s, k) => `<li class="${k === 0 && !benign ? 'now' : ''}"><span class="n">${s.i + 1}</span><span class="t">${s.name}</span></li>`),
+      `<li class="${benign ? 'now' : ''} benign"><span class="n">◦</span><span class="t">${A.benign.name}</span></li>`, '<li class="gone"><span class="n">✓</span><span class="t">Healed</span></li>'].join('');
+    P.innerHTML = `<header><button type="button" class="back" data-a="back" aria-label="Back to the chart">◂</button><span class="where">${PARTS[a.part].name}</span><span class="stage">${benign ? 'Benign' : 'Healing'}</span></header>
+      ${tabs}
+      <h3 style="--m:${benign ? '#9ab89a' : A.mark}">${ch.name}${benign ? '' : ' <small>treated</small>'}</h3>
+      <div class="worse heal"><label>${benign ? 'Fading' : 'Healing'}</label><div class="bar"><i></i></div><span class="left"></span></div>
+      <h4>Condition</h4><p class="look">${benign ? ch.look : `Closing. ${ch.look}`}</p>
+      <h4>Recovery</h4><ol class="steps recover">${track}</ol>`;
+    liveBits(P, ch);
+  }
+  // what changes moment to moment: how close it is to worsening, or how far it has healed
+  function liveBits(P, ch) {
+    const w = P.querySelector('.worse .bar i'); if (w) { w.style.width = Math.round(Math.min(1, ch.progress) * 100) + '%'; w.parentNode.classList.toggle('near', ch.phase === 'active' && ch.progress > 0.75); }
+    const l = P.querySelector('.worse .left'); if (l) { const m = ch.minutesLeft; l.textContent = m >= 1 ? `~${Math.ceil(m)}m left` : `~${Math.max(1, Math.round(m * 60))}s left`; }
+  }
+  // testing: restore yourself, or have something take hold
+  function devClick(e) {
+    const btn = e.target.closest('[data-dev]'); if (!btn) return;
+    const c = camp();
+    if (btn.dataset.dev === 'heal') {
+      if (c) { Object.assign(c.stats, { health: 100, soul: 100, hunger: 0, thirst: 0, exhaustion: 0 }); if (root.Camp) Camp.save(); }
+      needs(); btn.classList.remove('done'); void btn.offsetWidth; btn.classList.add('done');
+    } else {
+      const a = B.roll(st.b); save();
+      if (a) examine(a.part, a.id); else note('Nothing more can take hold of you.', LW / 2, LH / 2);
+    }
+  }
   function panelClick(e) {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.a === 'back') return examine(null);
@@ -156,7 +190,7 @@
     const c = camp(), N = el.querySelector('.bx-needs'); if (!c) { N.hidden = true; return; } N.hidden = false;
     // what the afflictions are draining, a minute
     const drain = { health: 0, soul: 0 };
-    st.b.afflictions.forEach(a => { const d = AIL[a.key].stages[a.stage].drain; drain.health += d.health || 0; drain.soul += d.soul || 0; });
+    st.b.afflictions.filter(B.active).forEach(a => { const d = AIL[a.key].stages[a.stage].drain; drain.health += d.health || 0; drain.soul += d.soul || 0; });
     NEEDS.forEach(n => {
       const box = N.querySelector(`[data-s="${n.k}"]`), v = c.stats[n.k], bar = box.querySelector('.bar');
       bar.firstChild.style.width = Math.round(v) + '%'; bar.setAttribute('aria-valuenow', String(Math.round(v)));
@@ -214,15 +248,14 @@
     if (r.why === 'healthy') return note(`Nothing has taken your ${where}. Save the ${T.name.toLowerCase()}.`, p.x, p.y);
     if (r.why === 'none left') return note(`No ${T.name.toLowerCase()} left.`, p.x, p.y);
     if (r.why === 'cold') return note('The iron is cold. It wants the camp fire, burning.', p.x, p.y, 3000);
+    if (r.why === 'healing') return note(`Your ${where} is healing. Leave it be.`, p.x, p.y, 2000);
     const a = r.affliction;
     if (r.ok && root.Skills) { const X = Skills.XP; Skills.earn('medicine', X.step + X.stepPerStage * a.stage + (r.discovered ? X.discover : 0) + (r.cured ? X.cure * (a.stage + 1) : 0)); }
-    if (r.cured && !(was && was.id === a.id)) { save(); return note(`It is gone from your ${where}.`, p.x, p.y, 2000); } // cured from the chart
     if (!was || was.id !== a.id) examine(t.part, a.id); // see what you are working on
-    if (r.cured) { // the wound closes: a moment to see it, then the next on the part, or the chart
-      save(); st.exam = { part: t.part, id: a.id, cured: true };
+    if (r.cured) { // treated: it turns round and starts to heal (the panel shows its recovery)
+      save(); panel(true);
       const P = el.querySelector('.bx-panel'); P.classList.remove('cured'); void P.offsetWidth; P.classList.add('cured');
-      el.querySelectorAll('.bx-panel .steps li').forEach(li => li.classList.add('done'));
-      setTimeout(() => { P.classList.remove('cured'); if (st.exam && st.exam.cured) examine(st.b.afflictions.some(x => x.part === t.part) ? t.part : null); }, 1300);
+      setTimeout(() => P.classList.remove('cured'), 1400);
       return;
     }
     panel();
@@ -238,7 +271,7 @@
     const c = camp();
     B.step(st.b, dt, c ? c.stats : null);
     advanceCamp(dt); // the fire keeps burning while you see to yourself
-    if (t - st.uiAt > 200) { st.uiAt = t; needs(); if (st.exam && !st.exam.cured) { if (examined()) panel(); else examine(st.exam.part); } }
+    if (t - st.uiAt > 200) { st.uiAt = t; needs(); if (st.exam) { if (examined()) panel(); else examine(st.exam.part); } }
     if (t - st.saveAt > 5000) { st.saveAt = t; save(); }
     draw(t / 1000);
   }
@@ -277,6 +310,12 @@
     // vignette
     const v = g.createRadialGradient(LW / 2, LH / 2, Math.min(LW, LH) * 0.45, LW / 2, LH / 2, Math.max(LW, LH) * 0.75); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.6)'); g.fillStyle = v; g.fillRect(0, 0, LW, LH);
   }
+  // an affliction's mark: as it is while active; shrinking and fading while it heals; faint as its benign form
+  function mark(a, time, tf) {
+    if (B.active(a)) return C.drawMark(g, a, time, tf);
+    if (a.phase === 'healing') return C.drawMark(g, { ...a, progress: 1 - a.heal }, time, tf, 0.75);
+    C.drawMark(g, { ...a, stage: 0, progress: 0 }, time, tf, 0.1 + 0.35 * (1 - a.heal));
+  }
   // the pilgrims' chart: ink outline, parts washed where something has taken hold, the marks
   function drawChart(time) {
     const b = st.b, c = st.chart;
@@ -285,10 +324,11 @@
     g.fillStyle = 'rgba(42,32,24,0.7)'; g.font = `${Math.max(7, Math.round(c.k * 4.2))}px "IM Fell English SC", serif`; g.textAlign = 'center'; g.fillText('The Pilgrim\'s Body', c.x + c.w / 2, c.y + c.h - 4);
     Object.entries(PARTS).forEach(([k, p]) => {
       const here = b.afflictions.filter(a => a.part === k);
-      C.shapePath(g, p.shape, c); g.fillStyle = here.length ? `rgba(120,40,40,${Math.min(0.35, 0.08 + 0.06 * here.reduce((s, a) => s + a.stage + 1, 0))})` : 'rgba(120,90,50,0.08)'; g.fill();
+      const live = here.filter(B.active); // red where something is active, a faint green where it is only healing
+      C.shapePath(g, p.shape, c); g.fillStyle = live.length ? `rgba(120,40,40,${Math.min(0.35, 0.08 + 0.06 * live.reduce((s, a) => s + a.stage + 1, 0))})` : here.length ? 'rgba(70,120,60,0.16)' : 'rgba(120,90,50,0.08)'; g.fill();
       g.strokeStyle = '#3a2c20'; g.lineWidth = 1; g.stroke();
     });
-    b.afflictions.forEach(a => C.drawMark(g, a, time, c));
+    b.afflictions.forEach(a => mark(a, time, c));
     drawFlash(c);
   }
   // a flash where a tool was used: green for right, red for wrong
@@ -311,7 +351,7 @@
       g.strokeStyle = k === part ? `rgba(160,240,255,${0.55 + 0.3 * pulse})` : 'rgba(120,200,220,0.25)'; g.lineWidth = Math.max(1, tf.k * 0.4); g.stroke();
     });
     C.drawBones(g, tf, part, 0.7 + 0.3 * pulse);
-    st.b.afflictions.filter(x => x.part === part).forEach(x => C.drawMark(g, x, time, tf));
+    st.b.afflictions.filter(x => x.part === part).forEach(x => mark(x, time, tf));
     drawFlash(tf);
     // the scan: a bright band sweeping down, and scanlines
     const sy = r.y + ((time * 50) % (r.h + 30)) - 15, sg = g.createLinearGradient(0, sy - 12, 0, sy + 12);
@@ -321,7 +361,7 @@
     // the reticle on the wound, and a line from it to the panel
     if (a) {
       const m = C.markCentre(a), mx = tf.ox + m.x * tf.k, my = tf.oy + m.y * tf.k, rad = Math.max(8, Math.min(r.w, r.h) * 0.16) * (1 + 0.06 * pulse);
-      const col = `rgba(255,${st.exam.cured ? 240 : 230},${st.exam.cured ? 140 : 120},${0.75 + 0.25 * pulse})`;
+      const col = B.active(a) ? `rgba(255,230,120,${0.75 + 0.25 * pulse})` : `rgba(140,230,150,${0.6 + 0.2 * pulse})`; // green while it heals
       g.strokeStyle = col; g.lineWidth = 1;
       g.beginPath(); g.ellipse(mx, my, rad, rad, 0, 0, 7); g.stroke();
       g.setLineDash([3, 3]); g.lineDashOffset = -time * 8; g.beginPath(); g.ellipse(mx, my, rad + 3, rad + 3, 0, 0, 7); g.stroke(); g.setLineDash([]); g.lineDashOffset = 0;

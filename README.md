@@ -307,6 +307,11 @@ thirst and fatigue.
   (torso) and the Fade. Every stage has its own look, a drain on health, SOUL, hunger, thirst and exhaustion, the
   minutes before it worsens, and a chance per minute to **spread to a neighbouring part**. If a stage advances
   mid-treatment, the treatment starts over. The **cautery iron** only works while the camp fire is burning.
+- **Healing.** A fully treated wound does not vanish: it **heals** (a stage lower every 1.5 minutes, no draining, spreading
+  or worsening), then becomes a **benign** mark of itself (Star-Rot becomes Starmarks, a cyst a Quiet Scar, ...) for 3
+  minutes, then is gone (`HEAL` in `body/sim.js`). Only active afflictions drain you or count on the Body tab.
+- **Test buttons.** Top right of the Body screen: **Full heal** sets HP and SOUL to 100 and hunger, thirst and
+  exhaustion to 0; **+ Wound** rolls a random new affliction.
 - **Twelve tools**: knife, tweezers, cautery, hymnal and blindfold, plus limited spirits, salt, moss, thread, wax,
   splint and gauze (tally notches show how many are left).
 - **The omen bones** roll on the ailment table. **The hourglass** lets five minutes pass for both the body and the camp.

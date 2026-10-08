@@ -33,7 +33,7 @@
     // a little of each screen's state shows on its tab: the fire alight, how many things have taken hold
     let lit = false, n = 0;
     try { const c = root.Camp && Camp.state() && Camp.state().c; lit = !!(c && root.CampSim && CampSim.burning(c)); } catch (e) { /* not ready */ }
-    try { const s = root.Body && Body.state(); n = s && s.b ? s.b.afflictions.length : 0; } catch (e) { /* not ready */ }
+    try { const s = root.Body && Body.state(); n = s && s.b ? s.b.afflictions.filter(a => !a.phase).length : 0; /* only what is still active, not what is healing */ } catch (e) { /* not ready */ }
     bar.querySelector('[data-go="camp"]').classList.toggle('lit', lit);
     const badge = bar.querySelector('[data-go="body"] i');
     badge.textContent = n ? String(n) : ''; badge.hidden = !n;

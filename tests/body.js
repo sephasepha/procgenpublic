@@ -17,7 +17,21 @@ console.log('Taking hold and getting worse');
 { const b = B.createBody(3); B.roll(b, 'starRot', 'head'); for (let t = 0; t < 120; t++) B.step(b, 1, stats()); check(b.afflictions.length === 1, 'a first-stage affliction does not spread'); }
 
 console.log('Treatment');
-{ const b = B.createBody(3), s = stats(); const a = B.roll(b, 'starRot', 'legL'); const r1 = B.apply(b, 'legL', 'salt', {}, s), r2 = B.apply(b, 'legL', 'gauze', {}, s); check(r1.ok && !r1.cured && r2.ok && r2.cured && !b.afflictions.length, 'salt then gauze cures speckled Star-Rot'); }
+{ const b = B.createBody(3), s = stats(); const a = B.roll(b, 'starRot', 'legL'); const r1 = B.apply(b, 'legL', 'salt', {}, s), r2 = B.apply(b, 'legL', 'gauze', {}, s); check(r1.ok && !r1.cured && r2.ok && r2.cured && a.phase === 'healing', 'salt then gauze cures speckled Star-Rot: it starts to heal'); }
+
+console.log('Healing');
+{ const b = B.createBody(3), s = stats(); const a = B.roll(b, 'starRot', 'legL'); a.stage = 2; a.step = 0; ['cautery', 'spirits', 'gauze'].forEach(t => B.apply(b, 'legL', t, { fireHot: true }, s));
+  check(a.phase === 'healing' && a.stage === 2 && b.afflictions.includes(a), 'a treated wound stays, healing, at the stage it was treated at');
+  const h0 = { ...s }; for (let t = 0; t < 60; t++) B.step(b, 1, s); check(s.health === h0.health && s.soul === h0.soul, 'a healing wound drains nothing');
+  const seen = []; for (let t = 0; t < 20 * 60; t++) { B.step(b, 1, s); const x = b.afflictions.find(q => q.id === a.id); const k = x ? x.phase + x.stage : 'gone'; if (seen[seen.length - 1] !== k) seen.push(k); }
+  check(seen.join(',') === 'healing2,healing1,healing0,benign0,gone', `it heals back down its stages, becomes benign, then is gone (${seen.join(', ')})`);
+  check(b.log.some(l => l.benign === 'starRot') && b.log.some(l => l.healed === 'starRot'), 'and the log says so'); }
+{ const b = B.createBody(3), s = stats(); const a = B.roll(b, 'starRot', 'legL'); a.stage = 2; a.progress = 0.99; B.apply(b, 'legL', 'cautery', { fireHot: true }, s); B.apply(b, 'legL', 'spirits', {}, s); B.apply(b, 'legL', 'gauze', {}, s);
+  for (let t = 0; t < 300; t++) B.step(b, 1, s); check(a.stage < 2 && b.afflictions.filter(x => x.key === 'starRot').length === 1, 'a healing wound neither worsens nor spreads'); }
+{ const b = B.createBody(3), s = stats(); B.roll(b, 'starRot', 'legL'); B.apply(b, 'legL', 'salt', {}, s); B.apply(b, 'legL', 'gauze', {}, s); check(B.apply(b, 'legL', 'salt', {}, s).why === 'healing', 'there is nothing to treat on a part that is only healing');
+  const a = b.afflictions[0], c = B.chart(b, a); check(c.phase === 'healing' && c.name === 'Star-Rot' && c.minutesLeft > B.HEAL.benign && !c.worsens, 'the chart shows it healing, with the time it has left');
+  for (let t = 0; t < (B.HEAL.stage + 0.1) * 60; t++) B.step(b, 1, s); const c2 = B.chart(b, a); check(c2.phase === 'benign' && c2.name === D.BODY_AILMENTS.starRot.benign.name && c2.look === D.BODY_AILMENTS.starRot.benign.look, 'then its benign form'); }
+
 { const b = B.createBody(3), s = stats(); B.roll(b, 'starRot', 'legL'); const h = s.health; const r = B.apply(b, 'legL', 'gauze', {}, s); check(!r.ok && r.why === 'wrong' && s.health < h && b.afflictions[0].step === 0, 'the wrong tool hurts and does nothing'); check(b.tools.gauze === D.BODY_TOOLS.gauze.uses, 'but is not used up (you only find out it does not fit)'); }
 { const b = B.createBody(3), s = stats(); const a = B.roll(b, 'starRot', 'torso'); a.stage = 2; const r = B.apply(b, 'torso', 'cautery', { fireHot: false }, s); check(!r.ok && r.why === 'cold', 'the cautery iron does nothing while the fire is out'); check(B.apply(b, 'torso', 'cautery', { fireHot: true }, s).ok, 'and works when it is red from the fire'); }
 { const b = B.createBody(3), s = stats(); const a = B.roll(b, 'cyst', 'armL'); B.apply(b, 'armL', 'knife', {}, s); a.progress = 0.999; B.step(b, 60, s); check(a.stage === 1 && a.step === 0, 'a stage advancing mid-treatment starts its treatment over'); }
@@ -53,6 +67,7 @@ Object.entries(D.BODY_AILMENTS).forEach(([k, A]) => {
     check(st.lore && st.look, `${k} stage ${i + 1}: has a look and a pilgrim's note`);
   });
   check(A.stages[2].spread > 0 || A.stages[1].spread > 0, `${k}: spreads when it is bad`);
+  check(A.benign && A.benign.name && A.benign.look, `${k}: has a benign form to heal into`);
 });
 check(Object.keys(D.BODY_AILMENTS).length >= 10, 'at least ten ailments');
 Object.entries(tools).forEach(([k, t]) => check(t.px.length === 8 && t.px.every(r => r.length === 8) && t.px.join('').split('').every(c => c === '.' || t.pal[c]), `${k}: art is 8x8 in its palette`));
