@@ -423,5 +423,5 @@
     if (drag && drag.tool && drag.moved && drag.over && drag.over.part === part) { C.shapePath(g, PARTS[part].shape, tf); g.strokeStyle = 'rgba(243,211,107,0.9)'; g.lineWidth = 2; g.stroke(); g.lineWidth = 1; }
   }
 
-  root.Body = { open, leave, tick, state: () => st, examine };
+  root.Body = { injure: (cause, part) => { const a = B.injure(body(), cause, part); if (st) save(); return a; }, open, leave, tick, state: () => st, examine };
 })(window);

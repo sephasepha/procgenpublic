@@ -291,6 +291,17 @@ experience whichever screen is open. `tests/skills.js` covers levelling.
 
 - **Boiling things down (crafting).** An ingredient with `craft` (the Mycelial Lattice, `craft: 'bandage'`) boiled in a pot with liquids until the pot has come together as a stew becomes goods of that kind instead of a meal: the pot shows its name and a **Take** button. The liquids carry `liquid: { potency, trait }` (Black Water -0.3 Tainted, Clear Seep 0.4 Clean, Moon-Milk 1.0 Soothing); the score is 1 plus their mean potency (thinner with more water), and its tier (`CAMP_CRAFTS`: Poor 0.85, Good 1.4, Excellent 2.0 power) and traits go into each bandage. Kept bandages (`goods` on the camp, saved) appear on the Body screen's roll as the Boiled Bandage, which binds like gauze and gives its dressing to the wound: a healing wound heals `power` times as fast, and says so in its panel and in the medical history. New kinds of goods are a row in `CAMP_CRAFTS` and a material with `craft`.
 
+## Fishing: the black pool
+
+The fourth screen (**Fish**, key 4). It is not a cozy fishing game: what bites is not a fish. `fishing/data.js` (zones, creatures, hours, tuning), `fishing/sim.js` (the rules, no DOM, tested in `tests/fishing.js`), `fishing/fishing.js` (the screen).
+
+- **Cast, wait, hook.** Hold **Cast** to throw further (the shallows, the dark, the deep), with or without bait from your stock (grubs, meat, fungus, sweets, eggs, bone, eyes, fat). A shadow shows under the bobber before the dip; hook at the dip, not before and not after.
+- **Bait and the hour decide what bites.** Each creature has what it likes (bait tags, and the exact thing counts for more: marrow for the bone eel, comet honey for the lantern-gape, grubs for the shoal-things) and the hours it keeps (the bell: Dawn, Day, Dusk, Night; a day is 20 minutes of play). The bone eel and the drowner come at night; the pike and eel more by day and at the dawn bell.
+- **The fight on the line.** Hold **Reel** and ease off when it surges: a strain gauge, the line's strength, how tired it is, how near. Thrashes and dives (let it run, but not past the end), gnawing at the line. Too much strain breaks the line; too much slack and it spits the hook.
+- **The fight on the ledge.** Landed, it is alive: **Strike**, **Brace** (a brace on its attack parries it, and leaves it open for a double blow) or **Cut loose** (losing it). Its attacks cost health and soul, and can wound you through the body screen with a cause (blunt impact, thorn bite, spore cloud, starlight, whispering voices), so a fishing trip ends up in the medical history. Down at zero health, you collapse and lose it.
+- **The bone eel** is the one that flies: a snake of small bones that takes the air and circles out of reach. It can only be hit as it swoops in, or when a parry leaves it open.
+- **Spoils.** What you kill goes to your stock as ingredients (marrow, eel, leech, spore bladders, lantern eyes, star-gristle), for cooking. Angling is a skill with its own experience.
+
 ## Body: afflictions and treatment
 
 The ✚ Body screen: a table by candlelight with **The Pilgrim's Body**, an anatomical chart on which whatever has

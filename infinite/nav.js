@@ -1,14 +1,15 @@
-// The screens bar: a strip along the bottom of every game screen (the world, the camp, the body) to move between
+// The screens bar: a strip along the bottom of every game screen (the world, the camp, the body, the pool) to move between
 // them at any time. Which screen is showing is read from the page itself, so the bar can never disagree with it.
-// Keys 1, 2 and 3 do the same.
+// Keys 1 to 4 do the same.
 (function (root) {
   const TABS = [
     { k: 'map', icon: '◈', name: 'Delve', title: 'The world (1)' },
     { k: 'camp', icon: '♨', name: 'Camp', title: 'The fire and cooking (2)' },
     { k: 'body', icon: '✚', name: 'Body', title: 'Afflictions and treatment (3)' },
+    { k: 'fish', icon: '≋', name: 'Fish', title: 'Fishing the black pool (4)' },
   ];
   const vis = sel => { const e = document.querySelector(sel); return !!(e && !e.hidden); };
-  const current = () => vis('.camp:not(.body-screen)') ? 'camp' : vis('.body-screen') ? 'body' : 'map';
+  const current = () => vis('.fish-screen') ? 'fish' : vis('.camp:not(.body-screen):not(.fish-screen)') ? 'camp' : vis('.body-screen') ? 'body' : 'map';
   let bar = null;
 
   // back to the world: whatever screen was showing has already closed itself
@@ -19,10 +20,12 @@
     if (k === from || !document.documentElement.classList.contains('xp-open')) return;
     if (from === 'camp') Camp.leave(true);
     else if (from === 'body') Body.leave(true);
+    else if (from === 'fish') Fishing.leave(true);
     else if (root.Infinite) Infinite.suspend();
     if (k === 'map') home();
     else if (k === 'camp' && root.Camp) Camp.open(home);
     else if (k === 'body' && root.Body) Body.open(home);
+    else if (k === 'fish' && root.Fishing) Fishing.open(home);
     paint();
   }
 

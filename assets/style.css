@@ -511,3 +511,18 @@ html.has-screens .camp { bottom: var(--navh); }
 .cf-ctx .meal::after { content: attr(data-grade); margin-left: 8px; font: 0.58rem var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: #e8c872; }
 .cf-ctx .acts button[data-a="close"] { flex: 0 0 34px; width: 34px; }
 .cf-ctx .acts button[hidden] { display: none; }
+
+/* ---------- Fishing: the pool, the line, the bait, and what to do now ---------- */
+.fish-screen .bx-needs { pointer-events: none; }
+.fish-screen .fx-hour { margin-left: auto; font: 0.62rem var(--f-mono); letter-spacing: 0.1em; text-transform: uppercase; color: #e8c872; }
+.fx-bait { position: absolute; left: 8px; right: 8px; bottom: calc(var(--navh, 52px) + 60px); display: flex; gap: 5px; overflow-x: auto; padding: 2px; z-index: 3; }
+.fx-bait[hidden] { display: none; }
+.fx-bait button { appearance: none; flex: none; height: 28px; padding: 0 9px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.18); background: rgba(8,7,10,0.75); color: #e6e1d5; font: 0.64rem var(--f-mono); letter-spacing: 0.04em; cursor: pointer; white-space: nowrap; }
+.fx-bait button.on { border-color: #e8c872; color: #ffe08a; background: rgba(207,167,78,0.18); }
+.fx-bait button i { font-style: normal; opacity: 0.6; margin-left: 4px; }
+.fx-bar { position: absolute; left: 8px; right: 8px; bottom: calc(var(--navh, 52px) + 8px); display: flex; gap: 8px; justify-content: center; z-index: 3; }
+.fx-bar button { appearance: none; flex: 1 1 0; max-width: 220px; height: 46px; border-radius: 10px; border: 1px solid rgba(232,200,114,0.55); background: rgba(24,18,10,0.82); color: #f0e0b0; font: 600 0.85rem var(--f-display, serif); letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; touch-action: none; }
+.fx-bar button:active, .fx-bar button.on { background: rgba(207,167,78,0.3); }
+.fx-bar button.cool { opacity: 0.45; }
+.fx-bar button[data-k="flee"] { flex: 0 1 110px; border-color: rgba(240,130,100,0.5); color: #f0b0a0; font-size: 0.72rem; }
+.fx-bar button[data-k="brace"] { border-color: rgba(160,240,255,0.5); color: #c8f6ff; }

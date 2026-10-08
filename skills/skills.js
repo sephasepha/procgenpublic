@@ -7,12 +7,14 @@
 //   firemaking   a piece catching (camp), coals forming, a breath when the fire needs one, gathering ash and char
 //   cooking      food cooking (by how far each item gets towards done, unburnt), freeing food that was sticking,
 //                eating a dish or a stew
+//   angling      hooking something, landing it, parrying it, killing it (by what it was)
 //   medicine     a right step of a treatment, finding out a step, a cure (body)
 (function (root) {
   const SKILLS = {
     fire: { name: 'Firemaking', icon: '♨' },
     cooking: { name: 'Cooking', icon: '◒' },
     medicine: { name: 'Medicine', icon: '✚' },
+    angling: { name: 'Angling', icon: '≋' },
   };
   const XP = {
     catch: { tinder: 1, kindling: 2, fuel: 4 }, coals: 3, breath: 1, gather: 1,  // firemaking
