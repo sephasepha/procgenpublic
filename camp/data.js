@@ -14,7 +14,7 @@
   const STRIKER = { name: 'Striker', note: 'Flint on iron. Strike it over tinder.', pal: { a: '#6a6a72', b: '#9a9aa6', c: '#3a3a42', d: '#ffd060' }, px: ['......d.', '.....dbd', '....abb.', '...abb..', '..abb...', '.ccb....', 'cc......', 'c.......'] };
 
   const VESSELS = {
-    pot: { name: 'Pot', note: 'Iron pot. Dry, it is an oven and scorches what is in it. With water it boils; simmer cooked food long enough and it comes together as a stew.', cap: 4, gain: 0.17, tau: 10, coolTau: 60, burnAt: 150, dryBurnAt: 118, boils: true, boilOff: 0.00015, stickTime: 12, tend: 'Stir', tendLoss: 0,
+    pot: { name: 'Pot', note: 'Iron pot. Dry, it is an oven and scorches what is in it. With water it boils; simmer cooked food long enough and it comes together as a stew.', cap: 4, gain: 0.17, tau: 10, coolTau: 60, burnAt: 150, dryBurnAt: 118, boils: true, boilOff: 0.00015, stickTime: 12, tend: 'Stir', mix: 0.5, tendLoss: 0,
       pal: { a: '#2a2a30', b: '#4a4a56', c: '#14141a', d: '#6a6a7a' }, px: ['........', '.d....d.', 'dbbbbbbd', 'abbbbbba', 'aaaaaaaa', 'aaaaaaaa', '.aaaaaa.', '..c..c..'] },
     pan: { name: 'Pan', note: 'Blackened pan. Fries fast and burns faster.', cap: 3, gain: 0.25, tau: 3, coolTau: 20, speed: 2, burnAt: 190, stickTime: 10, tend: 'Flip', tendLoss: 3, greases: true,
       pal: { a: '#2a2a30', b: '#4a4a56', c: '#6a4a3a' }, px: ['........', '........', '.bbbbb..', 'abbbbba.', 'aaaaaacc', '.aaaaa..', '........', '........'] },

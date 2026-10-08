@@ -97,13 +97,20 @@
     v.items.push({ id: ing, progress: 0, scorch: 0, stick: 0 });
     return true;
   }
-  // flip the pan, turn the skewer, stir the pot: everything in it comes unstuck; lifting it costs a little heat
+  // flip the pan, turn the skewer, stir the pot: everything in it comes unstuck; lifting it costs a little heat; stirring also shares cooking between the items
   function tend(c, id) {
     const v = c.vessels.find(q => q.id === id); if (!v || !v.items.length) return false;
     const was = Math.max(0, ...v.items.map(it => it.stick || 0));
     v.items.forEach(it => { it.stick = 0; });
     v.T = Math.max(AMBIENT, v.T - (VESSELS[v.type].tendLoss || 0));
-    return { freed: was };
+    // stirring spreads the cooking about: what is far ahead gives some of its progress to what is behind (the total
+    // is kept), so a quick thing slows and a slow thing catches up. Scorch stays where it is.
+    const mix = VESSELS[v.type].mix || 0, food = v.items.filter(it => !ING[it.id].water);
+    if (mix > 0 && food.length > 1) {
+      const mean = food.reduce((s, it) => s + it.progress, 0) / food.length;
+      food.forEach(it => { it.progress += (mean - it.progress) * mix; });
+    }
+    return { freed: was, mixed: mix > 0 && food.length > 1 };
   }
   const texture = it => TEX[ING[it.id].texture] || TEX.usual;
   const clamp01 = x => Math.max(0, Math.min(1, x));
