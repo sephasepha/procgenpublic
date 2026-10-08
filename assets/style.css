@@ -526,3 +526,5 @@ html.has-screens .camp { bottom: var(--navh); }
 .fx-bar button.cool { opacity: 0.45; }
 .fx-bar button[data-k="flee"] { flex: 0 1 110px; border-color: rgba(240,130,100,0.5); color: #f0b0a0; font-size: 0.72rem; }
 .fx-bar button[data-k="brace"] { border-color: rgba(160,240,255,0.5); color: #c8f6ff; }
+.fx-bar button.warn { border-color: #ff7a5a; color: #ffd0a0; animation: fxwarn 0.22s ease-in-out infinite alternate; }
+@keyframes fxwarn { from { background: rgba(120,30,20,0.85); } to { background: rgba(200,70,40,0.9); } }

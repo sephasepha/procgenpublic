@@ -52,7 +52,7 @@
     wait: [4, 10], waitBait: 0.6, waitLiked: 0.6, omen: 1.6, bite: 0.9, // seconds to a bite (faster with bait, faster still if it is liked), the shadow shows this long first, the hooking window
     line: 10, linePerLevel: 0.25, tension: { reel: 0.3, calmPull: 0.25, surge: 0.9, free: 0.55, rate: 2.5, danger: 0.75, slack: 0.12 },
     reel: 0.07, reelTired: 0.6, run: 0.12, farthest: 1.15, // reel speed (as a share of the cast a second), faster when tired; how fast it runs out; past this the line is gone
-    lineDamage: 32, gnaw: 1.2, tire: { surge: 1, band: [0.3, 0.7], reel: 0.8 }, hookLoss: 0.25, surgeLen: [0.9, 1.6],
+    lineDamage: 32, gnaw: 1.2, tire: { surge: 1, band: [0.3, 0.7], reel: 0.8 }, hookLoss: 0.25, tell: 1.1, surgeLen: [0.9, 1.6],
     land: 0.04, strikeCd: 0.6, strike: 3, perLevel: 0.4, brace: 0.7, braceCd: 1.4, recover: 1.3, hit: 0.8, gapCombat: [1, 2], flyGap: 1.4, flyWindup: 1.3, near: 0.4, openingBonus: 2, parried: 0.2,
   };
   const api = { FISH_ZONES: ZONES, FISH_CREATURES: CREATURES, FISH_TUNING: TUNING, FISH_PERIODS: PERIODS, FISH_DAY: DAY, fishHourOf: hourOf, fishPeriodOf: periodOf };

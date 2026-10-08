@@ -126,6 +126,10 @@
     paintBar(); if (el.querySelector('.fx-bait').hidden === false) paintBait(false);
     // buttons that wait: strike and brace show their cooldowns
     if (f.phase === 'combat') { const s = el.querySelector('[data-k="strike"]'), b = el.querySelector('[data-k="brace"]'); if (s) s.classList.toggle('cool', f.cd > 0); if (b) { b.classList.toggle('cool', f.braceCd > 0); b.classList.toggle('on', f.brace > 0); } }
+    // the reel button says what to do while a move is being told
+    const wn = f.phase === 'fight' ? F.warning(f) : null, rb = el.querySelector('[data-k="reel"]');
+    if (rb) { const mode = wn ? (wn.harm ? 'ease' : wn.kind === 'gnaw' ? 'fast' : 'calm') : ''; if (rb.dataset.mode !== mode) { rb.dataset.mode = mode; rb.textContent = mode === 'ease' ? 'Ease off!' : mode === 'fast' ? 'Reel fast!' : 'Reel'; rb.classList.toggle('warn', mode === 'ease'); } }
+    if (wn && wn.harm && st.told !== f.m) { st.told = f.m; if (navigator.vibrate) navigator.vibrate(40); }
     needs(); draw(t / 1000);
   }
 
@@ -186,10 +190,11 @@
       if (f.omen || bite) { const sz = F.shadow(f) * 26 + 6; g.fillStyle = 'rgba(0,0,0,0.45)'; g.beginPath(); g.ellipse(b.x, b.y + 8, sz, sz * 0.3, 0, 0, 7); g.fill(); if (bite) { g.strokeStyle = 'rgba(200,230,255,0.5)'; g.lineWidth = 1; for (let r = 0; r < 3; r++) { g.beginPath(); g.ellipse(b.x, b.y + 2, 6 + r * 6 + (time * 14) % 6, 2 + r * 2, 0, 0, 7); g.stroke(); } } }
       let tip = { x: L.rx, y: L.ry - 14 }, bx = b.x, by = b.y + dip;
       if (f.phase === 'fight') { const cp = creatureAt(L, f); bx = cp.x; by = cp.y; }
-      g.strokeStyle = f.phase === 'fight' && f.tension > T.tension.danger ? '#ff6a5a' : 'rgba(230,225,210,0.6)'; g.lineWidth = 1; g.beginPath(); g.moveTo(tip.x, tip.y);
+      const warn = f.phase === 'fight' ? F.warning(f) : null; if (warn) { bx += Math.sin(time * 70) * (warn.harm ? 2 : 1); by += Math.cos(time * 63) * (warn.harm ? 1.5 : 0.8); }
+      g.strokeStyle = f.phase === 'fight' && f.tension > T.tension.danger ? '#ff6a5a' : warn && warn.harm ? `rgba(255,${150 + 60 * Math.sin(time * 28) | 0},90,0.95)` : 'rgba(230,225,210,0.6)'; g.lineWidth = warn && warn.harm ? 1.5 : 1; g.beginPath(); g.moveTo(tip.x, tip.y);
       const sag = f.phase === 'fight' ? Math.max(0, 1 - f.tension * 2) * 14 : 8; g.quadraticCurveTo((tip.x + bx) / 2, Math.max(tip.y, by) + sag - 4, bx, by); g.stroke();
       if (f.phase !== 'fight') { g.fillStyle = bite ? '#ff7a50' : '#e8e2d0'; g.fillRect(Math.round(b.x - 1.5), Math.round(b.y + dip - 3), 3, 3); g.fillStyle = '#d8402a'; g.fillRect(Math.round(b.x - 1.5), Math.round(b.y + dip - 1), 3, 2); }
-      if (f.phase === 'fight') { const cp = creatureAt(L, f), sc = 0.9 - f.dist * 0.45 + 0.35; creature(f.creature, cp.x, cp.y, sc * 1.5, Math.PI * 0.95 + Math.sin(time * 4) * 0.2, time, 'swim'); }
+      if (f.phase === 'fight') { const cp = creatureAt(L, f), sc = 0.9 - f.dist * 0.45 + 0.35; if (warn) { cp.x += Math.sin(time * 60) * 1.5; cp.y -= 3 * (warn.of - warn.left) / warn.of; } creature(f.creature, cp.x, cp.y, sc * 1.5, Math.PI * 0.95 + Math.sin(time * 4) * 0.2, time, 'swim'); }
     }
     if (f.phase === 'combat') combatScene(L, f, c, time);
     g.restore();
@@ -236,7 +241,14 @@
       text('LINE', X, y + 22, 10, '#c8c0b0'); bar0(X + 36, y + 15, W - 36, 5, f.line.hp / f.line.max, f.line.hp / f.line.max < 0.35 ? '#e0504a' : '#d8d0b8');
       text('TIRES', X, y + 35, 10, '#c8c0b0'); bar0(X + 46, y + 28, W - 46, 5, 1 - f.stamina / c.stamina, '#c0a0e0');
       text('NEARER', X, y + 48, 10, '#c8c0b0'); bar0(X + 46, y + 41, W - 46, 5, 1 - Math.min(1, f.dist), '#8fb8e8');
-      if (f.m && f.m.kind) text(({ thrash: 'It thrashes: ease off', dive: 'It dives: let it run', gnaw: 'It gnaws the line: keep reeling' })[f.m.kind], LW / 2, top + 52, 11, '#ff9a6a', 'center');
+      const w = F.warning(f);
+      if (w) { // it tenses before it moves: say so, and where the strain would go if you kept reeling
+        const pulse = 0.5 + 0.5 * Math.sin(time * 28), gx = Math.round(X + W * Math.min(1, w.strain));
+        g.strokeStyle = w.harm ? `rgba(255,${90 + 80 * pulse | 0},70,1)` : 'rgba(240,210,120,0.9)'; g.lineWidth = 1.5; g.strokeRect(gx - 3, y, 6, 11); g.beginPath(); g.moveTo(gx, y + 12); g.lineTo(gx - 3, y + 17); g.lineTo(gx + 3, y + 17); g.closePath(); g.fillStyle = g.strokeStyle; g.fill();
+        const msg = { thrash: w.harm ? 'It is about to thrash. EASE OFF!' : 'It is about to thrash.', dive: w.harm ? 'It is about to dive. EASE OFF, let it run!' : 'It is about to dive.', gnaw: 'It is about to gnaw the line. Reel fast!' }[w.kind];
+        text(msg, LW / 2, top + 54, 13, w.harm ? (pulse > 0.5 ? '#ffd0a0' : '#ff7a5a') : '#e8c872', 'center'); bar0(Math.round(LW / 2 - 50), top + 60, 100, 4, 1 - w.left / w.of, w.harm ? '#ff7a5a' : '#e8c872');
+        if (w.harm) { g.strokeStyle = `rgba(255,110,70,${0.25 + 0.45 * pulse})`; g.lineWidth = 3; g.strokeRect(1.5, 1.5, LW - 3, LH - 3); }
+      } else if (f.m && f.m.kind) text(({ thrash: 'It thrashes: ease off', dive: 'It dives: let it run', gnaw: 'It gnaws the line: keep reeling' })[f.m.kind], LW / 2, top + 54, 11, '#ff9a6a', 'center');
       if (f.tension < T.tension.slack * 1.5) text('slack: reel!', LW / 2, top + 66, 9, '#9ab8f0', 'center');
     }
     if (f.phase === 'idle' && st.charging || (f.phase === 'idle' && st.charge > 0 && st.charging)) { const x = L.rx + 10, y = L.ry - 36; bar0(x, y, 60, 5, st.charge, '#e8c872'); text('CAST', x, y - 3, 10, '#c8c0b0'); }

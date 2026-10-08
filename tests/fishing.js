@@ -61,6 +61,17 @@ console.log('The bone eel');
   k.ph = 'recover'; k.t = 1; check(F.reachable(q.f), 'and when a parry leaves it open'); }
 { const q = landed('boneEel', 18); let n = 0, parried = 0; run(q.f, q.ctx, 90, 0.05, () => { const k = q.f.combat; if (!k || q.f.phase !== 'combat') return; if (k.ph === 'windup' && k.t < 0.35) F.brace(q.f); if (F.reachable(q.f)) F.strike(q.f, q.ctx); }); check(q.f.result && q.f.result.kind === 'caught' && q.ctx.stock.marrow >= 3, 'braced at the swoop and struck when open, the bone eel can be killed, and gives marrow'); }
 
+console.log('Telling the move before it comes');
+{ const q = hooked('ossuaryPike', 21); q.f.m = { kind: null, t: 0, next: 0.05 }; let seenTell = false, tenseAt = -1, hitAt = -1, t = 0; const lp = q.f.line.hp;
+  for (; t < 6; t += 0.05) { F.setReel(q.f, true); F.step(q.f, 0.05, q.ctx); const w = F.warning(q.f); if (w && tenseAt < 0) { tenseAt = t; seenTell = true; check(w.harm && (w.kind === 'gnaw' || w.strain > T.tension.danger), 'a hard move warns that reeling through it would harm the line'); } if (tenseAt >= 0 && !w && hitAt < 0) hitAt = t; if (q.f.line.hp < lp - 0.01 && hitAt < 0) { hitAt = -2; break; } }
+  check(seenTell && hitAt !== -2, 'the line takes no damage while the move is only being told');
+  check(F.warning(q.f) === null || q.f.m.tell > 0, 'the warning ends when the move begins'); }
+{ const q = hooked('ossuaryPike', 22); q.f.m = { kind: 'thrash', tell: T.tell, t: 0, next: 0 }; const t0 = q.f.tension; let max = 0; for (let t = 0; t < T.tell - 0.1; t += 0.05) { F.setReel(q.f, true); F.step(q.f, 0.05, q.ctx); max = Math.max(max, q.f.tension); } check(max < T.tension.danger, 'during the tell the strain stays below the danger line, so there is time to ease off');
+  for (let t = 0; t < 1.5; t += 0.05) { F.setReel(q.f, false); F.step(q.f, 0.05, q.ctx); } check(q.f.line.hp === q.f.line.max, 'easing off at the tell takes no line damage at all'); }
+{ const q = hooked('ossuaryPike', 23); q.f.m = { kind: 'thrash', tell: T.tell, t: 0, next: 0 }; for (let t = 0; t < T.tell + 1.4; t += 0.05) { F.setReel(q.f, true); F.step(q.f, 0.05, q.ctx); } check(q.f.line.hp < q.f.line.max, 'but reeling through it does'); }
+{ const q = hooked('abyssalEel', 24); q.f.m = { kind: 'gnaw', tell: T.tell, t: 0, next: 0 }; check(F.warning(q.f).harm, 'a gnaw is told as harm'); for (let t = 0; t < T.tell - 0.1; t += 0.05) F.step(q.f, 0.05, q.ctx); check(q.f.line.hp === q.f.line.max, 'and does nothing until the tell is over'); }
+{ const q = hooked('blindShoal', 25); q.f.m = { kind: 'thrash', tell: T.tell, t: 0, next: 0 }; check(!F.warning(q.f).harm, 'a weak thing thrashing is told, but not as a danger to the line'); }
+
 console.log(`\n${checks} checks`);
 if (failures) { console.log(`${failures} FAILED`); process.exit(1); }
 console.log('All passed');

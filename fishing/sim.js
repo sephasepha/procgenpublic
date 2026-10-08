@@ -67,18 +67,21 @@
   // the line, the creature and your hands: one step of the fight
   function fight(f, dt, ctx) {
     const c = CR[f.creature], m = f.m, tune = T.tension, tired = f.stamina <= 0;
-    m.t -= dt;
-    if (m.kind && m.t <= 0) { m.kind = null; m.next = between(f, c.gap) * (tired ? 1.6 : 1); }
-    else if (!m.kind) { m.next -= dt; if (m.next <= 0 && !tired) { m.kind = c.moves[Math.floor(rng(f) * c.moves.length)]; m.t = between(f, T.surgeLen); say(f, ({ thrash: 'It thrashes.', dive: 'It dives, taking line.', gnaw: 'It gnaws at the line.' })[m.kind], 'warn'); } }
-    const surging = !!m.kind && m.kind !== 'gnaw', pull = c.pull * (tired ? 0.3 : 1), now = surging ? pull : pull * tune.calmPull;
+    // a move is told before it is made: the creature tenses (m.tell counts down) and only then does it pull, dive or gnaw
+    if (m.kind) {
+      if (m.tell > 0) { m.tell -= dt; if (m.tell <= 0) { m.tell = 0; m.t = between(f, T.surgeLen); say(f, ({ thrash: 'It thrashes.', dive: 'It dives, taking line.', gnaw: 'It gnaws at the line.' })[m.kind], 'warn'); } }
+      else { m.t -= dt; if (m.t <= 0) { m.kind = null; m.next = between(f, c.gap) * (tired ? 1.6 : 1); } }
+    } else { m.next -= dt; if (m.next <= 0 && !tired) { m.kind = c.moves[Math.floor(rng(f) * c.moves.length)]; m.tell = T.tell; m.t = 0; say(f, ({ thrash: 'It tenses. It is about to thrash.', dive: 'It turns its head down. It is about to dive.', gnaw: 'It bares its teeth at the line.' })[m.kind], 'warn'); } }
+    const telling = !!m.kind && m.tell > 0;
+    const surging = !!m.kind && !telling && m.kind !== 'gnaw', pull = c.pull * (tired ? 0.3 : 1), now = surging ? pull : pull * tune.calmPull;
     const target = f.reel ? tune.reel + now * tune.surge : now * tune.free;
     f.tension += clamp(target - f.tension, -tune.rate * dt, tune.rate * dt);
     // it runs when it dives and you let it; you take it in when you reel
-    if (m.kind === 'dive' && !f.reel) f.dist += T.run * (0.5 + pull) * dt;
+    if (m.kind === 'dive' && !telling && !f.reel) f.dist += T.run * (0.5 + pull) * dt;
     if (f.reel) f.dist -= T.reel * (tired ? 1 + T.reelTired : 1) * (1 - now * 0.6) * dt;
     // the line takes the strain
     if (f.tension > tune.danger) f.line.hp -= (f.tension - tune.danger) * T.lineDamage * dt;
-    if (m.kind === 'gnaw') f.line.hp -= T.gnaw * dt;
+    if (m.kind === 'gnaw' && !telling) f.line.hp -= T.gnaw * dt;
     // it tires from surging and from being reeled in the sweet band; slack lets it shake the hook
     if (surging) f.stamina -= T.tire.surge * dt;
     if (f.reel && f.tension >= T.tire.band[0] && f.tension <= T.tire.band[1]) f.stamina -= T.tire.reel * dt;
@@ -153,6 +156,12 @@
     else if (f.phase === 'combat') combat(f, dt, ctx);
   }
 
-  const api = { createAngler, cast, hook, setReel, reelIn, strike, brace, retreat, nextCast, step, shadow, zoneOf, chooseCreature, reachable };
+  // while a move is being told: what the strain would climb to if you kept reeling, and whether that would hurt the line
+  function warning(f) {
+    const m = f.m; if (f.phase !== 'fight' || !m || !m.kind || !(m.tell > 0)) return null;
+    const c = CR[f.creature], pull = c.pull * (f.stamina <= 0 ? 0.3 : 1), strain = m.kind === 'gnaw' ? T.tension.reel + pull * T.tension.calmPull * T.tension.surge : T.tension.reel + pull * T.tension.surge;
+    return { kind: m.kind, left: m.tell, of: T.tell, strain, harm: m.kind === 'gnaw' || strain > T.tension.danger };
+  }
+  const api = { warning, createAngler, cast, hook, setReel, reelIn, strike, brace, retreat, nextCast, step, shadow, zoneOf, chooseCreature, reachable };
   if (isNode) module.exports = api; else root.FishSim = api;
 })(typeof window !== 'undefined' ? window : globalThis);
