@@ -42,7 +42,7 @@
       { a: '#3f7a3a', b: '#5ea040', c: '#c33a5a' }, ['........', '.abba.b.', 'abcbbab.', 'bbcabcba', 'abacbcbb', '.bbacab.', '..abba..', '........'], { tags: ['green'] }),
     blackWater: I('Black Water', 'deep', 'Drawn from the deep. Something swims in it. Boil it.', 24,
       { thirst: -10, health: -7, soul: -4 }, { thirst: -24 },
-      { a: '#3a3530', b: '#8c8476', c: '#0b0b14', d: '#4a4a6a' }, ['...bb...', '...aa...', '..baab..', '.bccccb.', '.bcdccb.', '.bccccb.', '.bccccb.', '..bbbb..'], { tags: ['water'], water: true, only: ['pot'] }),
+      { a: '#3a3530', b: '#8c8476', c: '#0b0b14', d: '#4a4a6a' }, ['...bb...', '...aa...', '..baab..', '.bccccb.', '.bcdccb.', '.bccccb.', '.bccccb.', '..bbbb..'], { tags: ['water'], water: true, only: ['pot'], liquid: { potency: -0.3, trait: 'Tainted' } }),
     sporeBladder: I('Spore Bladder', 'growth', 'Breathes out when squeezed. Do not breathe in.', 18,
       { health: -10, exhaustion: 10 }, { exhaustion: -12, hunger: -6 },
       { a: '#c9a35a', b: '#e0c070', c: '#6a5a2a', d: '#e8e0c8' }, ['.d....d.', '..aaaa..', '.abbaca.', 'aabaaaca', 'acaabaaa', 'aaacaaba', '.aaaaaa.', '..a..a..'], { tags: ['fungus'] }),
@@ -85,6 +85,15 @@
     cometHoney: I('Comet Honey', 'cosmic', 'Sweet, cold, and full of little lights.', 8,
       { soul: -5, thirst: 6, exhaustion: -3 }, { hunger: -7, exhaustion: -9, soul: 3 },
       { a: '#8c8476', b: '#9fb4ff', c: '#e9e2ff' }, ['..aaaa..', '...aa...', '.abbbba.', 'abbcbbba', 'abbbbcba', 'abcbbbba', 'abbbbbba', '.aaaaaa.'], { tags: ['sweet'], glow: '#9fb4ff' }),
+    mycelLattice: I('Mycelial Lattice', 'growth', 'A grey mesh, fine as lace, grown on the dead. Boiled soft in something, it makes a dressing.', 14,
+      { health: -4, exhaustion: 4 }, { hunger: -6, health: 1 },
+      { a: '#bdb8a8', b: '#8a8678', c: '#e8e4d4' }, ['a.b.a.b.', '.bcbcbc.', 'acbabcb.', '.bcbcba.', 'bacbcbca', '.bcbcbc.', 'a.b.a.b.', '........'], { tags: ['fungus', 'lattice'], craft: 'bandage' }),
+    clearSeep: I('Clear Seep', 'deep', 'Water that came through clean stone and a long way down. It tastes of nothing, kindly.', 10,
+      { thirst: -12, health: 1 }, { thirst: -20, health: 1 },
+      { a: '#b8d8e8', b: '#e8f4fa', c: '#7aa8c0' }, ['...bb...', '...aa...', '..baab..', '.bccccb.', '.bcaacb.', '.bccccb.', '.bccccb.', '..bbbb..'], { tags: ['water'], water: true, only: ['pot'], liquid: { potency: 0.4, trait: 'Clean' } }),
+    moonMilk: I('Moon-Milk', 'cosmic', 'A pale drip from the roof of the deepest caves. It is warm, and it is not milk.', 18,
+      { soul: -2, thirst: -6 }, { soul: 4, thirst: -12, health: 3 },
+      { a: '#e8eef4', b: '#c8d4e0', c: '#9aa6c8' }, ['...bb...', '...aa...', '..baab..', '.bcaacb.', '.baaaab.', '.bcaacb.', '.bccccb.', '..bbbb..'], { tags: ['water'], water: true, only: ['pot'], glow: '#c8d4e0', liquid: { potency: 1.0, trait: 'Soothing' } }),
   };
 
   // how each ingredient takes the heat, by its texture: burn (how fast it scorches, 1 = usual) and window (how far
@@ -107,8 +116,16 @@
     water: { name: 'Water', note: 'Boils; does not burn the way food does.', mark: '#7aa8d8' },
   };
   // what an ingredient is worth raw, in coin: dearer the longer it takes to cook (the hard-won, the strange)
-  Object.values(INGREDIENTS).forEach(i => { i.price = i.water ? 1 : Math.round(3 + i.cook * 0.8); });
+  Object.values(INGREDIENTS).forEach(i => { i.price = i.water ? Math.max(1, 1 + Math.round(((i.liquid || {}).potency || 0) * 6)) : Math.round(3 + i.cook * 0.8); });
   Object.values(INGREDIENTS).forEach(i => { i.cls = i.water ? 'water' : Object.keys(CLASSES).find(k => i.cook <= CLASSES[k].max); });
+
+  // things to boil into other things: a material (an ingredient with `craft`) boiled in a pot with liquids until it has
+  // come together makes goods of that kind. What the liquids carry (`liquid`: its potency and a trait) goes into them:
+  // the score is 1 + the liquids' mean potency (thinner for more water), and its tier gives the goods their power.
+  const CRAFTS = {
+    bandage: { name: 'Bandage', note: 'A dressing for wounds. Used in the Body screen in place of gauze; its power is how much faster a wound heals under it.',
+      tiers: [{ name: 'Poor', min: -9, power: 0.85 }, { name: 'Good', min: 1.3, power: 1.4 }, { name: 'Excellent', min: 1.8, power: 2 }] },
+  };
 
   // dishes: a vessel and exactly these ingredients, all cooked and not burnt, earn the dish's bonus on top
   const D = (name, vessel, items, bonus, note) => ({ name, vessel, items, bonus, note });
@@ -133,6 +150,6 @@
     char: { name: 'Char', note: 'A lump of charcoal from a log that burnt down to coals and went cold. Light, black, and it burns hot again.',
       px: ['........', '...cC...', '..cCsc..', '.ccccCc.', '.cCcccs.', '..cccC..', '...cc...', '........'], pal: { c: '#2a272e', C: '#7a7484', s: '#c8c2d0' } },
   };
-  const api = { CAMP_FIRE: FIRE, CAMP_RESIDUE: RESIDUE, CAMP_STRIKER: STRIKER, CAMP_VESSELS: VESSELS, CAMP_INGREDIENTS: INGREDIENTS, CAMP_TEXTURES: TEXTURES, CAMP_CLASSES: CLASSES, CAMP_DISHES: DISHES, CAMP_STATS: STATS };
+  const api = { CAMP_FIRE: FIRE, CAMP_RESIDUE: RESIDUE, CAMP_STRIKER: STRIKER, CAMP_VESSELS: VESSELS, CAMP_INGREDIENTS: INGREDIENTS, CAMP_TEXTURES: TEXTURES, CAMP_CLASSES: CLASSES, CAMP_CRAFTS: CRAFTS, CAMP_DISHES: DISHES, CAMP_STATS: STATS };
   if (typeof module !== 'undefined' && module.exports && typeof window === 'undefined') module.exports = api; else Object.assign(root, api);
 })(typeof window !== 'undefined' ? window : globalThis);

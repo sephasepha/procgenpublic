@@ -77,6 +77,18 @@ function hold(T, items, flipEvery, secs, type) {
 { const a = hold(180, ['starGristle'], 0), b = hold(180, ['starGristle', 'moonlard'], 0); check(b.stick < a.stick * 0.6 && b.at.burnt > a.at.burnt, `fat greases the pan: food sticks and burns less (stuck ${a.stick.toFixed(2)} vs ${b.stick.toFixed(2)})`); }
 { const r = hold(180, ['starGristle'], 0, 6); const T0 = r.v.T, f = S.tend(r.c, r.v.id); check(f && f.freed > 0.4 && r.v.items[0].stick === 0 && r.v.T < T0, 'a flip frees what was sticking and costs a little heat'); }
 
+
+console.log('Boiling things down');
+{ const pot = (liquids, mats, x) => { const c = camp(() => {}); const v = S.placeVessel(c, 'pot', x || 0, 2); [...liquids, ...mats].forEach(k => S.addToVessel(c, v.id, k)); v.items.forEach(it => { it.progress = 1.2; }); v.stewed = true; return { c, v }; };
+  const poor = S.craftOf(pot(['blackWater'], ['mycelLattice']).v), good = S.craftOf(pot(['clearSeep'], ['mycelLattice']).v), best = S.craftOf(pot(['moonMilk'], ['mycelLattice']).v);
+  check(poor.tier === 'Poor' && good.tier === 'Good' && best.tier === 'Excellent' && poor.power < good.power && good.power < best.power, 'the liquid decides the bandage: black water poor, clear seep good, moon-milk excellent');
+  check(best.traits.includes('Soothing') && best.name.includes('Moon-Milk') && best.kind === 'bandage', 'it carries the liquid\'s trait and name');
+  const mix = S.craftOf(pot(['moonMilk', 'blackWater'], ['mycelLattice']).v), thin = S.craftOf(pot(['moonMilk', 'moonMilk', 'moonMilk'], ['mycelLattice']).v); check(mix.score < best.score && thin.score < best.score, 'mixed or watered-down liquids make it worse');
+  const dry = pot(['moonMilk'], ['mycelLattice']); dry.v.stewed = false; check(S.craftOf(dry.v) === null, 'it has to have come together first');
+  const meal = pot(['moonMilk'], ['mycelLattice', 'hardtack']); check(S.craftOf(meal.v) === null, 'a meal is not a craft');
+  const twice = pot(['moonMilk'], ['mycelLattice', 'mycelLattice']); check(S.craftOf(twice.v).count === 2, 'two lattices make two bandages');
+  const g = pot(['clearSeep'], ['mycelLattice']); const t = S.take(g.c, g.v.id); check(t && g.c.goods.length === 1 && g.c.goods[0].power === t.power && g.v.items.length === 0, 'taking it puts the bandage in your goods and empties the pot');
+  check(S.take(camp(() => {}), 1) === null, 'nothing to take'); }
 console.log('Meals: worth and names');
 { const mk = (type, items, prog, x) => { const c = camp(() => {}); const v = S.placeVessel(c, type, x || 0, 2); items.forEach(k => S.addToVessel(c, v.id, k)); v.items.forEach(it => { it.progress = prog; }); return { c, v }; };
   const raw = mk('pan', ['starGristle', 'veinMoss'], 0.1), ok = mk('pan', ['starGristle', 'veinMoss'], 1.05), dry = mk('pan', ['starGristle', 'veinMoss'], 1.05); dry.v.items.forEach(it => { it.dried = true; }); const burnt = mk('pan', ['starGristle', 'veinMoss'], 1.05); burnt.v.items.forEach(it => { it.scorch = 0.5; });
@@ -167,7 +179,7 @@ console.log('Eating');
 
 console.log('Data');
 const ING = D.CAMP_INGREDIENTS;
-check(Object.keys(ING).length === 20, `20 base ingredients (${Object.keys(ING).length})`);
+check(Object.keys(ING).length === 23, `23 base ingredients (${Object.keys(ING).length})`);
 check(new Set(Object.values(ING).map(i => i.theme)).size >= 5, 'ingredients span at least five themes');
 Object.entries(ING).forEach(([k, I]) => {
   check(I.px.length === 8 && I.px.every(r => r.length === 8), `${k}: art is 8x8`);

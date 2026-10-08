@@ -78,7 +78,7 @@
     cv.style.cursor = st.sel ? 'crosshair' : '';
     el.querySelectorAll('.cf-res').forEach(b => { const n = c.stock[b.dataset.r] || 0; b.querySelector('.ct').textContent = String(n); b.classList.toggle('empty', !n); });
     // the larder is icons only; the one in hand is named
-    const lh = el.querySelector('.cf-lhead'); if (lh) lh.textContent = st.sel && ING[st.sel] ? `${ING[st.sel].name} · ${c.stock[st.sel]}` : 'Larder';
+    const lh = el.querySelector('.cf-lhead'); if (lh) lh.textContent = st.sel && ING[st.sel] ? `${ING[st.sel].name} · ${c.stock[st.sel]}` : `Larder${(c.goods || []).length ? ` · ${(c.goods || []).length} bandage${c.goods.length > 1 ? 's' : ''} kept` : ''}`;
   }
   // open or close the larder drawer (toggle when open is not given)
   function larder(open) {
@@ -146,14 +146,19 @@
       const items = v.items.map(it => { const w = S.windowOf(it), wet = ING[it.id].water;
         return `<li class="${stateOf(it)}"><span style="--m:${CLS[ING[it.id].cls].mark}" title="${CLS[ING[it.id].cls].name}">${ING[it.id].name}</span><i${wet ? '' : ` style="--a:${(w.from / BAR).toFixed(3)};--b:${(w.to / BAR).toFixed(3)}"`}></i><em>${stateOf(it)}</em></li>`; }).join('');
       box.innerHTML = `<div class="hd"><b>${Vt.name}</b><span class="T"></span><span class="worth" hidden></span>${water ? `<span class="w">${water}</span>` : ''}${dish}</div>${items ? `<p class="meal" hidden></p><ul>${items}</ul>${uneven(v)}` : `<p>Empty. Open the larder, pick something, and tap the ${Vt.name.toLowerCase()}.</p>`}
-        <div class="acts"><button type="button" data-a="tend" ${v.items.some(it => !ING[it.id].water) ? '' : 'disabled'}>${Vt.tend}</button><button type="button" data-a="sell" disabled>Sell</button><button type="button" data-a="eat" ${v.items.length ? '' : 'disabled'}>Eat</button><button type="button" data-a="away" ${v.items.length ? 'disabled' : ''} aria-label="Put away">Away</button><button type="button" data-a="close" aria-label="Close">✕</button></div>`;
+        <div class="acts"><button type="button" data-a="tend" ${v.items.some(it => !ING[it.id].water) ? '' : 'disabled'}>${Vt.tend}</button><button type="button" data-a="take" hidden>Take</button><button type="button" data-a="sell" disabled>Sell</button><button type="button" data-a="eat" ${v.items.length ? '' : 'disabled'}>Eat</button><button type="button" data-a="away" ${v.items.length ? 'disabled' : ''} aria-label="Put away">Away</button><button type="button" data-a="close" aria-label="Close">✕</button></div>`;
     }
     // what changes every moment: stew forming, water left, temperature, each item's cooking and scorching
     // what the meal would sell for, and the coin you have
     const W = S.worth(v, j), wl = box.querySelector('.worth'), sb = box.querySelector('[data-a="sell"]');
     if (wl) { wl.hidden = !W.ready; wl.textContent = W.sellable ? `${W.value} coin` : W.ready ? 'worthless' : ''; wl.className = 'worth ' + (W.grade || '').toLowerCase(); }
-    const mn = box.querySelector('.meal'); if (mn) { mn.hidden = !W.name; mn.textContent = W.name ? `${W.name}` : ''; mn.dataset.grade = W.grade || ''; }
+    // a pot of material boiled down in liquid has become goods: they are taken, not sold
+    const CR = S.craftOf(v, j), tk = box.querySelector('[data-a="take"]'), mn = box.querySelector('.meal');
+    if (tk) { tk.hidden = !CR; tk.textContent = CR ? `Take ${CR.count > 1 ? '×' + CR.count : ''}`.trim() : 'Take'; }
+    if (mn) { mn.hidden = !(CR || W.name); mn.textContent = CR ? CR.name : W.name || ''; mn.dataset.grade = CR ? `${CR.power >= 1 ? '+' + Math.round((CR.power - 1) * 100) + '% healing' : Math.round((CR.power - 1) * 100) + '% healing'}${CR.traits.length ? ' · ' + CR.traits.join(', ') : ''}` : W.grade || ''; }
+    if (CR && wl) wl.hidden = true;
     if (sb) { sb.disabled = !W.sellable; sb.textContent = W.sellable ? `Sell ${W.value}` : 'Sell'; }
+    if (CR && sb) { sb.disabled = true; sb.textContent = 'Sell'; }
     const sf = box.querySelector('.stew'); if (sf) sf.textContent = `stew forming ${Math.round(j.stewing * 100)}%`;
     const wb = box.querySelector('.wbar i'); if (wb) { const f = Math.max(0, Math.min(1, v.water / Math.max(1, j.waters))); wb.style.width = Math.round(f * 100) + '%'; wb.parentNode.classList.toggle('low', f < 0.3); }
     const T = box.querySelector('.T'); T.textContent = `${Math.round(v.T)}° · ${heatWord(v.T)}`; T.className = 'T ' + (v.T > Vt.burnAt ? 'hot' : v.T > 68 ? 'warm' : '');

@@ -30,7 +30,7 @@
   const isNode = typeof module !== 'undefined' && module.exports && typeof window === 'undefined';
   const DATA = isNode ? require('./data.js') : root;
   const FIREMOD = isNode ? require('./fire.js') : root.CampFire;
-  const VESSELS = DATA.CAMP_VESSELS, ING = DATA.CAMP_INGREDIENTS, TEX = DATA.CAMP_TEXTURES, DISHES = DATA.CAMP_DISHES, STATS = DATA.CAMP_STATS;
+  const CRAFTS = DATA.CAMP_CRAFTS, VESSELS = DATA.CAMP_VESSELS, ING = DATA.CAMP_INGREDIENTS, TEX = DATA.CAMP_TEXTURES, DISHES = DATA.CAMP_DISHES, STATS = DATA.CAMP_STATS;
   const AMBIENT = FIREMOD.AMBIENT;
 
   // ---------- tuning ----------
@@ -237,6 +237,28 @@
     if (form === 1) return `${quality}${main} and ${second}${more ? ' ' + kind : ' ' + kind}`;
     return `${quality}${main} & ${second} ${kind}`;
   }
+  // what a pot has boiled down to, if it holds only a craftable material and liquids and has come together: goods of a
+  // kind, as many as there are materials, of the tier its liquids make, carrying their traits
+  function craftOf(v, j) {
+    if (!VESSELS[v.type].boils || !v.items.length) return null;
+    j = j || judge(v); const mats = v.items.filter(it => !ING[it.id].water), liqs = v.items.filter(it => ING[it.id].water);
+    if (!mats.length || !liqs.length || !j.stew || mats.some(it => !ING[it.id].craft || foodState(it) === 'burnt' || ING[it.id].craft !== ING[mats[0].id].craft)) return null;
+    const K = CRAFTS[ING[mats[0].id].craft], ps = liqs.map(it => (ING[it.id].liquid || {}).potency || 0);
+    const dilute = liqs.length === 1 ? 1 : liqs.length === 2 ? 0.85 : 0.6, score = 1 + ps.reduce((a, b) => a + b, 0) / ps.length * dilute;
+    const tier = K.tiers.reduce((best, t) => (score >= t.min ? t : best), K.tiers[0]);
+    const traits = [...new Set(liqs.map(it => (ING[it.id].liquid || {}).trait).filter(Boolean))];
+    const liquid = (ING[liqs.slice().sort((a, b) => ((ING[b.id].liquid || {}).potency || 0) - ((ING[a.id].liquid || {}).potency || 0))[0].id].name), mat = stem(ING[mats[0].id].name);
+    return { kind: ING[mats[0].id].craft, count: mats.length, tier: tier.name, power: tier.power, score, traits, name: `${tier.name} ${liquid} ${mat} ${K.name}` };
+  }
+  // take what a pot has boiled down to: the vessel is emptied and the goods are yours
+  function take(c, id) {
+    const v = c.vessels.find(q => q.id === id); if (!v) return null;
+    const cr = craftOf(v); if (!cr) return null;
+    c.goods = c.goods || [];
+    for (let k = 0; k < cr.count; k++) c.goods.push({ kind: cr.kind, name: cr.name, tier: cr.tier, power: cr.power, traits: cr.traits });
+    v.items = []; v.water = 0; v.scorch = 0; v.stew = 0; v.stewed = false;
+    return cr;
+  }
   // sell a vessel's meal: it is emptied and you are paid
   function sell(c, id) {
     const v = c.vessels.find(q => q.id === id); if (!v) return null;
@@ -269,6 +291,6 @@
     return { fx, judged: j, name };
   }
 
-  const api = { TUNING: COOK, placeVessel, moveVessel, removeVessel, addToVessel, tend, stepVessels, foodState, windowOf, judge, worth, sell, eat };
+  const api = { TUNING: COOK, placeVessel, moveVessel, removeVessel, addToVessel, tend, stepVessels, foodState, windowOf, judge, worth, sell, craftOf, take, eat };
   if (isNode) module.exports = api; else root.CampCooking = api;
 })(typeof window !== 'undefined' ? window : globalThis);

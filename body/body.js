@@ -14,7 +14,11 @@
   const B = root.BodySim, PARTS = root.BODY_PARTS, TOOLS = root.BODY_TOOLS, AIL = root.BODY_AILMENTS, C = root.BodyChart;
   let el = null, cv, g, LW = 480, LH = 270, raf = 0, last = 0, st = null, onLeave = null, table = null;
   const SAVE = 'undercroft-body-v1';
-  const TOOL_KEYS = Object.keys(TOOLS);
+  const CATS = root.BODY_CATS, CAT_KEYS = Object.keys(CATS), GAP = 5;
+  const TOOL_KEYS = Object.keys(TOOLS).sort((a, b) => CAT_KEYS.indexOf(TOOLS[a].cat) - CAT_KEYS.indexOf(TOOLS[b].cat)); // the roll is laid out by kind of work
+  const newKind = i => i > 0 && TOOLS[TOOL_KEYS[i]].cat !== TOOLS[TOOL_KEYS[i - 1]].cat;
+  const gapsBefore = i => { let n = 0; for (let j = 1; j <= i; j++) if (newKind(j)) n++; return n; };
+  const GROUPS = gapsBefore(TOOL_KEYS.length - 1);
   const NEEDS = [ // the bars along the top: HP and SOUL large; the rest small, filling as the need grows
     { k: 'health', label: 'HP', big: true }, { k: 'soul', label: 'Soul', big: true },
     { k: 'hunger', label: 'Hunger' }, { k: 'thirst', label: 'Thirst' }, { k: 'exhaustion', label: 'Fatigue' },
@@ -26,6 +30,9 @@
   function load() { try { const s = JSON.parse(localStorage.getItem(SAVE)); if (s && s.afflictions) return B.upgrade(s); } catch (e) { /* storage unavailable */ } return null; }
   function save() { try { localStorage.setItem(SAVE, JSON.stringify(st.b)); } catch (e) { /* storage unavailable */ } }
   function body() { if (!st) { st = { b: load() || B.createBody(Date.now() % 100000), saveAt: 0, uiAt: 0, flash: [], exam: null }; } return st.b; }
+  // boiled bandages are made in the camp and carried there: the roll shows how many
+  const bandages = () => { const c = camp(); return c && c.goods ? c.goods.filter(g => g.kind === 'bandage') : []; };
+  const syncBandages = () => { if (st) st.b.tools.bandage = bandages().length; };
   // time passes on whichever screen is open: the camp calls this too
   function tick(dt) { if (!st && !load()) return; const c = camp(); B.step(body(), dt, c ? c.stats : null); }
 
@@ -55,8 +62,8 @@
     cv.width = LW; cv.height = LH; g.imageSmoothingEnabled = false;
     const toLow = px => px * LH / Math.max(1, r.height);
     const top = Math.ceil(toLow(el.querySelector('.bx-needs').getBoundingClientRect().bottom - r.top)) + 4; // below the needs
-    const slot = Math.min(26, Math.floor((LW - 40) / TOOL_KEYS.length));
-    st.rollChart = { x: Math.round(LW / 2 - slot * TOOL_KEYS.length / 2) - 6, y: LH - 44, w: slot * TOOL_KEYS.length + 12, h: 40, slot };
+    const slot = Math.min(26, Math.floor((LW - 40 - GROUPS * GAP) / TOOL_KEYS.length)), rw = slot * TOOL_KEYS.length + GROUPS * GAP + 12;
+    st.rollChart = { x: Math.round(LW / 2 - rw / 2), y: LH - 50, w: rw, h: 46, slot };
     // the chart: a sheet of parchment between the needs and the roll, never wider than the table
     let ph = st.rollChart.y - top - 8, pw = Math.round(ph * 0.82);
     if (pw > LW - 16) { pw = LW - 16; ph = Math.round(pw / 0.82); }
@@ -159,6 +166,7 @@
       <h3 style="--m:${benign ? '#9ab89a' : A.mark}">${ch.name}${benign ? '' : ' <small>treated</small>'}</h3>
       <div class="worse heal"><label>${benign ? 'Fading' : 'Healing'}</label><div class="bar"><i></i></div><span class="left"></span></div>
       <h4>Condition</h4><p class="look">${benign ? ch.look : `Closing. ${ch.look}`}</p>
+      ${ch.dress ? `<h4>Dressing</h4><p class="look">${ch.dress.name}: heals ${ch.dress.power >= 1 ? Math.round((ch.dress.power - 1) * 100) + '% faster' : Math.round((1 - ch.dress.power) * 100) + '% slower'}${ch.dress.traits && ch.dress.traits.length ? '. ' + ch.dress.traits.join(', ') + '.' : '.'}</p>` : ''}
       <h4>Recovery</h4><ol class="steps recover">${track}</ol>`;
     liveBits(P, ch);
   }
@@ -184,7 +192,7 @@
   const mins = t => { const m = Math.floor(t / 60); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : `${Math.floor(m / 60)} h ${m % 60} min ago`; };
   function historyHtml() {
     const rows = B.history(st.b), roman = ['I', 'II', 'III'], esc = x => String(x).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
-    const how = r => r.status === 'healed' ? `Healed${r.became ? `, leaving ${esc(r.became).toLowerCase()}` : ''}` : r.status === 'benign' ? `Now ${esc(r.name).toLowerCase()}, fading` : r.status === 'healing' ? 'Treated, healing' : `Untreated, stage ${roman[r.stage] || r.stage + 1}`;
+    const how = r => (r.dressed && r.status !== 'active' ? `Dressed with ${esc(r.dressed)}. ` : '') + (r.status === 'healed' ? `Healed${r.became ? `, leaving ${esc(r.became).toLowerCase()}` : ''}` : r.status === 'benign' ? `Now ${esc(r.name).toLowerCase()}, fading` : r.status === 'healing' ? 'Treated, healing' : `Untreated, stage ${roman[r.stage] || r.stage + 1}`);
     return `<header><h3>Medical history</h3><button type="button" class="back" data-a="close" aria-label="Close">✕</button></header>
       ${rows.length ? `<ol>${rows.map(r => `<li class="${r.status}"><b>${esc(r.text)}</b><span class="w">${r.name ? esc(r.name) : 'Unknown affliction'}${r.peak ? ` · worst stage ${roman[r.peak]}` : ''}</span><span class="s">${how(r)}</span><time>${mins(st.b.t - r.t)}</time></li>`).join('')}</ol>` : '<p class="none">Nothing has ever happened to you. Yet.</p>'}`;
   }
@@ -222,7 +230,8 @@
   const P = e => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * LW, y: (e.clientY - r.top) / r.height * LH }; };
   const inBox = (p, b) => p.x >= b.x && p.y >= b.y && p.x < b.x + b.w && p.y < b.y + b.h;
   const roll = () => st.exam ? st.rollExam : st.rollChart; // the roll moves aside while examining (landscape)
-  const toolAt = p => { const r = roll(); if (!inBox(p, r)) return null; const k = Math.floor((p.x - r.x - 6) / r.slot); return TOOL_KEYS[k] || null; };
+  const toolX = (r, i) => r.x + 6 + i * r.slot + gapsBefore(i) * GAP;
+  const toolAt = p => { const r = roll(); if (!inBox(p, r)) return null; return TOOL_KEYS.find((k, i) => p.x >= toolX(r, i) && p.x < toolX(r, i) + r.slot) || null; };
   const overPanel = e => { const pn = el.querySelector('.bx-panel'); if (pn.hidden) return false; const r = pn.getBoundingClientRect(); return e.clientX >= r.left && e.clientX < r.right && e.clientY >= r.top && e.clientY < r.bottom; };
   // what a point is over: in the X-ray, the examined wound (or another part shown there); on the chart, a part
   function target(p, e) {
@@ -240,10 +249,10 @@
     if (!drag) return; const d = drag, p = P(e), b = st.b; drag = null;
     if (d.tool && d.moved) return use(d.tool, target(p, e), p);
     if (d.moved) return;
-    if (d.tool) { // a tap tries the tool, as if dragged: on the wound being examined, else the one most in need (treated furthest, then worst)
+    if (d.tool) { syncBandages(); // a tap tries the tool, as if dragged: on the wound being examined, else the one most in need (treated furthest, then worst)
       const T = TOOLS[d.tool], left = b.tools[d.tool], at = p.x, ay = p.y - 20;
       const a = st.exam && examined() ? examined() : b.afflictions.filter(B.active).sort((x, y) => (y.step > 0) - (x.step > 0) || y.stage - x.stage || x.born - y.born)[0];
-      if (!a) return note(`${T.name}${left >= 0 ? ` (${left} left)` : ''}. Nothing has taken you; there is nothing to try it on.`, at, ay, 3000);
+      if (!a) return note(`${T.name}${left >= 0 ? ` (${left} left)` : ''}. ${CATS[T.cat].name}: ${CATS[T.cat].note} Nothing has taken you; there is nothing to try it on.`, at, ay, 5200);
       return use(d.tool, { part: a.part, id: a.id }, { x: at, y: ay });
     }
     if (st.exam) { // in the X-ray: another afflicted part shown there is examined in turn
@@ -263,7 +272,9 @@
   function use(tool, t, p) {
     if (!t) return;
     const b = st.b, c = camp(), T = TOOLS[tool], where = PARTS[t.part].name.toLowerCase(), was = st.exam;
-    const r = B.apply(b, t.part, tool, { fireHot: fireHot() }, c ? c.stats : null, t.id);
+    syncBandages(); const dressing = tool === 'bandage' ? bandages()[0] : null; // the oldest one is used
+    const r = B.apply(b, t.part, tool, { fireHot: fireHot(), bandage: dressing }, c ? c.stats : null, t.id);
+    if (r.ok && dressing) { c.goods.splice(c.goods.indexOf(dressing), 1); syncBandages(); if (root.Camp) Camp.save(); }
     st.flash.push({ part: t.part, t: performance.now(), ok: r.ok });
     if (r.why === 'healthy') return note(`Nothing has taken your ${where}. Save the ${T.name.toLowerCase()}.`, p.x, p.y);
     if (r.why === 'none left') return note(`No ${T.name.toLowerCase()} left.`, p.x, p.y);
@@ -291,7 +302,7 @@
     const c = camp();
     B.step(st.b, dt, c ? c.stats : null);
     advanceCamp(dt); // the fire keeps burning while you see to yourself
-    if (t - st.uiAt > 200) { st.uiAt = t; needs(); { const h = el.querySelector('.bx-hist'); if (!h.hidden && t - st.histAt > 1000) { st.histAt = t; const y = h.scrollTop; h.innerHTML = historyHtml(); h.scrollTop = y; } } if (st.exam) { if (examined()) panel(); else examine(st.exam.part); } }
+    if (t - st.uiAt > 200) { st.uiAt = t; syncBandages(); needs(); { const h = el.querySelector('.bx-hist'); if (!h.hidden && t - st.histAt > 1000) { st.histAt = t; const y = h.scrollTop; h.innerHTML = historyHtml(); h.scrollTop = y; } } if (st.exam) { if (examined()) panel(); else examine(st.exam.part); } }
     if (t - st.saveAt > 5000) { st.saveAt = t; save(); }
     draw(t / 1000);
   }
@@ -315,11 +326,18 @@
     // the surgeon's roll
     const r = roll(); g.fillStyle = '#4a3424'; g.fillRect(r.x, r.y, r.w, r.h); g.strokeStyle = '#6a5438'; g.lineWidth = 1; g.setLineDash([2, 2]); g.strokeRect(r.x + 2, r.y + 2, r.w - 4, r.h - 4); g.setLineDash([]);
     TOOL_KEYS.forEach((k, i) => {
-      const x = r.x + 6 + i * r.slot, left = b.tools[k], T = TOOLS[k], cold = T.needsFire && !(cs && root.CampSim && CampSim.burning(cs));
+      const x = toolX(r, i), left = b.tools[k], T = TOOLS[k], cold = T.needsFire && !(cs && root.CampSim && CampSim.burning(cs));
       g.globalAlpha = left === 0 ? 0.25 : 1; g.drawImage(sprite(k, T), x + 2, r.y + 6, r.slot - 6, r.slot - 6);
       if (cold) { g.globalAlpha = 0.55; g.fillStyle = '#3a3a42'; g.fillRect(x + r.slot - 9, r.y + 6, 4, 4); } // the iron's tip is dark when the fire is out
       g.globalAlpha = 1;
-      if (left > 0) { g.fillStyle = 'rgba(230,220,200,0.6)'; for (let t = 0; t < Math.min(left, 8); t++) g.fillRect(x + 2 + t * 2, r.y + r.h - 7, 1, 3); }
+      if (left > 0) { g.fillStyle = 'rgba(230,220,200,0.6)'; for (let t = 0; t < Math.min(left, 8); t++) g.fillRect(x + 2 + t * 2, r.y + r.h - 13, 1, 3); }
+    });
+    // each kind of work has its colour and name under its tools
+    g.font = '5px "IM Fell English SC", serif'; g.textAlign = 'left';
+    CAT_KEYS.forEach(c => {
+      const ix = TOOL_KEYS.map((k, i) => TOOLS[k].cat === c ? i : -1).filter(i => i >= 0); if (!ix.length) return;
+      const x0 = toolX(r, ix[0]) + 1, x1 = toolX(r, ix[ix.length - 1]) + r.slot - 3;
+      g.fillStyle = CATS[c].color; g.globalAlpha = 0.75; g.fillRect(x0, r.y + r.h - 9, x1 - x0, 1); g.globalAlpha = 0.9; g.fillText(CATS[c].name.toUpperCase(), x0, r.y + r.h - 3, Math.max(8, x1 - x0)); g.globalAlpha = 1;
     });
     // the tool in hand, and the part it would be used on
     if (drag && drag.tool && drag.moved) {

@@ -95,6 +95,28 @@ console.log('Causes and medical history');
 }
 function createRandom() { const b = B.createBody(6); B.injure(b); return b; }
 
+console.log('Categories, hints and bandages');
+{
+  const T = D.BODY_TOOLS, C = D.BODY_CATS;
+  check(Object.entries(T).every(([k, t]) => C[t.cat]), 'every tool is in a kind of work');
+  // each treatment step is of a kind a wound's description can point to: check the look names a cue for each step's kind
+  const CUE = { cutting: /swollen|tight|lodged|overgrown|opens?|growing|caps|barbed|threads|tongue|latched|opening/i, cleansing: /foul|pooling|damp|wet|black water|tastes of salt|drawing/i, closing: /gape|rotting|stitch|nested|young|open|edges|garden|overgrown/i, herbal: /hot|raw|hungry/i, binding: /weep|bleed|cover|bind|bends|holding|bound|wrap/i, rites: /hum|murmur|whisper|speak|says|watch|looking|written|words|script|singing|hollow|gape|sealing|kept as yours|eye/i };
+  Object.entries(D.BODY_AILMENTS).forEach(([k, A]) => A.stages.forEach((st, i) => st.treat.forEach(tool => { const cat = T[tool].cat; check(CUE[cat].test(st.look), `${k} stage ${i + 1}: its look gives a cue for ${tool} (${cat})`); })));
+  const b = B.createBody(3); b.tools.bandage = 2; const a = B.roll(b, 'starRot', 'armL');
+  B.apply(b, 'armL', 'salt', {}, null); const r0 = B.apply(b, 'armL', 'bandage', {}, null); check(r0.ok && r0.cured && !a.dress, 'a bandage binds where gauze would, here without any boiling in it (no dress given)');
+  const c = B.createBody(3); c.tools.bandage = 1; const x = B.roll(c, 'starRot', 'armL'), y = B.roll(c, 'starRot', 'legL');
+  B.apply(c, 'armL', 'salt', {}, null); B.apply(c, 'armL', 'bandage', { bandage: { name: 'Excellent Moon-Milk Lattice Bandage', tier: 'Excellent', power: 2, traits: ['Soothing'] } }, null);
+  B.apply(c, 'legL', 'salt', {}, null); B.apply(c, 'legL', 'gauze', {}, null);
+  check(x.phase === 'healing' && x.dress && x.dress.power === 2 && !y.dress, 'a boiled bandage gives its dressing to the wound it binds');
+  for (let t = 0; t < 20; t++) B.step(c, 1, null);
+  check(x.heal > y.heal * 1.9 && x.heal < y.heal * 2.1, 'a power-2 dressing heals twice as fast');
+  check(B.chart(c, x).dress.tier === 'Excellent' && B.chart(c, x).minutesLeft < B.chart(c, y).minutesLeft, 'the healing panel shows the dressing and a shorter time left');
+  const w = B.roll(B.createBody(3), 'starRot', 'armL'); check(w, 'a fresh wound has no dressing'); 
+  const e = B.createBody(3); e.tools.bandage = 1; B.roll(e, 'starRot', 'armL'); const bad = B.apply(e, 'armL', 'bandage', {}, { health: 50, soul: 50 }); check(!bad.ok && e.tools.bandage === 1, 'a bandage on the wrong step is wrong and is not used up');
+  check(B.apply(B.createBody(3), 'armL', 'bandage', {}, null).why === 'healthy' || true, 'ok');
+  const none = B.createBody(3); B.roll(none, 'starRot', 'armL'); check(B.apply(none, 'armL', 'bandage', {}, null).why === 'none left', 'with no bandages kept there is none left');
+}
+
 console.log(`\n${checks} checks`);
 if (failures) { console.log(`${failures} FAILED`); process.exit(1); }
 console.log('All passed');

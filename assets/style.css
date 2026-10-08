@@ -510,3 +510,4 @@ html.has-screens .camp { bottom: var(--navh); }
 .cf-ctx .meal[hidden] { display: none; }
 .cf-ctx .meal::after { content: attr(data-grade); margin-left: 8px; font: 0.58rem var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: #e8c872; }
 .cf-ctx .acts button[data-a="close"] { flex: 0 0 34px; width: 34px; }
+.cf-ctx .acts button[hidden] { display: none; }

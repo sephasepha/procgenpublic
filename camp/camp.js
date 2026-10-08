@@ -35,7 +35,7 @@
   // ---------- saving: your stats and what you carry ----------
   const SAVE = 'undercroft-camp-v1';
   function load() { try { const s = JSON.parse(localStorage.getItem(SAVE)); if (s && s.stats) return s; } catch (e) { /* storage unavailable */ } return null; }
-  function save() { try { localStorage.setItem(SAVE, JSON.stringify({ stats: V.st.c.stats, stock: V.st.c.stock, coin: V.st.c.coin || 0 })); } catch (e) { /* storage unavailable */ } }
+  function save() { try { localStorage.setItem(SAVE, JSON.stringify({ stats: V.st.c.stats, stock: V.st.c.stock, coin: V.st.c.coin || 0, goods: V.st.c.goods || [] })); } catch (e) { /* storage unavailable */ } }
 
   // ---------- the screen ----------
   function ui() {
@@ -63,7 +63,7 @@
   function ensure() {
     if (!V.st) {
       const c = S.createCamp(1), saved = load();
-      if (saved) { Object.assign(c.stats, saved.stats); Object.assign(c.stock, saved.stock); c.coin = saved.coin || 0; }
+      if (saved) { Object.assign(c.stats, saved.stats); Object.assign(c.stock, saved.stock); c.coin = saved.coin || 0; c.goods = saved.goods || []; }
       c.unlimitedFire = true; // prototype: tinder, kindling and fuel never run out
       V.st = { c, L: null, mode: 'fire', saveAt: 0, sel: null, vsel: null, hover: null, uiAt: 0, trayAt: 0, flash: 0, sackBox: null };
     }
@@ -196,6 +196,7 @@
     const st = V.st, v = st.c.vessels.find(q => q.id === st.vsel), p = { x: V.LW / 2, y: V.LH * 0.6 };
     if (a.dataset.a === 'close' || !v) { st.vsel = null; return UI.ctx(); }
     if (a.dataset.a === 'tend') tendVessel(v);
+    if (a.dataset.a === 'take') takeFrom(v, p);
     if (a.dataset.a === 'sell') sellFrom(v, p);
     if (a.dataset.a === 'eat') eatFrom(v, p);
     if (a.dataset.a === 'away') putAway(v, p);
@@ -261,6 +262,11 @@
     const r = S.tend(V.st.c, v.id); if (!r) return;
     if (XP && r.freed > 0.4) earn('cooking', XP.tend);
     D.tendFx(v); UI.ctx();
+  }
+  function takeFrom(v, p) {
+    const r = S.take(V.st.c, v.id); if (!r) return UI.note('It has not come together yet.', p.x, p.y);
+    if (XP) earn('cooking', XP.dish * r.count);
+    UI.note(`${r.count > 1 ? r.count + ' × ' : ''}${r.name}${r.traits.length ? ` (${r.traits.join(', ').toLowerCase()})` : ''}. Kept for the Body screen.`, V.st.L.hands.x + 30, V.st.L.hands.y - 20, 4800); save(); UI.refresh(); UI.ctx();
   }
   function sellFrom(v, p) {
     const r = S.sell(V.st.c, v.id); if (!r) return UI.note('Nobody buys that.', p.x, p.y);

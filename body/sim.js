@@ -26,7 +26,7 @@
   }
   // a body saved before discovery existed: everything is unknown
   function upgrade(b) {
-    b.known = b.known || {}; b.tried = b.tried || {}; b.history = b.history || [];
+    b.known = b.known || {}; b.tried = b.tried || {}; b.history = b.history || []; if (b.tools && b.tools.bandage === undefined) b.tools.bandage = 0;
     b.afflictions.forEach(a => { if (!b.history.some(h => h.id === a.id)) b.history.push({ id: a.id, t: a.born || 0, cause: 'unknown', key: a.key, part: a.part, peak: a.stage, status: a.phase || 'active', end: null }); });
     return b;
   }
@@ -74,7 +74,7 @@
 
   // a treated affliction heals: back down a stage at a time, then its benign form, then gone (returns false when gone)
   function heal(b, a, m) {
-    a.heal += m / (a.phase === 'benign' ? HEAL.benign : HEAL.stage);
+    a.heal += m * (a.dress ? a.dress.power : 1) / (a.phase === 'benign' ? HEAL.benign : HEAL.stage); // a good bandage speeds it
     if (a.heal < 1) return true;
     a.heal = 0;
     if (a.phase === 'healing' && a.stage > 0) { a.stage--; b.log.push({ t: b.t, mending: a.key, part: a.part, stage: a.stage }); return true; }
@@ -94,7 +94,7 @@
       const A = AIL[a.key], st = A.stages[a.stage];
       if (st.minutes > 0) {
         a.progress += m / st.minutes;
-        if (a.progress >= 1 && a.stage < A.stages.length - 1) { a.stage++; a.progress = 0; a.step = 0; note(b, a, { peak: a.stage }); b.log.push({ t: b.t, worse: a.key, part: a.part, stage: a.stage }); }
+        if (a.progress >= 1 && a.stage < A.stages.length - 1) { a.stage++; a.progress = 0; a.step = 0; a.dress = null; note(b, a, { peak: a.stage }); b.log.push({ t: b.t, worse: a.key, part: a.part, stage: a.stage }); }
       }
       if (stats) Object.entries(st.drain).forEach(([s, v]) => { stats[s] = clamp(stats[s] + v * m); });
       if (st.spread > 0 && rnd(b) < st.spread * m) {
@@ -120,7 +120,8 @@
     if (T.needsFire && !(ctx && ctx.fireHot)) return { ok: false, why: 'cold' };
     const a = here.find(x => x.id === id) || here.find(x => x.step > 0) || here.slice().sort((x, y) => y.stage - x.stage || x.born - y.born)[0];
     const st = AIL[a.key].stages[a.stage], want = st.treat[a.step], steps = knownSteps(b, a.key, a.stage);
-    if (tool !== want) {
+    const eff = tool === 'bandage' ? 'gauze' : tool; // a boiled bandage binds like gauze
+    if (eff !== want) {
       if (stats) { stats.health = clamp(stats.health - 2.5); stats.soul = clamp(stats.soul - 1); }
       const t = b.tried[triedKey(a, a.step)] = b.tried[triedKey(a, a.step)] || [];
       if (!t.includes(tool)) t.push(tool);
@@ -130,6 +131,7 @@
     if (b.tools[tool] > 0) b.tools[tool]--;
     const step = a.step, discovered = !steps[step];
     steps[step] = true; b.known[a.key].named = true;
+    if (tool === 'bandage' && ctx && ctx.bandage) { a.dress = { ...ctx.bandage }; note(b, a, { dressed: ctx.bandage.name, tier: ctx.bandage.tier }); } // what it was boiled in goes into the wound
     a.step++;
     if (a.step >= st.treat.length) { // treated: from now on it heals
       a.phase = 'healing'; a.heal = 0; a.progress = 0; note(b, a, { status: 'healing', treatedAt: b.t });
@@ -146,11 +148,11 @@
   function chart(b, a) {
     const A = AIL[a.key], st = A.stages[a.stage], k = upgrade(b).known[a.key], steps = (k && k.stages[a.stage]) || st.treat.map(() => false);
     if (!active(a)) {
-      const left = a.phase === 'benign' ? (1 - a.heal) * HEAL.benign : (a.stage + 1 - a.heal) * HEAL.stage + HEAL.benign;
+      const pw = a.dress ? a.dress.power : 1, left = (a.phase === 'benign' ? (1 - a.heal) * HEAL.benign : (a.stage + 1 - a.heal) * HEAL.stage + HEAL.benign) / pw;
       return {
         id: a.id, key: a.key, part: a.part, phase: a.phase, named: true, name: a.phase === 'benign' ? A.benign.name : A.name,
         stage: a.stage, stages: A.stages.length, stageName: st.name, look: a.phase === 'benign' ? A.benign.look : st.look,
-        progress: a.heal, worsens: false, minutesLeft: left, steps: [], lore: null,
+        progress: a.heal, worsens: false, minutesLeft: left, steps: [], lore: null, dress: a.dress || null,
       };
     }
     return { phase: 'active',
@@ -170,6 +172,7 @@
       const text = h.cause === 'spread' && h.from ? `Spread from ${PARTS[h.from].site}, ${PARTS[h.part].site}` : h.cause === 'unknown' ? `Unknown cause, ${PARTS[h.part].site}` : `${C.name}, ${PARTS[h.part].site}`;
       const live = b.afflictions.find(a => a.id === h.id);
       return { id: h.id, t: h.t, text, status: h.status, end: h.end, treatedAt: h.treatedAt || null, peak: h.peak, stages: A.stages.length,
+        dressed: h.dressed || null, tier: h.tier || null,
         name: named ? (h.status === 'benign' ? A.benign.name : A.name) : null, became: named && h.status !== 'active' ? A.benign.name : null, stage: live ? live.stage : null };
     });
   }
