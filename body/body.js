@@ -154,6 +154,16 @@
     P.querySelectorAll('canvas[data-t]').forEach(c => c.getContext('2d').drawImage(sprite(c.dataset.t, TOOLS[c.dataset.t]), 0, 0));
     liveBits(P, ch);
   }
+  // what a boiled bandage does for the wound under it, in words
+  const FASTER = x => x >= 1 ? Math.round((x - 1) * 100) + '% faster' : Math.round((1 - x) * 100) + '% slower';
+  const STAT_WORD = { health: 'health', soul: 'spirit' };
+  function dressNote(d) {
+    const bits = [`heals ${FASTER(d.power)}`];
+    if (d.stage) bits.push(`and a further ${Math.round(d.stage * 100)}% while it mends`);
+    if (d.benign) bits.push(`${Math.round(d.benign * 100)}% more while the mark fades`);
+    const t = Object.entries(d.tonic || {}).map(([k, r]) => STAT_WORD[k] || k).join(' and ');
+    return bits.join(', ') + (t ? `. Returns ${t} as it heals` : '') + (d.traits && d.traits.length ? '. ' + d.traits.join(', ') + '.' : '.');
+  }
   // a treated wound: how it is healing, the way back down its stages to its benign form and then gone (the reverse of
   // how it worsened), and how long that has left
   function recovery(P, a, ch, tabs) {
@@ -166,7 +176,7 @@
       <h3 style="--m:${benign ? '#9ab89a' : A.mark}">${ch.name}${benign ? '' : ' <small>treated</small>'}</h3>
       <div class="worse heal"><label>${benign ? 'Fading' : 'Healing'}</label><div class="bar"><i></i></div><span class="left"></span></div>
       <h4>Condition</h4><p class="look">${benign ? ch.look : `Closing. ${ch.look}`}</p>
-      ${ch.dress ? `<h4>Dressing</h4><p class="look">${ch.dress.name}: heals ${ch.dress.power >= 1 ? Math.round((ch.dress.power - 1) * 100) + '% faster' : Math.round((1 - ch.dress.power) * 100) + '% slower'}${ch.dress.traits && ch.dress.traits.length ? '. ' + ch.dress.traits.join(', ') + '.' : '.'}</p>` : ''}
+      ${ch.dress ? `<h4>Dressing</h4><p class="look">${ch.dress.name}: ${dressNote(ch.dress)}</p>` : ''}
       <h4>Recovery</h4><ol class="steps recover">${track}</ol>`;
     liveBits(P, ch);
   }

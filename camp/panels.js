@@ -123,7 +123,7 @@
   // food that cooks at different speeds in one vessel: the quick will be done, and burn, before the slow is ready
   function uneven(v) {
     if (v.water > 0) return ''; // boiling food does not burn, whatever its speed
-    const cs = [...new Set(v.items.filter(it => !ING[it.id].water && ING[it.id].texture !== 'fat').map(it => ING[it.id].cls))];
+    const cs = [...new Set(v.items.filter(it => !ING[it.id].water && ING[it.id].cls !== 'medical' && ING[it.id].texture !== 'fat').map(it => ING[it.id].cls))];
     return cs.length > 1 ? `<p class="uneven">Cooks unevenly: ${cs.map(c => CLS[c].name.toLowerCase()).join(' with ')}</p>` : '';
   }
   function ctx() {

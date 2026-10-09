@@ -85,7 +85,13 @@ console.log('Boiling things down');
   check(best.traits.includes('Soothing') && best.name.includes('Moon-Milk') && best.kind === 'bandage', 'it carries the liquid\'s trait and name');
   const mix = S.craftOf(pot(['moonMilk', 'blackWater'], ['mycelLattice']).v), thin = S.craftOf(pot(['moonMilk', 'moonMilk', 'moonMilk'], ['mycelLattice']).v); check(mix.score < best.score && thin.score < best.score, 'mixed or watered-down liquids make it worse');
   const dry = pot(['moonMilk'], ['mycelLattice']); dry.v.stewed = false; check(S.craftOf(dry.v) === null, 'it has to have come together first');
-  const meal = pot(['moonMilk'], ['mycelLattice', 'hardtack']); check(S.craftOf(meal.v) === null, 'a meal is not a craft');
+  const meal = pot(['moonMilk'], ['hardtack', 'starGristle']); check(S.craftOf(meal.v) === null, 'a meal with no lattice in it is not a craft');
+  const plain = S.craftOf(pot(['moonMilk'], ['mycelLattice']).v), withFig = S.craftOf(pot(['moonMilk'], ['mycelLattice', 'waxFig']).v), withTack = S.craftOf(pot(['moonMilk'], ['mycelLattice', 'hardtack']).v), withBoth = S.craftOf(pot(['moonMilk'], ['mycelLattice', 'hardtack', 'waxFig']).v);
+  check(withFig && withTack && withFig.benign > 0 && withFig.power === plain.power && withTack.power > plain.power && withFig.traits.includes('Waxed') && withFig.name.includes('Waxed'), 'any food boiled in gives the bandage its own balm: its trait, its name, its effect');
+  check(withBoth.power === withTack.power && withBoth.benign === withFig.benign && withBoth.traits.length === 3 && withBoth.balms.length === 2, 'several foods add up');
+  check(Object.entries(D.CAMP_INGREDIENTS).every(([k, i]) => i.water || i.craft || (i.balm && i.balm.name)) && new Set(Object.values(D.CAMP_BALMS).map(b => b.name)).size === Object.keys(D.CAMP_BALMS).length, 'every food has a balm, and no two are alike');
+  const burntFood = pot(['moonMilk'], ['mycelLattice', 'waxFig']); burntFood.v.items[2].scorch = 2; check(S.craftOf(burntFood.v) === null, 'a burnt thing in the pot spoils it');
+  const kept = pot(['moonMilk'], ['mycelLattice', 'cometHoney']); S.take(kept.c, kept.v.id); check(kept.c.goods[0].tonic.health > 0 && kept.c.goods[0].benign > 0, 'the kept bandage carries the balm');
   const twice = pot(['moonMilk'], ['mycelLattice', 'mycelLattice']); check(S.craftOf(twice.v).count === 2, 'two lattices make two bandages');
   const g = pot(['clearSeep'], ['mycelLattice']); const t = S.take(g.c, g.v.id); check(t && g.c.goods.length === 1 && g.c.goods[0].power === t.power && g.v.items.length === 0, 'taking it puts the bandage in your goods and empties the pot');
   check(S.take(camp(() => {}), 1) === null, 'nothing to take'); }
@@ -188,6 +194,7 @@ Object.entries(ING).forEach(([k, I]) => {
   check(I.cook > 0 && Object.keys(I.cooked).length > 0, `${k}: cooks into something`);
 });
 Object.entries(ING).forEach(([k, i]) => check(D.CAMP_CLASSES[i.cls], `${k}: has a cooking-speed class`));
+check(Object.entries(ING).every(([k, i]) => (i.cls === 'medical') === !!(i.craft || i.liquid)) && ING.mycelLattice.cls === 'medical' && ING.moonMilk.cls === 'medical' && ING.clearSeep.cls === 'medical', 'crafting materials and medical liquids are their own class');
 check(Math.max(...Object.values(ING).filter(i => i.cls === 'quick').map(i => i.cook)) < Math.min(...Object.values(ING).filter(i => i.cls === 'steady').map(i => i.cook)) && Math.max(...Object.values(ING).filter(i => i.cls === 'steady').map(i => i.cook)) < Math.min(...Object.values(ING).filter(i => i.cls === 'slow').map(i => i.cook)), 'quick cooks faster than steady, which cooks faster than slow');
 [...Object.values(D.CAMP_FIRE), D.CAMP_STRIKER, ...Object.values(D.CAMP_VESSELS)].forEach(o => check(o.px.length === 8 && o.px.every(r => r.length === 8) && o.px.join('').split('').every(ch => ch === '.' || o.pal[ch]), `${o.name}: art is 8x8 in its palette`));
 check(D.CAMP_DISHES.length >= 8, `at least 8 dishes (${D.CAMP_DISHES.length})`);

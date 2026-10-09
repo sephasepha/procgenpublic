@@ -108,16 +108,34 @@
   Object.values(INGREDIENTS).forEach(i => { if (!i.texture) i.texture = (i.tags || []).map(t => TEXTURE_OF_TAG[t]).find(Boolean) || 'usual'; });
 
   // cooking speed, by how long an ingredient takes to cook: things of one class are done at about the same time, so
-  // they fry together; a quick thing with a slow thing is burnt before the slow one is done. Water is its own.
+  // they fry together; a quick thing with a slow thing is burnt before the slow one is done. Water is its own, and so are the medical things (materials and liquids that boil down into goods).
   const CLASSES = {
     quick: { name: 'Quick', note: 'Done in moments.', max: 13, mark: '#f0c060' },
     steady: { name: 'Steady', note: 'Takes its time, not too long.', max: 25, mark: '#8fd29a' },
     slow: { name: 'Slow', note: 'Wants long, patient heat.', max: Infinity, mark: '#e08a6a' },
     water: { name: 'Water', note: 'Boils; does not burn the way food does.', mark: '#7aa8d8' },
+    medical: { name: 'Medical', note: 'Not for eating well: boil it down into dressings and the like.', mark: '#d88aa8' },
   };
   // what an ingredient is worth raw, in coin: dearer the longer it takes to cook (the hard-won, the strange)
   Object.values(INGREDIENTS).forEach(i => { i.price = i.water ? Math.max(1, 1 + Math.round(((i.liquid || {}).potency || 0) * 6)) : Math.round(3 + i.cook * 0.8); });
-  Object.values(INGREDIENTS).forEach(i => { i.cls = i.water ? 'water' : Object.keys(CLASSES).find(k => i.cook <= CLASSES[k].max); });
+  Object.values(INGREDIENTS).forEach(i => { i.cls = (i.craft || i.liquid) ? 'medical' : i.water ? 'water' : Object.keys(CLASSES).find(k => i.cook <= CLASSES[k].max); });
+
+  // what a food gives a bandage it is boiled into, when the bandage is used on a wound: `power` heals it faster all
+  // through, `stage` faster while it mends back down its stages, `benign` faster while the mark fades, and `tonic`
+  // gives back health or soul each minute it heals. Each food its own; a bandage carries all of them.
+  const BALMS = {
+    lanternEye: { name: 'Watchful', stage: 0.25 }, weepingTuber: { name: 'Astringent', benign: 0.4 },
+    hymnGrub: { name: 'Hymnal', tonic: { soul: 2 } }, starGristle: { name: 'Sinewy', power: 0.15 },
+    veinMoss: { name: 'Greening', stage: 0.3 }, sporeBladder: { name: 'Breathing', power: 0.1, benign: 0.15 },
+    tongueFern: { name: 'Cooling', tonic: { health: 1.5 } }, hardtack: { name: 'Binding', power: 0.1 },
+    tideSalt: { name: 'Briny', stage: 0.35 }, choirEgg: { name: 'Chorused', power: 0.05, tonic: { soul: 1.5 } },
+    marrow: { name: 'Marrowed', power: 0.2, tonic: { health: 1 } }, moonlard: { name: 'Rendered', benign: 0.3, tonic: { soul: 1 } },
+    thornLeech: { name: 'Drawing', stage: 0.4 }, gloamCap: { name: 'Gloaming', benign: 0.1, tonic: { soul: 2.5 } },
+    waxFig: { name: 'Waxed', benign: 0.35 }, eelSlice: { name: 'Slick', power: 0.1, stage: 0.2 },
+    saintsFinger: { name: 'Blessed', power: 0.1, tonic: { soul: 2 } }, emberBeetle: { name: 'Warming', power: 0.25 },
+    cometHoney: { name: 'Honeyed', benign: 0.2, tonic: { health: 2 } },
+  };
+  Object.entries(BALMS).forEach(([k, b]) => { INGREDIENTS[k].balm = b; });
 
   // things to boil into other things: a material (an ingredient with `craft`) boiled in a pot with liquids until it has
   // come together makes goods of that kind. What the liquids carry (`liquid`: its potency and a trait) goes into them:
@@ -150,6 +168,6 @@
     char: { name: 'Char', note: 'A lump of charcoal from a log that burnt down to coals and went cold. Light, black, and it burns hot again.',
       px: ['........', '...cC...', '..cCsc..', '.ccccCc.', '.cCcccs.', '..cccC..', '...cc...', '........'], pal: { c: '#2a272e', C: '#7a7484', s: '#c8c2d0' } },
   };
-  const api = { CAMP_FIRE: FIRE, CAMP_RESIDUE: RESIDUE, CAMP_STRIKER: STRIKER, CAMP_VESSELS: VESSELS, CAMP_INGREDIENTS: INGREDIENTS, CAMP_TEXTURES: TEXTURES, CAMP_CLASSES: CLASSES, CAMP_CRAFTS: CRAFTS, CAMP_DISHES: DISHES, CAMP_STATS: STATS };
+  const api = { CAMP_FIRE: FIRE, CAMP_RESIDUE: RESIDUE, CAMP_STRIKER: STRIKER, CAMP_VESSELS: VESSELS, CAMP_INGREDIENTS: INGREDIENTS, CAMP_TEXTURES: TEXTURES, CAMP_CLASSES: CLASSES, CAMP_CRAFTS: CRAFTS, CAMP_BALMS: BALMS, CAMP_DISHES: DISHES, CAMP_STATS: STATS };
   if (typeof module !== 'undefined' && module.exports && typeof window === 'undefined') module.exports = api; else Object.assign(root, api);
 })(typeof window !== 'undefined' ? window : globalThis);

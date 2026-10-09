@@ -241,21 +241,28 @@
   // kind, as many as there are materials, of the tier its liquids make, carrying their traits
   function craftOf(v, j) {
     if (!VESSELS[v.type].boils || !v.items.length) return null;
-    j = j || judge(v); const mats = v.items.filter(it => !ING[it.id].water), liqs = v.items.filter(it => ING[it.id].water);
-    if (!mats.length || !liqs.length || !j.stew || mats.some(it => !ING[it.id].craft || foodState(it) === 'burnt' || ING[it.id].craft !== ING[mats[0].id].craft)) return null;
+    j = j || judge(v);
+    // materials are what it is made of, liquids what it is boiled in, and any food besides adds its own balm
+    const liqs = v.items.filter(it => ING[it.id].water), mats = v.items.filter(it => ING[it.id].craft), foods = v.items.filter(it => !ING[it.id].water && !ING[it.id].craft);
+    if (!mats.length || !liqs.length || !j.stew || v.items.some(it => foodState(it) === 'burnt') || mats.some(it => ING[it.id].craft !== ING[mats[0].id].craft)) return null;
     const K = CRAFTS[ING[mats[0].id].craft], ps = liqs.map(it => (ING[it.id].liquid || {}).potency || 0);
     const dilute = liqs.length === 1 ? 1 : liqs.length === 2 ? 0.85 : 0.6, score = 1 + ps.reduce((a, b) => a + b, 0) / ps.length * dilute;
     const tier = K.tiers.reduce((best, t) => (score >= t.min ? t : best), K.tiers[0]);
-    const traits = [...new Set(liqs.map(it => (ING[it.id].liquid || {}).trait).filter(Boolean))];
+    const balms = [...new Set(foods.map(it => it.id))].map(id => ({ id, ...ING[id].balm })).filter(b => b.name);
+    const sum = f => balms.reduce((n, b) => n + (b[f] || 0), 0), tonic = {};
+    balms.forEach(b => Object.entries(b.tonic || {}).forEach(([k, r]) => { tonic[k] = (tonic[k] || 0) + r; }));
+    const power = tier.power + Math.min(0.6, sum('power')), stage = Math.min(0.8, sum('stage')), benign = Math.min(0.8, sum('benign'));
+    const traits = [...new Set([...liqs.map(it => (ING[it.id].liquid || {}).trait), ...balms.map(b => b.name)].filter(Boolean))];
     const liquid = (ING[liqs.slice().sort((a, b) => ((ING[b.id].liquid || {}).potency || 0) - ((ING[a.id].liquid || {}).potency || 0))[0].id].name), mat = stem(ING[mats[0].id].name);
-    return { kind: ING[mats[0].id].craft, count: mats.length, tier: tier.name, power: tier.power, score, traits, name: `${tier.name} ${liquid} ${mat} ${K.name}` };
+    const lead = balms.length ? balms.slice().sort((a, b) => ING[b.id].price - ING[a.id].price)[0].name + ' ' : '';
+    return { kind: ING[mats[0].id].craft, count: mats.length, tier: tier.name, power, stage, benign, tonic, score, traits, balms: balms.map(b => b.name), name: `${tier.name} ${liquid} ${lead}${mat} ${K.name}` };
   }
   // take what a pot has boiled down to: the vessel is emptied and the goods are yours
   function take(c, id) {
     const v = c.vessels.find(q => q.id === id); if (!v) return null;
     const cr = craftOf(v); if (!cr) return null;
     c.goods = c.goods || [];
-    for (let k = 0; k < cr.count; k++) c.goods.push({ kind: cr.kind, name: cr.name, tier: cr.tier, power: cr.power, traits: cr.traits });
+    for (let k = 0; k < cr.count; k++) c.goods.push({ kind: cr.kind, name: cr.name, tier: cr.tier, power: cr.power, stage: cr.stage, benign: cr.benign, tonic: cr.tonic, traits: cr.traits });
     v.items = []; v.water = 0; v.scorch = 0; v.stew = 0; v.stewed = false;
     return cr;
   }

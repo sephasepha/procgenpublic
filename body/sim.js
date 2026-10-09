@@ -73,8 +73,10 @@
   }
 
   // a treated affliction heals: back down a stage at a time, then its benign form, then gone (returns false when gone)
-  function heal(b, a, m) {
-    a.heal += m * (a.dress ? a.dress.power : 1) / (a.phase === 'benign' ? HEAL.benign : HEAL.stage); // a good bandage speeds it
+  function heal(b, a, m, stats) {
+    const d = a.dress, benign = a.phase === 'benign';
+    a.heal += m * (d ? d.power + (benign ? d.benign || 0 : d.stage || 0) : 1) / (benign ? HEAL.benign : HEAL.stage); // a good bandage speeds it
+    if (d && d.tonic && stats) Object.entries(d.tonic).forEach(([k, r]) => { if (stats[k] !== undefined) stats[k] = clamp(stats[k] + r * m); }); // and what it was boiled with gives back
     if (a.heal < 1) return true;
     a.heal = 0;
     if (a.phase === 'healing' && a.stage > 0) { a.stage--; b.log.push({ t: b.t, mending: a.key, part: a.part, stage: a.stage }); return true; }
@@ -88,7 +90,7 @@
   function step(b, dt, stats) {
     b.t += dt;
     const m = dt / 60, born = [];
-    b.afflictions = b.afflictions.filter(a => active(a) || heal(b, a, m));
+    b.afflictions = b.afflictions.filter(a => active(a) || heal(b, a, m, stats));
     b.afflictions.forEach(a => {
       if (!active(a)) return;
       const A = AIL[a.key], st = A.stages[a.stage];
@@ -148,7 +150,7 @@
   function chart(b, a) {
     const A = AIL[a.key], st = A.stages[a.stage], k = upgrade(b).known[a.key], steps = (k && k.stages[a.stage]) || st.treat.map(() => false);
     if (!active(a)) {
-      const pw = a.dress ? a.dress.power : 1, left = (a.phase === 'benign' ? (1 - a.heal) * HEAL.benign : (a.stage + 1 - a.heal) * HEAL.stage + HEAL.benign) / pw;
+      const d = a.dress, ps = d ? d.power + (d.stage || 0) : 1, pb = d ? d.power + (d.benign || 0) : 1, left = a.phase === 'benign' ? (1 - a.heal) * HEAL.benign / pb : (a.stage + 1 - a.heal) * HEAL.stage / ps + HEAL.benign / pb;
       return {
         id: a.id, key: a.key, part: a.part, phase: a.phase, named: true, name: a.phase === 'benign' ? A.benign.name : A.name,
         stage: a.stage, stages: A.stages.length, stageName: st.name, look: a.phase === 'benign' ? A.benign.look : st.look,

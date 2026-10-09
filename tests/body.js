@@ -111,6 +111,10 @@ console.log('Categories, hints and bandages');
   for (let t = 0; t < 20; t++) B.step(c, 1, null);
   check(x.heal > y.heal * 1.9 && x.heal < y.heal * 2.1, 'a power-2 dressing heals twice as fast');
   check(B.chart(c, x).dress.tier === 'Excellent' && B.chart(c, x).minutesLeft < B.chart(c, y).minutesLeft, 'the healing panel shows the dressing and a shorter time left');
+  { const mk = d => { const q = B.createBody(3); q.tools.bandage = 1; const a = B.roll(q, 'starRot', 'armL'); B.apply(q, 'armL', 'salt', {}, null); B.apply(q, 'armL', 'bandage', { bandage: { name: 'x', tier: 'Good', power: 1, traits: [], ...d } }, null); return { q, a }; };
+    const base = mk({}), st = mk({ stage: 0.5 }), tn = mk({ tonic: { soul: 60 } }); const s0 = { health: 50, soul: 50 }, s1 = { health: 50, soul: 50 };
+    B.step(base.q, 30, s0); B.step(st.q, 30, { ...s0 }); B.step(tn.q, 30, s1);
+    check(st.a.heal > base.a.heal * 1.4, 'a balm that speeds mending speeds the stages back down'); check(s1.soul > s0.soul + 5, 'a tonic balm gives spirit back while the wound heals'); }
   const w = B.roll(B.createBody(3), 'starRot', 'armL'); check(w, 'a fresh wound has no dressing'); 
   const e = B.createBody(3); e.tools.bandage = 1; B.roll(e, 'starRot', 'armL'); const bad = B.apply(e, 'armL', 'bandage', {}, { health: 50, soul: 50 }); check(!bad.ok && e.tools.bandage === 1, 'a bandage on the wrong step is wrong and is not used up');
   check(B.apply(B.createBody(3), 'armL', 'bandage', {}, null).why === 'healthy' || true, 'ok');
