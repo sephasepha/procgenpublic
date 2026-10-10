@@ -2,13 +2,14 @@
 // as one InstancedMesh with orbit controls, plus debug overlays: markers, walking route, slice.
 import * as THREE from 'three';
 import { OrbitControls } from './vendor/OrbitControls.js';
+import { OBJLoader } from './vendor/OBJLoader.js';
 
-const { generateVoxels, voxelComponents, generateStructure, walkCheck, STRUCTURE_SHAPES, SVOX: V, SVOX_NAMES, SVOX_SOLID } = window;
+const { generateVoxels, voxelComponents, generateStructure, walkCheck, dressStructure, STRUCTURE_SHAPES, SVOX: V, SVOX_NAMES, SVOX_SOLID } = window;
 const $ = id => document.getElementById(id);
 const SHAPE_NAMES = { tower: 'Tower', mega: 'Megastructure', pyramid: 'Pyramid labyrinth', column: 'Sunken column', pillars: 'Pillars and bridges' };
 
 // ---- settings, mirrored into the URL hash ----
-const DEF = { shape: 'tower', seed: 1, size: 6, storeys: 8, rooms: 3, shafts: 1, braid: 100, towers: 6, maxh: 40, loops: 25, slice: 63, color: 'type', grid: 0, bounds: 1, edges: 0, spin: 0, markers: 1, path: 1 };
+const DEF = { shape: 'tower', seed: 1, size: 6, storeys: 8, rooms: 3, shafts: 1, braid: 100, towers: 6, maxh: 40, loops: 25, slice: 63, color: 'type', grid: 0, bounds: 1, edges: 0, spin: 0, markers: 1, path: 1, tiles: 0 };
 const S = Object.assign({}, DEF);
 for (const kv of location.hash.slice(1).split('&')) {
   const [k, v] = kv.split('=');
@@ -130,14 +131,60 @@ bar.addEventListener('keydown', e => {
   e.preventDefault();
 });
 
+// ---- the 3D tile kit (voxels/tiles): OBJ pieces placed by dress3d.js ----
+const FAMILY_COLORS = { wall: 0x9aa3b5, window: 0x7f8aa0, door: 0x6fa8dc, arch: 0x8fb3d9, entrance: 0x69f0ae, rail: 0xe0b44c, floor: 0x5d6475,
+  floor_hole: 0x5d6475, stair: 0xd9a441, roof: 0xb85a5a, deck: 0xc27a2c, stair_run: 0xd9a441, shaft: 0xb388ff, mass: 0x4f5563, goal: 0xff4d6d };
+const VARIANT_SHADE = [1, 0.74, 1.22];
+let kit = null, kitLoading = null, tileMeshes = [], dressed = null, dressedFor = null;
+function ensureKit() {
+  if (kit || kitLoading) return kitLoading || Promise.resolve(kit);
+  kitLoading = fetch('voxels/tiles/tileset.json').then(r => r.json()).then(async ts => {
+    const loader = new OBJLoader(), geos = {};
+    await Promise.all(Object.entries(ts.pieces).map(async ([name, p]) => {
+      const obj = await loader.loadAsync('voxels/tiles/' + p.file);
+      obj.traverse(o => { if (o.isMesh && !geos[name]) geos[name] = o.geometry; });
+    }));
+    kit = { ts, geos }; kitLoading = null; return kit;
+  });
+  return kitLoading;
+}
+const tilesOn = () => !!(S.tiles && isStructure() && kit);
+function buildTiles() {
+  for (const t of tileMeshes) { scene.remove(t); t.dispose(); }
+  tileMeshes = [];
+  if (!tilesOn()) return;
+  if (dressedFor !== chunk) { dressed = dressStructure(chunk, kit.ts, S.seed); dressedFor = chunk; }
+  const byPiece = new Map();
+  for (const pl of dressed.placements) if (pl.y < S.slice) { if (!byPiece.has(pl.piece)) byPiece.set(pl.piece, []); byPiece.get(pl.piece).push(pl); }
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1), c = new THREE.Color();
+  for (const [piece, list] of byPiece) {
+    const geo = kit.geos[piece]; if (!geo) continue;
+    const im = new THREE.InstancedMesh(geo, mat, list.length);
+    list.forEach((pl, n) => {
+      q.setFromAxisAngle(up, pl.rot * Math.PI / 180);
+      m.compose(new THREE.Vector3(pl.x - chunk.W / 2, pl.y, pl.z - chunk.D / 2), q, one);
+      im.setMatrixAt(n, m);
+      c.setHex(FAMILY_COLORS[pl.family] || 0xffffff).multiplyScalar(VARIANT_SHADE[pl.variant || 0] || 1);
+      im.setColorAt(n, c);
+    });
+    im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
+    scene.add(im); tileMeshes.push(im);
+  }
+}
+
 function rebuildMesh() {
   const { W, H, D, vox, owner } = chunk;
   const cut = S.slice;
   const solid = (x, y, z) => x >= 0 && z >= 0 && y >= 0 && x < W && z < D && y < H && y <= cut && SVOX_SOLID[vox[x + z * W + y * W * D]] === 1;
   const list = [], markList = [];
+  const tileMode = tilesOn();
+  // in tile mode only the ground stays voxels, minus the patches the pieces cover
+  let covered = null;
+  if (tileMode) { covered = new Set(); for (const cl of chunk.cells) { const [x0, y0, z0] = cl.origin; if (y0 === chunk.groundY || y0 + chunk.S === chunk.groundY) for (let z = z0; z <= z0 + chunk.P; z++) for (let x = x0; x <= x0 + chunk.P; x++) covered.add(x + z * W); } }
   for (let y = 0; y < H && y <= cut; y++) for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
     const i = x + z * W + y * W * D, t = vox[i];
     if (!t) continue;
+    if (tileMode && (t !== V.GROUND || covered.has(x + z * W))) continue;
     if (!SVOX_SOLID[t]) { if (S.markers && MARK_SIZE[t]) markList.push(i); continue; }
     // only voxels with at least one open face; the underside of the ground plate counts as closed
     if (solid(x + 1, y, z) && solid(x - 1, y, z) && solid(x, y + 1, z) && (t === V.GROUND || solid(x, y - 1, z)) && solid(x, y, z + 1) && solid(x, y, z - 1)) continue;
@@ -191,6 +238,7 @@ function rebuildMesh() {
     scene.add(pathLine);
   }
   $('hud').dataset.drawn = list.length;
+  buildTiles();
 }
 
 function fitHelpers() {
@@ -238,6 +286,7 @@ function updateHud() {
       (comps === 1 ? 'all towers connected' : `<b>${comps} disconnected groups</b>`);
   }
   html += `<br>${chunk.count.toLocaleString()} voxels · ${Number($('hud').dataset.drawn).toLocaleString()} drawn`;
+  if (tilesOn() && dressed) html += `<br>tiles: ${dressed.placements.length.toLocaleString()} pieces · ${dressed.slots} WFC slots ${dressed.wfc.solved ? '✓' : '✗ fell back'}`;
   $('hud').innerHTML = html;
   $('seedOut').textContent = S.seed;
   $('shapeName').innerHTML = `${SHAPE_NAMES[S.shape]}<small>${SHAPE_ORDER.indexOf(S.shape) + 1} / ${SHAPE_ORDER.length}</small>`;
@@ -246,7 +295,9 @@ function updateHud() {
 function legend() {
   const L = $('legend');
   const sw = (col, label) => `<span><i style="background:#${col.toString(16).padStart(6, '0')}"></i>${label}</span>`;
-  if (S.color === 'type') {
+  if (tilesOn()) {
+    L.innerHTML = Object.entries(FAMILY_COLORS).filter(([f]) => f !== 'floor_hole' && f !== 'stair_run').map(([f, col]) => sw(col, f.replace('_', ' '))).join('') + '<span>shade = WFC variant</span>';
+  } else if (S.color === 'type') {
     const present = new Set(chunk.vox);
     L.innerHTML = Object.entries(TYPE_COLORS).filter(([t]) => present.has(Number(t))).map(([t, col]) => sw(col, SVOX_NAMES[t] + (SVOX_SOLID[t] ? '' : ' ◦'))).join('') +
       (isStructure() ? '<span>◦ marker, not solid</span>' : '');
@@ -298,6 +349,7 @@ chipGroup('toggles', v => !!S[v], v => {
   if (v === 'grid') gridHelper.visible = !!S.grid;
   if (v === 'bounds') boundsHelper.visible = !!S.bounds;
   if (v === 'edges' || v === 'markers' || v === 'path') rebuildMesh();
+  if (v === 'tiles') { if (S.tiles) { $('hud').insertAdjacentHTML('beforeend', '<br>loading tiles…'); ensureKit().then(() => { rebuildMesh(); updateHud(); legend(); }); } else { rebuildMesh(); updateHud(); legend(); } }
   if (v === 'spin') controls.autoRotate = !!S.spin;
 });
 $('regen').addEventListener('click', () => { S.seed = 1 + Math.floor(Math.random() * 99999); build(); writeHash(); });
@@ -314,8 +366,9 @@ function resize() {
 new ResizeObserver(resize).observe(stage);
 
 resize(); showShapeControls(); build(); writeHash();
+if (S.tiles) ensureKit().then(() => { rebuildMesh(); updateHud(); legend(); });
 renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
 window.VoxelView = {
-  state: () => ({ S, drawn: mesh.count, marks: marks.count, walk: walk && { ok: walk.ok, bad: walk.bad.length, path: walk.path.length }, deadEnds: chunk.deadEnds }),
+  state: () => ({ S, drawn: mesh.count, tiles: tileMeshes.reduce((a, t) => a + t.count, 0), marks: marks.count, walk: walk && { ok: walk.ok, bad: walk.bad.length, path: walk.path.length }, deadEnds: chunk.deadEnds }),
   chunk: () => chunk
 };

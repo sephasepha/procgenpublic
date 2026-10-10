@@ -402,6 +402,7 @@
       if ((dir === 'nz' && rows.includes(1)) || (dir === 'pz' && rows.includes(3))) return [1];
       return [2];
     };
+    const doorAt = new Map(); // "cell:dir" -> which of the 3 voxels along the face the door uses (1..3, along +x or +z)
     for (const L of links) {
       if (L.dir === 'up') continue;
       const r = region[L.a];
@@ -413,6 +414,7 @@
         const a1 = doorAlong(L.a, L.dir), a2 = doorAlong(L.b, OPP[L.dir]);
         const along = a1[0] === 1 || a2[0] === 1 ? [1] : [2];
         for (const [x, y, z] of faceVoxels(L.a, L.dir, along, [1, 2])) set(x, y, z, V.DOOR, r);
+        doorAt.set(L.a + ':' + L.dir, along[0]); doorAt.set(L.b + ':' + OPP[L.dir], along[0]); // for the tile placer
       }
     }
     // room interiors: clear the corner posts where four cells of one room meet
@@ -513,7 +515,10 @@
         else if (ML) faces[dir] = dir === 'up' ? (solidCell(i, j + 1, k) ? 'floor' : 'roof') : dir === 'down' ? 'floor' : solidCell(i + DIRS[dir][0], j, k + DIRS[dir][2]) ? 'wall' : 'window';
         else faces[dir] = dir === 'up' ? (has(i, j + 1, k) ? 'floor' : 'roof') : dir === 'down' ? 'floor' : 'wall';
       }
-      cells.push({ c, i, j, k, origin: origin(c), region: region[c], kind: c === goalC ? 'goal' : c === entC ? 'entrance' : regions[region[c]].kind, faces, dist: dist[c], ...(floatC[c] ? { element: elem.get(c).t, rise: elem.get(c).rise } : {}) });
+      cells.push({ c, i, j, k, origin: origin(c), region: region[c], kind: c === goalC ? 'goal' : c === entC ? 'entrance' : regions[region[c]].kind, faces, dist: dist[c],
+        ...(stairUp(c) ? { stairRow: stairRow(j) } : {}), ...(stairBelow(c) ? { holeRow: stairRow(j - 1) } : {}),
+        ...(['px', 'nx', 'pz', 'nz'].some(d => doorAt.has(c + ':' + d)) ? { doors: Object.fromEntries(['px', 'nx', 'pz', 'nz'].filter(d => doorAt.has(c + ':' + d)).map(d => [d, doorAt.get(c + ':' + d)])) } : {}),
+        ...(floatC[c] ? { element: elem.get(c).t, rise: elem.get(c).rise } : {}) });
     }
     const deg = degree();
     const deadEnds = regions.filter(r => deg[r.id] <= 1 && r.cells.indexOf(goalC) < 0).length;

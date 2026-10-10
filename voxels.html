@@ -89,7 +89,7 @@
         </div>
         <div class="eyebrow" style="margin-top:4px">Overlays</div>
         <div class="chips" id="toggles" role="group" aria-label="Overlays">
-          <button type="button" data-v="markers">Markers</button><button type="button" data-v="path">Route</button><button type="button" data-v="grid">Grid</button><button type="button" data-v="bounds">Bounds</button><button type="button" data-v="edges">Voxel edges</button><button type="button" data-v="spin">Auto spin</button>
+          <button type="button" data-v="tiles">Tiles</button><button type="button" data-v="markers">Markers</button><button type="button" data-v="path">Route</button><button type="button" data-v="grid">Grid</button><button type="button" data-v="bounds">Bounds</button><button type="button" data-v="edges">Voxel edges</button><button type="button" data-v="spin">Auto spin</button>
         </div>
       </section>
 
@@ -99,6 +99,7 @@
         <p class="desc">The <b>Tower</b> has an entrance on the ground floor and its goal on the top floor. The <b>Megastructure</b> is not a building but a volume: habitation clusters hang at many heights in a mostly empty space, joined by bridges and long stairways routed across the void (each stair cell climbs or drops one storey across one cell, so the runs zig-zag up through the gulfs). Monoliths of solid mass stand in the void and prop up some clusters. There is no floor plan; the only promise is that all of it can be walked. The <b>Pyramid</b> narrows from a triangular base to a single top cell. The <b>Sunken column</b> starts at a stair in the surface and descends to its goal at the bottom.</p>
         <p class="desc">A walk check then moves a two-voxel-tall explorer through the voxels: walking, stepping up or down one voxel, dropping and climbing shafts. It confirms every cell can be reached <i>and left again</i>. The red line is its route from outside to the goal.</p>
         <p class="note">For WFC, each voxel has a label (wall, floor, stair, door, shaft…), and each cell records its region, its kind and a socket on each of its six faces (wall, open, arch, door, entrance, stair, shaft, floor, roof). Markers (◦) are air with a meaning: doorways, shaft space, the entrance, the goal.</p>
+        <p class="desc"><b>Tiles</b> swaps the voxels for a kit of 3D pieces (OBJ files in <code>voxels/tiles/</code>, listed in <code>tileset.json</code>). Each cell's sockets pick a piece family and rotation: wall, window, door, arch, rail, floor, roof, deck, stair, stair run, ladder or mass. A wave function collapse then chooses the variants under adjacency rules: pilasters run the full height of a facade, bands run its full width, one kind of window per ribbon, and a monolith keeps one finish. Shading shows the variant.</p>
         <p class="note">One finger drags to orbit, pinch to zoom, two fingers to pan. The bar on the right of the diorama slices the structure: drag it down to hide everything above that height and look inside; the ticks mark each storey. The arrows step through the structures. Settings live in the URL, so a structure can be bookmarked.</p>
         <p class="note" id="build"></p>
       </section>
@@ -108,6 +109,7 @@
 <script src="voxels/gen.js"></script>
 <script src="voxels/structures.js"></script>
 <script src="voxels/walk.js"></script>
+<script src="voxels/dress3d.js"></script>
 <script src="assets/build.js"></script>
 <script type="module" src="voxels/view.js"></script>
 <script src="assets/sw-register.js"></script>

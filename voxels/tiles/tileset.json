@@ -1,0 +1,282 @@
+{
+  "version": 1,
+  "units": {
+    "unit": "1 voxel",
+    "cell": 4,
+    "storey": 4,
+    "up": "+Y",
+    "authoredFace": "+Z",
+    "rotations": {
+      "pz": 0,
+      "px": 90,
+      "nz": 180,
+      "nx": 270
+    },
+    "pivot": "centre of the cell floor"
+  },
+  "unreal": "Import with Z-up conversion and a uniform scale (voxel size in cm). Rotations become yaw about Z.",
+  "pieces": {
+    "wall_plain": {
+      "file": "wall_plain.obj",
+      "family": "wall",
+      "weight": 4
+    },
+    "wall_ribbed": {
+      "file": "wall_ribbed.obj",
+      "family": "wall",
+      "weight": 2
+    },
+    "wall_banded": {
+      "file": "wall_banded.obj",
+      "family": "wall",
+      "weight": 2
+    },
+    "window_slot": {
+      "file": "window_slot.obj",
+      "family": "window",
+      "weight": 3
+    },
+    "window_barred": {
+      "file": "window_barred.obj",
+      "family": "window",
+      "weight": 2
+    },
+    "door_c": {
+      "file": "door_c.obj",
+      "family": "door",
+      "offset": 0
+    },
+    "door_n": {
+      "file": "door_n.obj",
+      "family": "door",
+      "offset": -1
+    },
+    "door_p": {
+      "file": "door_p.obj",
+      "family": "door",
+      "offset": 1
+    },
+    "arch": {
+      "file": "arch.obj",
+      "family": "arch"
+    },
+    "entrance": {
+      "file": "entrance.obj",
+      "family": "entrance"
+    },
+    "rail": {
+      "file": "rail.obj",
+      "family": "rail"
+    },
+    "floor_plain": {
+      "file": "floor_plain.obj",
+      "family": "floor",
+      "weight": 4
+    },
+    "floor_grate": {
+      "file": "floor_grate.obj",
+      "family": "floor",
+      "weight": 1
+    },
+    "floor_hole_r1": {
+      "file": "floor_hole_r1.obj",
+      "family": "floor_hole",
+      "row": 1
+    },
+    "stair_r1": {
+      "file": "stair_r1.obj",
+      "family": "stair",
+      "row": 1
+    },
+    "floor_hole_r3": {
+      "file": "floor_hole_r3.obj",
+      "family": "floor_hole",
+      "row": 3
+    },
+    "stair_r3": {
+      "file": "stair_r3.obj",
+      "family": "stair",
+      "row": 3
+    },
+    "roof_plain": {
+      "file": "roof_plain.obj",
+      "family": "roof",
+      "weight": 3
+    },
+    "roof_vents": {
+      "file": "roof_vents.obj",
+      "family": "roof",
+      "weight": 1
+    },
+    "deck_plain": {
+      "file": "deck_plain.obj",
+      "family": "deck",
+      "weight": 3
+    },
+    "deck_slats": {
+      "file": "deck_slats.obj",
+      "family": "deck",
+      "weight": 1
+    },
+    "stair_run": {
+      "file": "stair_run.obj",
+      "family": "stair_run"
+    },
+    "shaft_ladder": {
+      "file": "shaft_ladder.obj",
+      "family": "shaft"
+    },
+    "mass_plain": {
+      "file": "mass_plain.obj",
+      "family": "mass",
+      "weight": 3
+    },
+    "mass_ribbed": {
+      "file": "mass_ribbed.obj",
+      "family": "mass",
+      "weight": 1
+    },
+    "goal_beacon": {
+      "file": "goal_beacon.obj",
+      "family": "goal"
+    }
+  },
+  "families": {
+    "wall": [
+      "wall_plain",
+      "wall_ribbed",
+      "wall_banded"
+    ],
+    "window": [
+      "window_slot",
+      "window_barred"
+    ],
+    "door": [
+      "door_c",
+      "door_n",
+      "door_p"
+    ],
+    "arch": [
+      "arch"
+    ],
+    "entrance": [
+      "entrance"
+    ],
+    "rail": [
+      "rail"
+    ],
+    "floor": [
+      "floor_plain",
+      "floor_grate"
+    ],
+    "floor_hole": [
+      "floor_hole_r1",
+      "floor_hole_r3"
+    ],
+    "stair": [
+      "stair_r1",
+      "stair_r3"
+    ],
+    "roof": [
+      "roof_plain",
+      "roof_vents"
+    ],
+    "deck": [
+      "deck_plain",
+      "deck_slats"
+    ],
+    "stair_run": [
+      "stair_run"
+    ],
+    "shaft": [
+      "shaft_ladder"
+    ],
+    "mass": [
+      "mass_plain",
+      "mass_ribbed"
+    ],
+    "goal": [
+      "goal_beacon"
+    ]
+  },
+  "sockets": {
+    "side": {
+      "wall": "wall",
+      "window": "window",
+      "door": "door",
+      "arch": "arch",
+      "entrance": "entrance",
+      "rail": "rail"
+    },
+    "down": {
+      "floor": "floor",
+      "stair": "floor_hole",
+      "deck": "deck"
+    },
+    "up": {
+      "roof": "roof"
+    }
+  },
+  "rules": {
+    "wall": {
+      "v": {
+        "wall_ribbed": [
+          "wall_ribbed"
+        ],
+        "wall_plain": [
+          "wall_plain",
+          "wall_banded"
+        ],
+        "wall_banded": [
+          "wall_plain",
+          "wall_banded"
+        ]
+      },
+      "h": {
+        "wall_banded": [
+          "wall_banded"
+        ],
+        "wall_plain": [
+          "wall_plain",
+          "wall_ribbed"
+        ],
+        "wall_ribbed": [
+          "wall_plain",
+          "wall_ribbed"
+        ]
+      }
+    },
+    "window": {
+      "h": {
+        "window_slot": [
+          "window_slot"
+        ],
+        "window_barred": [
+          "window_barred"
+        ]
+      }
+    },
+    "deck": {
+      "n": {
+        "deck_plain": [
+          "deck_plain",
+          "deck_slats"
+        ],
+        "deck_slats": [
+          "deck_plain",
+          "deck_slats"
+        ]
+      }
+    },
+    "mass": {
+      "v": {
+        "mass_ribbed": [
+          "mass_ribbed"
+        ],
+        "mass_plain": [
+          "mass_plain"
+        ]
+      }
+    }
+  }
+}
