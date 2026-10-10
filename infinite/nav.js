@@ -16,6 +16,7 @@
   const home = () => { if (root.Infinite) Infinite.resume(); paint(); };
 
   function go(k) {
+    if (root.Walk && Walk.active()) return; // the first-person view has its own way back
     const from = current();
     if (k === from || !document.documentElement.classList.contains('xp-open')) return;
     if (from === 'camp') Camp.leave(true);

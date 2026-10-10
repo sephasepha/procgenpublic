@@ -135,6 +135,13 @@ The grammar holds globally even though no sector ever sees the whole world:
 
 The **Rules** panel in the explorer re-checks these live against every loaded sector. `tests/world.js` checks them over every sector within a few steps of the start: doorways meet edge to edge, every cell belongs to exactly one sector, floors of two sectors only ever touch at a doorway, and sectors come out identical in any generation order.
 
+## Walking the maze in 3D
+
+The **3D** button on the Delve screen (bottom right) walks the same world in first person, for a computer with a mouse: **W A S D** walk, the **mouse** looks (click to capture it), **Space** jumps, **Shift** runs, **Esc** frees the mouse and a second **Esc** (or the Map button) goes back to the map. The look is deliberately plain: flat colours, a torch around you and fog (`walk/walk.js`, a small WebGL renderer with no libraries). Each cell of the map is 2 units square with 3.2 high ceilings; floors are tinted by their stratum style, and the world streams in around you exactly as on the map (the explorer follows you, so what you walk shows as charted when you go back).
+
+- **The spawn room.** You always start in a room of your own. The maze has no outside (its entrance is a spot in the middle of a room), so `walk/spawn.js` finds solid rock near the entrance, cuts a 7 by 7 chamber into it and joins it to the maze with one corridor cut through the rock, looking at the doorway when you spawn. The corridor touches the maze only at its far end, with exactly one floor cell beside it, so it opens no shortcuts. The room and corridor are laid over the maze as an overlay and change nothing in the generator. `tests/spawn.js` checks it over 36 seeds and presets: rock found, one join, corridor of at least six cells, the start reaches the entrance.
+- **Moving.** Collision is a small square against the cells, each axis separately, so you slide along walls. Gravity and a jump that clears about a metre; the ceiling stops a jump.
+
 ## Camp: fire and cooking
 
 The **Camp** tab (♨) switches to a second screen: a fixed first-person view down at a fire pit on the cavern floor.
@@ -146,6 +153,7 @@ the pit, the vessels and the fire; what you use and what you need to know are pl
 | File | What it holds |
 |---|---|
 | `camp/fire.js` | The fire: laying, striking, air, heat, catching and going out, breath, embers and coals, ash and char, the placement preview and the gauge's reading. Its header documents a piece's states and fields and how a step works; every number it runs on is in its tuning table (`TUNING`) or the gauge's (`GAUGE`). |
+| `walk/spawn.js`, `walk/walk.js` | The first-person view: the spawn room and corridor, and the plain WebGL walker. |
 | `camp/cooking.js` | Pots, pans and skewers: temperature, water and boil-off, cooking and scorching, stews, what the contents amount to (`judge`, `foodState`) and what eating does. Its tuning is `COOK`; each vessel's own properties are in `camp/data.js`. |
 | `camp/sim.js` | The camp as a whole: its state, one step (fire, then vessels, then body), the body's needs, foraging, and the cost of blowing and the effect of eating. It exports everything as `CampSim`. |
 | `camp/data.js` | Fire supplies, vessels, the 20 ingredients, the dishes, ash and char. |

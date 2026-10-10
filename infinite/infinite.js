@@ -100,6 +100,7 @@
         <button class="xp-act on" data-x="fog" type="button" aria-pressed="true"><b>☼</b><span>Light</span></button>
         <button class="xp-act" data-x="zoom" type="button" aria-pressed="false"><b>▣</b><span>Map</span></button>
         <button class="xp-act on" data-x="tiles" type="button" aria-pressed="true"><b>▦</b><span>Tiles</span></button>
+        <button class="xp-act" data-x="walk" type="button" title="Walk the maze in first person"><b>◧</b><span>3D</span></button>
         <button class="xp-act" data-x="rules" type="button" aria-pressed="false"><b>✓</b><span>Rules</span></button>
         <button class="xp-act" data-x="perf" type="button" aria-pressed="false"><b>⏱</b><span>Perf</span></button>
       </div>
@@ -139,6 +140,7 @@
       const x = e.target.closest('[data-x]'); if (!x) return;
       const k = x.dataset.x, on = v => { x.classList.toggle('on', v); x.setAttribute('aria-pressed', String(v)); };
       if (k === 'close') close();
+      if (k === 'walk') { if (!root.Walk || !st.placed) { toast('Still charting the start…'); return; } Walk.open(); return; }
       if (k === 'fog') { st.fog = !st.fog; on(st.fog); st.sectors.forEach(s => s.dirty = true); }
       if (k === 'zoom') { st.map = !st.map; on(st.map); }
       if (k === 'tiles') { st.tiles = !st.tiles; on(st.tiles); st.sectors.forEach(s => s.dirty = true); }
@@ -866,5 +868,16 @@
       row('long frames (> 50 ms)', p.drops, p.drops < 5);
   }
 
-  root.Infinite = { open, close, suspend, resume, state: () => st, perf: () => st && perfSummary(), move };
+  // for the first-person view: what is at a world cell (1 floor, 0 wall, -1 not generated yet), its floor style and
+  // colour, where the maze is entered, and moving the explorer's own position to follow the walker
+  const colAt = (gx, gy) => { const s = secAt(gx, gy); if (!s || s.failed) return -1; return s.col[(gy - s.oy * 3) * SW + (gx - s.ox * 3)]; };
+  function entrance() { const s = st && st.sectors.get('0,0'); return s && !s.failed ? { gx: s.ox * 3 + s.entranceSub % SW, gy: s.oy * 3 + ((s.entranceSub / SW) | 0) } : null; }
+  function follow(gx, gy) {
+    if (!st || !st.placed || (gx === st.gx && gy === st.gy) || passAt(gx, gy) !== 1) return;
+    st.from = [gx, gy]; st.gx = gx; st.gy = gy; st.mv = null; st.path = null;
+    const cs = ownerSub(gx, gy); if (cs[0] !== st.cs[0] || cs[1] !== st.cs[1]) crossed(st.cs, cs);
+    light(); hud();
+  }
+  const floorColors = () => FLOOR.concat([OTHER]);
+  root.Infinite = { open, close, suspend, resume, state: () => st, perf: () => st && perfSummary(), move, pass: passAt, col: colAt, entrance, follow, floorColors, ready: () => !!(st && st.placed), info: () => st && sectorInfo(st.S, st.cs[0], st.cs[1]) };
 })(window);
