@@ -160,6 +160,8 @@ The home page (`index.html`) is a separate 3D game, a Blame!-like infinite struc
 
 The HUD names the district and the kind of space you are in. The pills under the top buttons (Mixed, Interior, Colonnade, Terraces, Chasm) force every district to one kind, to test each on its own; the choice goes into the address (`#seed=…&biome=terraces`).
 
+**Stair towers.** About one column in twelve carries a stair tower through the open voids: a landing at every level that every walkway there joins, and a flight of slabs up to the landing above, alternating sides by level, so the voids can be climbed and descended without going back indoors.
+
 **Guarantees.** Every cell connects back to the start (a tree towards the origin, plus loops), whatever the district, and the tests walk it by steps for the mixed world and for each forced kind, and walk the real body up and down stairs and across walkways.
 
 **Look.** Dark inked palettes per district (Stone and Ash for the terraces, Concrete and Basalt for the colonnade, Steel and Rust for the chasm), a headlamp falloff, pale haze fog. Draw distance is six cells sideways on a computer, five on a phone.

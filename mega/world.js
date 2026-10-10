@@ -131,9 +131,15 @@
       if (parentMemo.size > 60000) parentMemo.clear();
       parentMemo.set(key, pick); return pick;
     }
+    // stair towers in the open: some columns carry a landing at every level of a void and a stair up to the next,
+    // so the voids can be climbed and descended (never where a colonnade pillar or a well or drop stands)
+    const towerCol = (i, k) => !shaftCol(i, k) && H01(i, 0, k, 420) < 0.08;
+    const voidStair = (i, j, k) => towerCol(i, k) && isVoid(i, j, k) && isVoid(i, j + 1, k) && !(pillarCol(i, k) && (districtOf(i, j, k).type === 'colonnade' || districtOf(i, j + 1, k).type === 'colonnade'));
     // the opening between a cell and its neighbour in direction d (symmetric)
     function link(i, j, k, d) {
       const [dx, dy, dz] = DIRS[d], ni = i + dx, nj = j + dy, nk = k + dz;
+      if (d === 4 && voidStair(i, j, k)) return true;
+      if (d === 5 && voidStair(i, j - 1, k)) return true;
       if (parentDir(i, j, k) === d || parentDir(ni, nj, nk) === OPP[d]) return true;
       // extra links make loops; decided once per pair from its canonical (lower) side
       const c = d % 2 === 0 ? [i, j, k, d] : [ni, nj, nk, OPP[d]];
@@ -216,7 +222,8 @@
         }
         // a slender column, kept out of the lanes the walkways use (lanes never cover 4 or 12)
         if (H01(i, 0, k, 210) < 0.3) { const c = H(i, 0, k, 211) % 4, px = c & 1 ? 12 : 4, pz = c & 2 ? 12 : 4; box(px, px, 0, CH - 1, pz, pz, M.PILLAR); }
-        if (links.some(Boolean)) {
+        const up = voidStair(i, j, k), down = voidStair(i, j - 1, k);
+        if (links.some(Boolean) || up || down) {
           box(6, 10, 0, 0, 6, 10, M.BRIDGE); // the central platform
           for (let d = 0; d < 4; d++) {
             if (!links[d]) continue;
@@ -224,6 +231,14 @@
             if (d < 2) { if (d === 0) box(8, CW - 1, 0, 0, c - 1, c + 1, M.BRIDGE); else box(0, 8, 0, 0, c - 1, c + 1, M.BRIDGE); box(7, 9, 0, 0, lo, hi, M.BRIDGE); }
             else { if (d === 2) box(c - 1, c + 1, 0, 0, 8, CW - 1, M.BRIDGE); else box(c - 1, c + 1, 0, 0, 0, 8, M.BRIDGE); box(lo, hi, 0, 0, 7, 9, M.BRIDGE); }
           }
+        }
+        if (up || down) {
+          // a landing that every walkway here joins, a stair of single slabs up to the landing above, and the hole the
+          // stair from below comes up through (the lanes alternate by level, so the two never meet)
+          box(1, CW - 2, 0, 0, 1, CW - 2, M.BRIDGE);
+          for (const [x, z] of [[1, 1], [1, CW - 2], [CW - 2, 1], [CW - 2, CW - 2]]) box(x, x, 1, 1, z, z, M.TRIM);
+          if (down) { const st = stairOf(i, j - 1, k), [x0, x1] = LANE(st.lane); box(x0, x1, 0, 0, st.z0 + 4, st.z0 + 6, 0); }
+          if (up) { const st = stairOf(i, j, k), [x0, x1] = LANE(st.lane); for (let t = 0; t <= 6; t++) box(x0, x1, 1 + t, 1 + t, st.z0 + t, st.z0 + t, M.BRIDGE); box(x0 - 1, x0 - 1, 1, 7, st.z0 + 6, st.z0 + 6, M.PILLAR); }
         }
         return g;
       }
@@ -351,7 +366,7 @@
       let yaw = 0; for (let d = 0; d < 4; d++) if (link(0, 0, 0, d)) { yaw = [Math.PI / 2, 3 * Math.PI / 2, Math.PI, 0][d]; break; }
       return { x: 8.5, y: 1, z: 8.5, yaw };
     }
-    return { seed: S, biome: force, districtOf, BIOMES, BIOME_NAMES, CW, CH, M, DIRS, PALETTES, info, link, isVoid, wellCol, dropCol, shaftCol, wellHole, dropHole, stairUp, stairOf, laneOf, variantOf, wide, parentDir, genCell, cell, voxel, spawn, regionOf, lightOf, LANE };
+    return { seed: S, biome: force, voidStair, towerCol, districtOf, BIOMES, BIOME_NAMES, CW, CH, M, DIRS, PALETTES, info, link, isVoid, wellCol, dropCol, shaftCol, wellHole, dropHole, stairUp, stairOf, laneOf, variantOf, wide, parentDir, genCell, cell, voxel, spawn, regionOf, lightOf, LANE };
   }
 
   const api = { createWorld, CW, CH, MATERIALS: M, PALETTES, BIOMES, BIOME_NAMES };

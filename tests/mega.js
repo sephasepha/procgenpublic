@@ -35,14 +35,14 @@ for (const { seed, biome } of cases) {
   check(!w.isVoid(0, 0, 0) && [-4, -2, 1, 3].every(j => !w.isVoid(0, j, 0)), 'the start and the vertical axis are solid');
 
   // links are symmetric, and vertical ones join rooms only
-  let asym = 0, badVert = 0, vertical = 0, bridges = 0;
+  let asym = 0, badVert = 0, vertical = 0, bridges = 0, voidStairs = 0;
   for (let i = -R; i <= R; i++) for (let j = -RY; j <= RY; j++) for (let k = -R; k <= R; k++) for (let d = 0; d < 6; d++) {
     const [dx, dy, dz] = DIRS[d], l = w.link(i, j, k, d);
     if (l !== w.link(i + dx, j + dy, k + dz, OPP[d])) asym++;
-    if (l && d >= 4) { vertical++; if (w.isVoid(i, j, k) || w.isVoid(i + dx, j + dy, k + dz) || w.shaftCol(i, k)) badVert++; }
+    if (l && d >= 4) { vertical++; const lo = d === 4 ? j : j - 1; if (w.shaftCol(i, k) || (w.isVoid(i, j, k) || w.isVoid(i + dx, j + dy, k + dz)) && !w.voidStair(i, lo, k)) badVert++; if (w.voidStair(i, lo, k)) voidStairs++; }
     if (l && d < 4 && w.isVoid(i, j, k) !== w.isVoid(i + dx, j, k + dz)) bridges++;
   }
-  check(asym === 0, 'a link looks the same from both sides'); check(badVert === 0, 'stairs only join halls, never void or shafts'); check(vertical > 10 && (biome === 'interior' || bridges > 10), `there are stairs (${vertical / 2 | 0}) and doors onto voids (${bridges / 2 | 0})`);
+  check(asym === 0, 'a link looks the same from both sides'); check(badVert === 0, 'stairs join halls, or landings in a stair tower; never shafts'); if (biome === 'colonnade' || biome === 'chasm') check(voidStairs > 4, `the open voids have stair towers (${voidStairs / 2 | 0} flights)`); check(vertical > 10 && (biome === 'interior' || bridges > 10), `there are stairs (${vertical / 2 | 0}) and doors onto voids (${bridges / 2 | 0})`);
 
   // every cell reaches the start through links
   const seen = new Set(['0,0,0']), q = [[0, 0, 0]];
@@ -80,6 +80,26 @@ for (const { seed, biome } of cases) {
 check(mixVo / mixN > 0.25 && mixVo / mixN < 0.7, `mixed: voids are a fair share of space (${(mixVo / mixN * 100).toFixed(0)}%)`);
 check(mixTerr > 5, `mixed: there are open terraces (${mixTerr})`);
 check(mixBiomes.size === 4, `mixed: every kind of district occurs (${[...mixBiomes]})`);
+
+console.log('Stair towers in the voids');
+for (const biome of ['colonnade', 'chasm', null]) for (const seed of [1, 2, 3]) {
+  const w = createWorld(seed, { biome }), solid = (x, y, z) => w.voxel(x, y, z) !== 0;
+  const stand = (x, y, z) => solid(x, y - 1, z) && !solid(x, y, z) && !solid(x, y + 1, z);
+  let tried = 0, climbed = 0;
+  for (let i = -12; i <= 12 && tried < 6; i++) for (let k = -12; k <= 12 && tried < 6; k++) for (let j = -3; j <= 3 && tried < 6; j++) {
+    if (!w.voidStair(i, j, k)) continue; tried++;
+    const s0 = [i * CW + 3, j * CH + 1, k * CW + 3], seen = new Set([s0.join()]), q = [s0]; let ok = false;
+    for (let h = 0; h < q.length && !ok; h++) { const [x, y, z] = q[h];
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (const dy of [0, 1, -1]) {
+        const nx = x + dx, ny = y + dy, nz = z + dz; if (nx < i * CW || nx >= (i + 1) * CW || nz < k * CW || nz >= (k + 1) * CW) continue;
+        const key = nx + ',' + ny + ',' + nz; if (seen.has(key) || !stand(nx, ny, nz)) continue;
+        if (dy === 1 && solid(x, y + 2, z)) continue; if (dy === -1 && solid(nx, y + 1, nz)) continue;
+        seen.add(key); q.push([nx, ny, nz]); if (ny === (j + 1) * CH + 1) ok = true;
+      } }
+    if (ok) climbed++;
+  }
+  if (tried) check(climbed === tried, `${biome || 'mixed'} seed ${seed}: every stair tower flight can be climbed (${climbed}/${tried})`);
+}
 
 console.log('Walking it with the real body: stairs up and down, bridges over voids');
 for (const seed of [1, 2, 3]) {
