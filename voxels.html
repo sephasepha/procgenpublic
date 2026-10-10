@@ -15,6 +15,21 @@
 <style>
 .stage { position: relative; border: 1px solid var(--rule); border-radius: 6px; background: #0b0c10; overflow: hidden; height: min(68vh, 560px); }
 .stage canvas { width: 100%; height: 100%; touch-action: none; image-rendering: auto; }
+/* slice bar: a tall vertical slider on the right edge of the diorama; drag anywhere on it */
+.slicebar { position: absolute; right: 4px; top: 10px; bottom: 10px; width: 44px; touch-action: none; cursor: ns-resize; user-select: none; -webkit-user-select: none; outline: none; }
+.slicebar .track { position: absolute; left: 50%; top: 0; bottom: 0; width: 6px; margin-left: -3px; border-radius: 3px; background: rgba(255,255,255,0.12); }
+.slicebar .fill { position: absolute; left: 50%; bottom: 0; width: 6px; margin-left: -3px; border-radius: 3px; background: var(--brass); opacity: 0.85; }
+.slicebar .tick { position: absolute; left: 50%; width: 14px; margin-left: -7px; height: 1px; background: rgba(255,255,255,0.35); }
+.slicebar .thumb { position: absolute; left: 50%; transform: translate(-50%, 50%); min-width: 34px; padding: 5px 4px; border-radius: 999px; background: var(--brass); color: var(--ink); font-family: var(--f-mono); font-size: 0.72rem; font-weight: 500; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.6); pointer-events: none; }
+.slicebar:focus-visible .thumb { outline: 2px solid var(--gate); outline-offset: 2px; }
+.slicebar .cap { position: absolute; left: 50%; top: -2px; transform: translateX(-50%); font-family: var(--f-mono); font-size: 0.6rem; letter-spacing: 0.08em; color: var(--dim); text-transform: uppercase; pointer-events: none; display: none; }
+/* previous / next structure */
+.arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 64px; border-radius: 10px; border: 1px solid var(--rule); background: rgba(17,19,24,0.72); color: var(--text); font-size: 1.5rem; line-height: 1; cursor: pointer; display: grid; place-items: center; padding: 0; -webkit-tap-highlight-color: transparent; }
+.arrow:active { background: var(--brass); color: var(--ink); }
+.arrow.prev { left: 6px; }
+.arrow.next { right: 52px; }
+.shapename { position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; font-family: var(--f-display); font-size: 1rem; color: var(--text); text-shadow: 0 1px 3px #000; pointer-events: none; }
+.shapename small { display: block; font-family: var(--f-mono); font-size: 0.66rem; color: var(--dim); }
 .hud { position: absolute; left: 8px; top: 6px; font-family: var(--f-mono); font-size: 0.72rem; color: var(--dim); pointer-events: none; line-height: 1.4; text-shadow: 0 1px 2px #000; }
 .hud b { color: var(--brass); font-weight: 500; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 0.76rem; color: var(--dim); }
@@ -37,7 +52,15 @@
 
   <div class="layout">
     <div style="display:grid;gap:10px;min-width:0">
-      <div class="stage" id="stage"><div class="hud" id="hud"></div></div>
+      <div class="stage" id="stage">
+        <div class="hud" id="hud"></div>
+        <button class="arrow prev" id="prevShape" type="button" aria-label="Previous structure">‹</button>
+        <button class="arrow next" id="nextShape" type="button" aria-label="Next structure">›</button>
+        <div class="slicebar" id="slicebar" role="slider" tabindex="0" aria-label="Slice: hide everything above this height" aria-orientation="vertical">
+          <div class="track"></div><div class="fill" id="sliceFill"></div><div id="sliceTicks"></div><div class="thumb" id="sliceThumb"></div>
+        </div>
+        <div class="shapename" id="shapeName"></div>
+      </div>
       <div class="nav"><span class="seed">seed <b id="seedOut"></b></span><span class="grow"></span><button class="btn" id="resetCam" type="button">Reset view</button><button class="btn primary" id="regen" type="button">New seed</button></div>
       <div class="legend" id="legend"></div>
     </div>
@@ -60,7 +83,6 @@
 
       <section class="card">
         <div class="eyebrow">Debug view</div>
-        <div class="ctl"><label for="pSlice">Slice above</label><output id="vSlice"></output><input id="pSlice" type="range" min="1" max="63" step="1"><small>Hide every voxel above this height to look inside</small></div>
         <div class="eyebrow" style="margin-top:4px">Colour by</div>
         <div class="chips" id="colorBy" role="group" aria-label="Colour by">
           <button type="button" data-v="type">Voxel type</button><button type="button" data-v="kind">Region kind</button><button type="button" data-v="owner">Owner</button><button type="button" data-v="height">Height</button>
@@ -77,7 +99,7 @@
         <p class="desc">The <b>Tower</b> has an entrance on the ground floor and its goal on the top floor. The <b>Pyramid</b> narrows from a triangular base to a single top cell. The <b>Sunken column</b> starts at a stair in the surface and descends to its goal at the bottom.</p>
         <p class="desc">A walk check then moves a two-voxel-tall explorer through the voxels: walking, stepping up or down one voxel, dropping and climbing shafts. It confirms every cell can be reached <i>and left again</i>. The red line is its route from outside to the goal.</p>
         <p class="note">For WFC, each voxel has a label (wall, floor, stair, door, shaft…), and each cell records its region, its kind and a socket on each of its six faces (wall, open, arch, door, entrance, stair, shaft, floor, roof). Markers (◦) are air with a meaning: doorways, shaft space, the entrance, the goal.</p>
-        <p class="note">One finger drags to orbit, pinch to zoom, two fingers to pan. Settings live in the URL, so a structure can be bookmarked.</p>
+        <p class="note">One finger drags to orbit, pinch to zoom, two fingers to pan. The bar on the right of the diorama slices the structure: drag it down to hide everything above that height and look inside; the ticks mark each storey. The arrows step through the structures. Settings live in the URL, so a structure can be bookmarked.</p>
         <p class="note" id="build"></p>
       </section>
     </div>

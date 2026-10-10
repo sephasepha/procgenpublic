@@ -74,11 +74,61 @@ function build() {
     chunk = generateVoxels({ seed: S.seed, towers: S.towers, maxH: S.maxh, loops: S.loops });
     chunk.focusY = 14; walk = null;
   }
+  // the slice bar runs from the ground (or the bottom of a sunken structure) to the top of the content
+  let top = 0;
+  for (let i = chunk.vox.length - 1; i >= 0; i--) if (SVOX_SOLID[chunk.vox[i]]) { top = Math.floor(i / (chunk.W * chunk.D)); break; }
+  sliceMax = top; sliceMin = 0;
+  if (S.slice > sliceMax || S.slice < sliceMin) S.slice = sliceMax;
+  sliceBar();
   rebuildMesh();
   fitHelpers();
   updateHud();
   legend();
 }
+
+// ---- slice bar (in the diorama) ----
+let sliceMax = 63, sliceMin = 0;
+const bar = $('slicebar');
+function sliceBar() {
+  const span = Math.max(1, sliceMax - sliceMin), f = (S.slice - sliceMin) / span;
+  $('sliceThumb').style.bottom = (f * 100) + '%';
+  $('sliceFill').style.height = (f * 100) + '%';
+  $('sliceThumb').textContent = S.slice >= sliceMax ? 'all' : S.slice;
+  bar.setAttribute('aria-valuemin', sliceMin); bar.setAttribute('aria-valuemax', sliceMax); bar.setAttribute('aria-valuenow', S.slice);
+  bar.setAttribute('aria-valuetext', S.slice >= sliceMax ? 'showing everything' : 'hiding above ' + S.slice);
+  // a tick at the top of each storey's headroom, so one tap lands on a clean cut through that storey
+  let ticks = '';
+  if (chunk && chunk.cells) {
+    const ys = [...new Set(chunk.cells.map(c => c.origin[1] + chunk.S - 1))];
+    for (const y of ys) ticks += `<div class="tick" style="bottom:${((y - sliceMin) / span) * 100}%"></div>`;
+  }
+  $('sliceTicks').innerHTML = ticks;
+}
+let sliceQueued = false;
+function setSlice(v, snap) {
+  v = Math.max(sliceMin, Math.min(sliceMax, Math.round(v)));
+  if (snap && chunk.cells) {
+    // land on the nearest storey tick when close to one
+    for (const c of chunk.cells) { const y = c.origin[1] + chunk.S - 1; if (Math.abs(y - v) <= 1) { v = y; break; } }
+  }
+  if (v === S.slice) return;
+  S.slice = v; sliceBar();
+  if (!sliceQueued) { sliceQueued = true; requestAnimationFrame(() => { sliceQueued = false; rebuildMesh(); updateHud(); writeHash(); }); }
+}
+const sliceFromY = clientY => { const r = bar.getBoundingClientRect(); return sliceMin + (1 - (clientY - r.top) / r.height) * (sliceMax - sliceMin); };
+bar.addEventListener('pointerdown', e => { bar.setPointerCapture(e.pointerId); bar.dataset.drag = '1'; setSlice(sliceFromY(e.clientY)); e.preventDefault(); });
+bar.addEventListener('pointermove', e => { if (bar.dataset.drag) setSlice(sliceFromY(e.clientY)); });
+const endDrag = e => { if (!bar.dataset.drag) return; delete bar.dataset.drag; setSlice(sliceFromY(e.clientY), true); };
+bar.addEventListener('pointerup', endDrag);
+bar.addEventListener('pointercancel', () => { delete bar.dataset.drag; });
+bar.addEventListener('keydown', e => {
+  const step = e.shiftKey ? 4 : 1;
+  if (e.key === 'ArrowUp' || e.key === 'ArrowRight') setSlice(S.slice + step);
+  else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') setSlice(S.slice - step);
+  else if (e.key === 'Home') setSlice(sliceMin); else if (e.key === 'End') setSlice(sliceMax);
+  else return;
+  e.preventDefault();
+});
 
 function rebuildMesh() {
   const { W, H, D, vox, owner } = chunk;
@@ -188,6 +238,7 @@ function updateHud() {
   html += `<br>${chunk.count.toLocaleString()} voxels · ${Number($('hud').dataset.drawn).toLocaleString()} drawn`;
   $('hud').innerHTML = html;
   $('seedOut').textContent = S.seed;
+  $('shapeName').innerHTML = `${SHAPE_NAMES[S.shape]}<small>${SHAPE_ORDER.indexOf(S.shape) + 1} / ${SHAPE_ORDER.length}</small>`;
 }
 
 function legend() {
@@ -206,7 +257,7 @@ function legend() {
 const sliders = [
   ['pTowers', 'vTowers', 'towers', true], ['pMaxH', 'vMaxH', 'maxh', true], ['pLoops', 'vLoops', 'loops', true, '%'],
   ['pSize', 'vSize', 'size', true], ['pStoreys', 'vStoreys', 'storeys', true], ['pRooms', 'vRooms', 'rooms', true],
-  ['pShafts', 'vShafts', 'shafts', true], ['pBraid', 'vBraid', 'braid', true, '%'], ['pSlice', 'vSlice', 'slice', false]
+  ['pShafts', 'vShafts', 'shafts', true], ['pBraid', 'vBraid', 'braid', true, '%']
 ];
 const syncSliders = () => { for (const [inp, out, key, , unit] of sliders) { $(inp).value = S[key]; $(out).textContent = S[key] + (unit || ''); } };
 for (const [inp, out, key, regen, unit] of sliders) {
@@ -226,13 +277,19 @@ function chipGroup(id, isOn, onClick) {
   sync();
   return sync;
 }
-chipGroup('shapes', v => S.shape === v, v => {
+const SHAPE_ORDER = ['tower', 'pyramid', 'column', 'pillars'];
+function setShape(v) {
   if (S.shape === v) return;
   S.shape = v;
   const d = STRUCTURE_SHAPES[v];
   if (d) Object.assign(S, { size: d.size, storeys: d.storeys, rooms: d.rooms, shafts: d.shafts, braid: d.braid });
-  syncSliders(); showShapeControls(); build();
-});
+  S.slice = 999; // a new structure starts uncut
+  syncSliders(); showShapeControls(); build(); syncShapeChips();
+}
+const syncShapeChips = chipGroup('shapes', v => S.shape === v, setShape);
+const stepShape = d => { setShape(SHAPE_ORDER[(SHAPE_ORDER.indexOf(S.shape) + d + SHAPE_ORDER.length) % SHAPE_ORDER.length]); writeHash(); };
+$('prevShape').addEventListener('click', () => stepShape(-1));
+$('nextShape').addEventListener('click', () => stepShape(1));
 chipGroup('colorBy', v => S.color === v, v => { S.color = v; rebuildMesh(); legend(); });
 chipGroup('toggles', v => !!S[v], v => {
   S[v] = S[v] ? 0 : 1;
