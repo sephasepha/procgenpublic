@@ -243,7 +243,7 @@
     const cache = new Map();
     function cell(i, j, k) {
       const key = i + ',' + j + ',' + k; let c = cache.get(key);
-      if (!c) { c = genCell(i, j, k); if (cache.size > 900) { const first = cache.keys().next().value; cache.delete(first); } cache.set(key, c); }
+      if (!c) { c = genCell(i, j, k); if (cache.size > 3200) { const first = cache.keys().next().value; cache.delete(first); } cache.set(key, c); }
       else { cache.delete(key); cache.set(key, c); } // most recently used last
       return c;
     }
