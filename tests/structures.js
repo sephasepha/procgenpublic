@@ -20,27 +20,30 @@ for (const shape of Object.keys(St.STRUCTURE_SHAPES)) {
     // exactly one entrance into the structure, and it is the entrance cell's
     const ent = st.cells.filter(c => Object.values(c.faces).includes('entrance') || (c.kind === 'entrance'));
     if (ent.length !== 1) entrance = false;
-    // every face socket agrees with the cell on the other side
-    const byPos = new Map(st.cells.map(c => [c.i + ',' + c.j + ',' + c.k, c]));
+    // every link carries the same socket on both of its faces (links can be diagonal: stair runs climb across cells)
+    const byC = new Map(st.cells.map(c => [c.c, c]));
     const D = { px: [1, 0, 0, 'nx'], nx: [-1, 0, 0, 'px'], pz: [0, 0, 1, 'nz'], nz: [0, 0, -1, 'pz'], up: [0, 1, 0, 'down'], down: [0, -1, 0, 'up'] };
-    for (const c of st.cells) for (const [dir, [dx, dy, dz, opp]] of Object.entries(D)) {
+    for (const L of st.links) { const a = byC.get(L.a), b = byC.get(L.b); if (a.faces[L.dir] !== L.kind || b.faces[D[L.dir][3]] !== L.kind) sockets = false; }
+    // and neighbouring cells of the solid kind (not walkways) agree where they are not linked
+    const byPos = new Map(st.cells.map(c => [c.i + ',' + c.j + ',' + c.k, c]));
+    for (const c of st.cells) if (!c.element) for (const [dir, [dx, dy, dz, opp]] of Object.entries(D)) {
       const o = byPos.get((c.i + dx) + ',' + (c.j + dy) + ',' + (c.k + dz));
-      if (!o) continue;
-      const a = c.faces[dir], b = o.faces[opp];
-      const same = a === b || (dir === 'up' && a === 'floor' && b === 'floor') || (dir === 'down' && a === 'floor' && b === 'floor');
-      if (!same) sockets = false;
+      if (!o || o.element) continue;
+      if (c.faces[dir] !== o.faces[opp]) sockets = false;
     }
-    // every storey above the ground storey can be reached by a stair or a shaft from the one below
-    const js = [...new Set(st.cells.map(c => c.j))].sort((a, b) => a - b);
-    for (const j of js.slice(1)) if (!st.cells.some(c => c.j === j && (c.faces.down === 'stair' || c.faces.down === 'shaft'))) vertical = false;
-    if (!st.stairs) stairsOk = false;
+    if (shape !== 'mega') {
+      // every storey above the ground storey can be reached by a stair or a shaft from the one below
+      const js = [...new Set(st.cells.map(c => c.j))].sort((a, b) => a - b);
+      for (const j of js.slice(1)) if (!st.cells.some(c => c.j === j && (c.faces.down === 'stair' || c.faces.down === 'shaft'))) vertical = false;
+      if (!st.stairs) stairsOk = false;
+    }
   }
   check(walk, `${shape}: every cell can be reached on foot and left again ${msg}`);
   check(oneWay === 0, `${shape}: no one-way drops (${oneWay} spots you could not get back from)`);
   check(goalOk, `${shape}: there is a walking route from the entrance to the goal`);
   check(entrance, `${shape}: exactly one entrance`);
   check(sockets, `${shape}: the sockets on both sides of every shared face agree`);
-  check(vertical && stairsOk, `${shape}: every storey is joined to the one below by a stair or shaft`);
+  if (shape !== 'mega') check(vertical && stairsOk, `${shape}: every storey is joined to the one below by a stair or shaft`);
   const avg = dead / SEEDS, limit = shape === 'pyramid' ? 4 : 0.5;
   check(avg <= limit, `${shape}: dead ends stay rare (average ${avg.toFixed(2)} per structure, limit ${limit})`);
 }
@@ -63,31 +66,33 @@ for (const shape of Object.keys(St.STRUCTURE_SHAPES)) {
   const js = Object.keys(per).map(Number).sort((a, b) => a - b);
   check(js.every((j, i) => i === 0 || per[j] <= per[js[i - 1]]), 'the pyramid narrows (never widens) going up');
   check(per[js[js.length - 1]] <= 2 && st.cells.find(c => c.c === st.goal).j === js[js.length - 1], 'and ends in a point, which is the goal'); }
-{ // megastructure: an atrium void through the core, bridges across it, galleries and terraces
-  let voidOk = true, bridgesOk = true, galleries = true, terraces = 0, groundFull = true, sky = true;
+{ // megastructure: clusters floating at many heights, joined by bridges and stairways across the void, with monoliths
+  let floating = 0, heights = true, stairways = true, spread = true, mass = true, summit = true, groundOnly = 0;
   for (let seed = 1; seed <= SEEDS; seed++) {
-    const st = St.generateStructure('mega', { seed }), n = 9;
-    const at = new Map(st.cells.map(c => [c.i + ',' + c.j + ',' + c.k, c]));
-    if (st.cells.filter(c => c.j === 0).length !== n * n) groundFull = false;
-    const mid = Math.floor(n / 2);
-    for (let j = 1; j < 12; j++) { const c = at.get(mid + ',' + j + ',' + mid); if (c && c.kind !== 'bridge' && c.kind !== 'goal') voidOk = false; }
-    if (!st.bridges.length) bridgesOk = false;
-    for (const b of st.bridges) {
-      const cells = st.cells.filter(c => c.region === b.region);
-      const ends = cells.flatMap(c => ['px', 'nx', 'pz', 'nz'].filter(d => c.faces[d] === 'arch' || c.faces[d] === 'door'));
-      if (ends.length !== 2 || !cells.every(c => Object.values(c.faces).filter(f => f === 'rail').length === 2)) bridgesOk = false;
-    }
-    if (!st.cells.some(c => Object.values(c.faces).includes('gallery'))) galleries = false;
-    if (st.cells.some(c => Object.values(c.faces).includes('terrace'))) terraces++;
-    // nothing roofs the atrium: straight up from the middle of its floor you only meet bridge decks
-    const x = st.bounds.x0 + mid * st.P + 2, z = st.bounds.z0 + mid * st.P + 2;
-    for (let y = 5; y < st.H; y++) { const t = st.vox[st.idx(x, y, z)]; if (St.SVOX_SOLID[t] && t !== St.SVOX.DECK) sky = false; }
+    const st = St.generateStructure('mega', { seed });
+    const C = st.clusters;
+    floating += C.filter(c => c.j0 > 0).length / C.length;
+    if (new Set(C.map(c => c.j0)).size < 4) heights = false;
+    if (!st.connectors.some(k => k.stairs >= 4)) stairways = false;
+    if (C.length < 6) spread = false;
+    if (!(st.mass > 1000)) mass = false;
+    const top = Math.max(...st.cells.filter(c => !c.element).map(c => c.j));
+    if (top < 14 - 3 || st.cells.find(c => c.c === st.goal).j !== top) summit = false;
+    // nothing walkable but the clusters and their connectors: no cell sits on a regular floor plan grid of storeys
+    if (st.cells.every(c => c.j === 0)) groundOnly++;
   }
-  check(groundFull, 'megastructure: the ground floor covers the whole square footprint');
-  check(voidOk && sky, 'megastructure: an atrium runs from the first storey up to the sky');
-  check(bridgesOk, 'megastructure: bridges cross the atrium, land at both ends (wide arch, or a door into a room), and have rails on both sides');
-  check(galleries, 'megastructure: walls facing the atrium open into galleries');
-  check(terraces > SEEDS / 2, `megastructure: setbacks leave walk-out roof terraces (in ${terraces} of ${SEEDS})`);
+  check(floating / SEEDS > 0.6, `megastructure: most clusters float above the ground (${(100 * floating / SEEDS).toFixed(0)}%)`);
+  check(heights && spread, 'megastructure: at least six clusters, starting at four or more different heights');
+  check(stairways, 'megastructure: long stairways (four or more stair cells) climb between clusters');
+  check(mass, 'megastructure: monoliths of solid mass stand in the void');
+  check(summit && groundOnly === 0, 'megastructure: it rises close to the top of the volume, and the goal is up there');
+}
+{ // stair cells are straight: each climbs one storey across one cell, and links run in its direction
+  let ok = true;
+  for (let seed = 1; seed <= 10; seed++) { const st = St.generateStructure('mega', { seed });
+    const byC = new Map(st.cells.map(c => [c.c, c]));
+    for (const L of st.links) if (L.kind === 'stairrun') { const a = byC.get(L.a), b = byC.get(L.b); if (Math.abs(a.j - b.j) > 1 || Math.abs(a.i - b.i) + Math.abs(a.k - b.k) !== 1) ok = false; } }
+  check(ok, 'megastructure: every stair step joins cells one apart across and at most one storey apart');
 }
 { let ok = true; for (const shape of Object.keys(St.STRUCTURE_SHAPES)) { const st = St.generateStructure(shape, { seed: 5 });
     const b = st.bounds; if (b.x0 < 0 || b.z0 < 0 || b.x1 >= st.W || b.z1 >= st.D || Math.max(b.y1, st.groundY) >= st.H) ok = false; }

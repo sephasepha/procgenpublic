@@ -41,9 +41,9 @@ let chunk = null, walk = null;
 
 const TYPE_COLORS = {
   [V.GROUND]: 0x3d4b3a, [V.WALL]: 0x8a93a6, [V.FLOOR]: 0x5d6475, [V.DECK]: 0xe08a2e, [V.RAIL]: 0xf2d04b,
-  [V.ROOF]: 0xb85a5a, [V.STAIR]: 0xd9a441, [V.SHAFT]: 0xb388ff, [V.DOOR]: 0x4fc3f7, [V.ENTRANCE]: 0x69f0ae, [V.GOAL]: 0xff4d6d
+  [V.ROOF]: 0xb85a5a, [V.STAIR]: 0xd9a441, [V.SHAFT]: 0xb388ff, [V.DOOR]: 0x4fc3f7, [V.ENTRANCE]: 0x69f0ae, [V.GOAL]: 0xff4d6d, [V.MASS]: 0x4a4f5c
 };
-const KIND_COLORS = { hall: 0x8a93a6, room: 0x6fa8dc, shaft: 0xb388ff, atrium: 0x4dd0c4, bridge: 0xe08a2e, entrance: 0x69f0ae, goal: 0xff4d6d };
+const KIND_COLORS = { hall: 0x8a93a6, room: 0x6fa8dc, shaft: 0xb388ff, bridge: 0xe08a2e, stairway: 0xf2d04b, entrance: 0x69f0ae, goal: 0xff4d6d };
 const MARK_SIZE = { [V.SHAFT]: 0.22, [V.DOOR]: 0.32, [V.ENTRANCE]: 0.55, [V.GOAL]: 0.95 };
 const OWNER_PALETTE = [0x5fa8e8, 0xe86f5f, 0x6fd08a, 0xc58be8, 0xe8c55f, 0x5fe0d6, 0xe85fb0, 0x9ad05f, 0x8a8ae8, 0xe8995f];
 
@@ -226,7 +226,9 @@ function updateHud() {
   let html = `<b>${SHAPE_NAMES[S.shape]}</b> · ${chunk.W}×${chunk.H}×${chunk.D}<br>`;
   if (isStructure()) {
     const k = { hall: 0, room: 0, shaft: 0, bridge: 0 }; for (const r of chunk.regions) k[r.kind] = (k[r.kind] || 0) + 1;
-    html += `${chunk.cells.length} cells · ${k.hall} halls · ${k.room} rooms · ${k.shaft} shafts` + (k.bridge ? ` · ${k.bridge} bridges` : '') + '<br>' +
+    html += (chunk.clusters
+      ? `${chunk.clusters.length} clusters · ${k.bridge} bridges · ${k.stairway || 0} stairways · ${chunk.connectors.reduce((a, c) => a + c.stairs, 0)} stair cells<br>${chunk.cells.length} cells · ${k.hall} halls · ${k.room} rooms · ${chunk.mass.toLocaleString()} mass<br>`
+      : `${chunk.cells.length} cells · ${k.hall} halls · ${k.room} rooms · ${k.shaft} shafts<br>`) +
       `${chunk.stairs} stairs · ${chunk.deadEnds} dead end${chunk.deadEnds === 1 ? '' : 's'}<br>` +
       (walk.ok ? `walk check ✓ all ${walk.cells} cells reachable and returnable` : `<b>walk check ✗ ${walk.bad.length} cells unreachable</b>`) + '<br>' +
       (walk.path.length ? `route to goal: ${walk.path.length} steps` : '<b>no route to goal</b>');
