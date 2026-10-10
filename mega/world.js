@@ -54,7 +54,15 @@
       // big blobs, with a finer grain; and shafts that run through many levels
       const n = 0.66 * noise(i / 5, j / 3.6, k / 5, 101) + 0.34 * noise(i / 3.2, j / 2.4, k / 3.2, 102);
       const shaft = noise(i / 6.5, 0, k / 6.5, 103) > 0.68 && Math.abs(j - Math.round(10 * (noise(i / 14, 0, k / 14, 104) - 0.5))) <= 4;
-      const v = n > 0.64 || shaft;
+      // colossal voids: boxes 3-4 cells across and 6-9 levels tall, one in about every other lattice node
+      const bi = Math.floor(i / 8), bj = Math.floor(j / 12), bk = Math.floor(k / 8);
+      let big = false;
+      if (H01(bi, bj, bk, 121) < 0.5) {
+        const w = 3 + (H(bi, bj, bk, 122) & 1), d = 3 + (H(bi, bj, bk, 123) & 1), hh = 6 + (H(bi, bj, bk, 124) % 4);
+        const ox = bi * 8 + (H(bi, bj, bk, 125) % 4), oz = bk * 8 + (H(bi, bj, bk, 126) % 4), oy = bj * 12 + (H(bi, bj, bk, 127) % 3);
+        big = i >= ox && i < ox + w && k >= oz && k < oz + d && j >= oy && j < oy + hh;
+      }
+      const v = n > 0.675 || shaft || big;
       if (voidMemo.size > 60000) voidMemo.clear();
       voidMemo.set(key, v); return v;
     }

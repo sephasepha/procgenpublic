@@ -4,8 +4,8 @@
 (function (root) {
   const W = root.MegaWorld, { CW, CH } = W;
   const EYE = 1.55, STEP_DT = 1 / 120;
-  const RH = (matchMedia("(pointer: coarse)").matches || "ontouchstart" in window) ? 4 : 6, RUP = 4, RDOWN = 6;                    // cells drawn around you: sideways, above, below
-  const FOG = [0.62, 0.64, 0.66], FOGD = (matchMedia("(pointer: coarse)").matches || "ontouchstart" in window) ? 0.011 : 0.0085;
+  const RH = (matchMedia("(pointer: coarse)").matches || "ontouchstart" in window) ? 5 : 6, RUP = 4, RDOWN = 6;                    // cells drawn around you: sideways, above, below
+  const FOG = [0.62, 0.64, 0.66], FOGD = (matchMedia("(pointer: coarse)").matches || "ontouchstart" in window) ? 0.009 : 0.0085;
   const TAU = Math.PI * 2;
   const hexRGB = h => { const n = parseInt(h.slice(1), 16); return [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]; };
   const fdiv = (a, b) => Math.floor(a / b);
