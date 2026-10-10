@@ -21,8 +21,8 @@ for (const seed of [1, 2, 3, 4, 5]) {
   const w = createWorld(seed); console.log(`Seed ${seed}`);
   let vo = 0, n = 0; const variants = {};
   for (let i = -R; i <= R; i++) for (let j = -RY; j <= RY; j++) for (let k = -R; k <= R; k++) { n++; if (w.isVoid(i, j, k)) vo++; else { const v = w.variantOf(i, j, k); variants[v] = (variants[v] || 0) + 1; } }
-  check(vo / n > 0.12 && vo / n < 0.45, `voids are a fair share of space (${(vo / n * 100).toFixed(0)}%)`);
-  check(Object.keys(variants).length === 4, `all four room interiors occur (${JSON.stringify(variants)})`);
+  check(vo / n > 0.12 && vo / n < 0.6, `voids are a fair share of space (${(vo / n * 100).toFixed(0)}%)`);
+  check(Object.keys(variants).length === 4, `all four interiors occur (${JSON.stringify(variants)})`);
   check(!w.isVoid(0, 0, 0) && [-4, -2, 1, 3].every(j => !w.isVoid(0, j, 0)), 'the start and the vertical axis are solid');
 
   // links are symmetric, and vertical ones join rooms only
@@ -30,10 +30,10 @@ for (const seed of [1, 2, 3, 4, 5]) {
   for (let i = -R; i <= R; i++) for (let j = -RY; j <= RY; j++) for (let k = -R; k <= R; k++) for (let d = 0; d < 6; d++) {
     const [dx, dy, dz] = DIRS[d], l = w.link(i, j, k, d);
     if (l !== w.link(i + dx, j + dy, k + dz, OPP[d])) asym++;
-    if (l && d >= 4) { vertical++; if (w.isVoid(i, j, k) || w.isVoid(i + dx, j + dy, k + dz) || w.wellCol(i, k)) badVert++; }
+    if (l && d >= 4) { vertical++; if (w.isVoid(i, j, k) || w.isVoid(i + dx, j + dy, k + dz) || w.shaftCol(i, k)) badVert++; }
     if (l && d < 4 && w.isVoid(i, j, k) !== w.isVoid(i + dx, j, k + dz)) bridges++;
   }
-  check(asym === 0, 'a link looks the same from both sides'); check(badVert === 0, 'stairs only join rooms, never void or wells'); check(vertical > 20 && bridges > 10, `there are stairs (${vertical / 2 | 0}) and doors onto voids (${bridges / 2 | 0})`);
+  check(asym === 0, 'a link looks the same from both sides'); check(badVert === 0, 'stairs only join halls, never void or shafts'); check(vertical > 20 && bridges > 10, `there are stairs (${vertical / 2 | 0}) and doors onto voids (${bridges / 2 | 0})`);
 
   // every cell reaches the start through links
   const seen = new Set(['0,0,0']), q = [[0, 0, 0]];

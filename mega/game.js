@@ -4,8 +4,8 @@
 (function (root) {
   const W = root.MegaWorld, { CW, CH } = W;
   const EYE = 1.55, STEP_DT = 1 / 120;
-  const RH = 3, RUP = 2, RDOWN = 3;                    // cells drawn around you: sideways, above, below
-  const FOG = [0.70, 0.74, 0.76], FOGD = 0.021;
+  const RH = (matchMedia("(pointer: coarse)").matches || "ontouchstart" in window) ? 3 : 4, RUP = 3, RDOWN = 4;                    // cells drawn around you: sideways, above, below
+  const FOG = [0.62, 0.64, 0.66], FOGD = 0.014;
   const TAU = Math.PI * 2;
   const hexRGB = h => { const n = parseInt(h.slice(1), 16); return [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]; };
   const fdiv = (a, b) => Math.floor(a / b);
@@ -40,20 +40,20 @@
     if (nv > 65000) { console.warn('mega: cell too dense for 16-bit indices'); return c; }
     c.vbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, c.vbo); gl.bufferData(gl.ARRAY_BUFFER, new Uint8Array(V), gl.STATIC_DRAW);
     c.ibo = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, c.ibo); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(X), gl.STATIC_DRAW);
-    c.n = X.length; c.pal = new Float32Array(PAL[c.info.region]); c.light = c.info.light;
+    c.n = X.length; c.pal = new Float32Array(PAL[c.info.region]); c.light = c.info.light; { let e = 0; for (const [a, b, d] of [[1,0,0],[-1,0,0],[0,0,1],[0,0,-1],[0,1,0],[0,-1,0]]) if (world.isVoid(c.i + a, c.j + b, c.k + d)) e++; c.amb = 0.16 + 0.12 * e; if (c.info.void) c.amb = 0.4; }
     return c;
   }
   const dropCell = c => { if (c.vbo) { gl.deleteBuffer(c.vbo); gl.deleteBuffer(c.ibo); } };
   let PAL = [];
 
   // ---------- shaders ----------
-  const VS = `attribute vec4 a; uniform mat4 uVP; uniform vec3 uRel; uniform vec3 uPal[8]; uniform float uLight;
+  const VS = `attribute vec4 a; uniform mat4 uVP; uniform vec3 uRel; uniform vec3 uPal[8]; uniform float uLight; uniform float uAmb;
     varying vec3 vL; varying vec3 vRel; varying float vFace; varying vec3 vCol;
     void main() {
       float mat = floor(a.w / 8.0 + 0.001); float face = a.w - mat * 8.0;
       float shade = face < 1.5 ? 0.80 : face < 2.5 ? 1.0 : face < 3.5 ? 0.50 : 0.66;
       vec3 base = uPal[int(mat + 0.5)];
-      vCol = mat > 6.5 ? base * 1.12 : base * shade * uLight;
+      vCol = mat > 6.5 ? base * 1.12 : base * shade * uLight * (uAmb + 1.1 / (1.0 + 0.12 * length(a.xyz + uRel)));
       vL = a.xyz; vFace = face; vRel = a.xyz + uRel;
       gl_Position = uVP * vec4(vRel, 1.0);
     }`;
@@ -72,7 +72,7 @@
     prog = gl.createProgram(); gl.attachShader(prog, shader(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog);
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
     loc = { a: gl.getAttribLocation(prog, 'a') };
-    ['uVP', 'uRel', 'uPal', 'uLight', 'uFog', 'uFogD'].forEach(n => { loc[n] = gl.getUniformLocation(prog, n); });
+    ['uVP', 'uRel', 'uPal', 'uLight', 'uAmb', 'uFog', 'uFogD'].forEach(n => { loc[n] = gl.getUniformLocation(prog, n); });
     gl.enable(gl.DEPTH_TEST); gl.enable(gl.CULL_FACE); gl.clearColor(FOG[0], FOG[1], FOG[2], 1);
     return true;
   }
@@ -160,7 +160,7 @@
       const cx = c.i * CW + CW / 2 - eye[0], cy = c.j * CH + CH / 2 - eye[1], cz = c.k * CW + CW / 2 - eye[2];
       for (let f = 0; f < 6; f++) if (pl[f][0] * cx + pl[f][1] * cy + pl[f][2] * cz + pl[f][3] < -13) return; // outside the view
       gl.uniform3f(loc.uRel, c.i * CW - eye[0], c.j * CH - eye[1], c.k * CW - eye[2]);
-      gl.uniform3fv(loc.uPal, c.pal); gl.uniform1f(loc.uLight, c.light);
+      gl.uniform3fv(loc.uPal, c.pal); gl.uniform1f(loc.uLight, c.light); gl.uniform1f(loc.uAmb, c.amb);
       gl.bindBuffer(gl.ARRAY_BUFFER, c.vbo); gl.vertexAttribPointer(loc.a, 4, gl.UNSIGNED_BYTE, false, 4, 0);
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, c.ibo); gl.drawElements(gl.TRIANGLES, c.n, gl.UNSIGNED_SHORT, 0);
       drawn++;
@@ -173,7 +173,7 @@
   function toast(msg) { const t = q('.mg-toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 3200); }
   function hud() {
     const p = st.p, i = fdiv(Math.floor(p.x), CW), j = fdiv(Math.floor(p.y), CH), k = fdiv(Math.floor(p.z), CW), inf = world.info(i, j, k);
-    const place = inf.void ? 'The void' : inf.well ? 'A well' : ({ open: 'A hall', pillars: 'A pillared hall', maze: 'A warren of rooms', cross: 'A crossing' })[inf.variant];
+    const place = inf.void ? 'The shaft' : inf.well ? 'A well' : inf.drop ? 'A drop' : ({ open: 'A hall', pillars: 'Pillar hall', tunnels: 'Conduit', warren: 'Cells' })[inf.variant];
     q('.mg-where').innerHTML = `<b>${place}</b><span>${W.PALETTES[inf.region].name} · level ${j}</span>`;
     q('.mg-pos').textContent = `cell ${i}, ${j}, ${k} · seed ${world.seed}`;
   }
