@@ -110,7 +110,7 @@ header .preset { grid-template-columns: repeat(2, minmax(0, 1fr)); min-width: 11
 .tiertag.tr { color: var(--s1); }
 
 /* shared page nav */
-.topnav { display: flex; gap: 4px; }
+.topnav { display: flex; flex-wrap: wrap; gap: 4px; }
 .topnav a { font-family: var(--f-mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); text-decoration: none; padding: 6px 10px; border: 1px solid var(--rule); border-radius: 999px; }
 .topnav a[aria-current="page"] { color: var(--ink); background: var(--brass); border-color: var(--brass); }
 .topnav a:focus-visible { outline: 2px solid var(--gate); outline-offset: 2px; }

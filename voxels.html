@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111318">
+<title>Voxel Structures</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon-192.png">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+.stage { position: relative; border: 1px solid var(--rule); border-radius: 6px; background: #0b0c10; overflow: hidden; height: min(68vh, 560px); }
+.stage canvas { width: 100%; height: 100%; touch-action: none; image-rendering: auto; }
+/* slice bar: a tall vertical slider on the right edge of the diorama; drag anywhere on it */
+.slicebar { position: absolute; right: 4px; top: 24px; bottom: 20px; width: 44px; touch-action: none; cursor: ns-resize; user-select: none; -webkit-user-select: none; outline: none; }
+.slicebar .track { position: absolute; left: 50%; top: 0; bottom: 0; width: 6px; margin-left: -3px; border-radius: 3px; background: rgba(255,255,255,0.12); }
+.slicebar .fill { position: absolute; left: 50%; bottom: 0; width: 6px; margin-left: -3px; border-radius: 3px; background: var(--brass); opacity: 0.85; }
+.slicebar .tick { position: absolute; left: 50%; width: 14px; margin-left: -7px; height: 1px; background: rgba(255,255,255,0.35); }
+.slicebar .thumb { position: absolute; left: 50%; transform: translate(-50%, 50%); min-width: 34px; padding: 5px 4px; border-radius: 999px; background: var(--brass); color: var(--ink); font-family: var(--f-mono); font-size: 0.72rem; font-weight: 500; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.6); pointer-events: none; }
+.slicebar:focus-visible .thumb { outline: 2px solid var(--gate); outline-offset: 2px; }
+.slicebar .cap { position: absolute; left: 50%; top: -2px; transform: translateX(-50%); font-family: var(--f-mono); font-size: 0.6rem; letter-spacing: 0.08em; color: var(--dim); text-transform: uppercase; pointer-events: none; display: none; }
+/* previous / next structure */
+.arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 64px; border-radius: 10px; border: 1px solid var(--rule); background: rgba(17,19,24,0.72); color: var(--text); font-size: 1.5rem; line-height: 1; cursor: pointer; display: grid; place-items: center; padding: 0; -webkit-tap-highlight-color: transparent; }
+.arrow:active { background: var(--brass); color: var(--ink); }
+.arrow.prev { left: 6px; }
+.arrow.next { right: 52px; }
+.shapename { position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; font-family: var(--f-display); font-size: 1rem; color: var(--text); text-shadow: 0 1px 3px #000; pointer-events: none; }
+.shapename small { display: block; font-family: var(--f-mono); font-size: 0.66rem; color: var(--dim); }
+.hud { position: absolute; left: 8px; top: 6px; right: 56px; font-family: var(--f-mono); font-size: 0.72rem; color: var(--dim); pointer-events: none; line-height: 1.4; text-shadow: 0 1px 2px #000; }
+.hud b { color: var(--brass); font-weight: 500; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 0.76rem; color: var(--dim); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button { appearance: none; font: inherit; font-size: 0.8rem; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--rule); background: var(--slab); color: var(--dim); cursor: pointer; }
+.chips button.on { background: var(--brass); border-color: var(--brass); color: var(--ink); font-weight: 700; }
+</style>
+<script type="importmap">{ "imports": { "three": "./voxels/vendor/three.module.min.js" } }</script>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Voxel Structures</h1>
+      <p class="sub">Debug blocking-in layer: explorable voxel structures with the layout and sockets WFC will skin</p>
+    </div>
+    <nav class="topnav" aria-label="Pages"><a href="./">Infinite</a><a href="workbench.html">Workbench</a><a href="lab.html">Maze Lab</a><a href="tiles.html">Tiles</a><a href="voxels.html" aria-current="page">Voxels</a></nav>
+  </header>
+
+  <div class="layout">
+    <div style="display:grid;gap:10px;min-width:0">
+      <div class="stage" id="stage">
+        <div class="hud" id="hud"></div>
+        <button class="arrow prev" id="prevShape" type="button" aria-label="Previous structure">‹</button>
+        <button class="arrow next" id="nextShape" type="button" aria-label="Next structure">›</button>
+        <div class="slicebar" id="slicebar" role="slider" tabindex="0" aria-label="Slice: hide everything above this height" aria-orientation="vertical">
+          <div class="track"></div><div class="fill" id="sliceFill"></div><div id="sliceTicks"></div><div class="thumb" id="sliceThumb"></div>
+        </div>
+        <div class="shapename" id="shapeName"></div>
+      </div>
+      <div class="nav"><span class="seed">seed <b id="seedOut"></b></span><span class="grow"></span><button class="btn" id="resetCam" type="button">Reset view</button><button class="btn primary" id="regen" type="button">New seed</button></div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div class="panel">
+      <section class="card">
+        <div class="eyebrow">Shape</div>
+        <div class="chips" id="shapes" role="group" aria-label="Shape">
+          <button type="button" data-v="tower">Tower</button><button type="button" data-v="mega">Megastructure</button><button type="button" data-v="pyramid">Pyramid labyrinth</button><button type="button" data-v="column">Sunken column</button><button type="button" data-v="pillars">Pillars and bridges</button>
+        </div>
+        <div class="ctl" data-shapes="tower mega pyramid column"><label for="pSize">Size</label><output id="vSize"></output><input id="pSize" type="range" min="3" max="14" step="1"><small>Cells across the base; each cell is 4 voxels (a wall plus a 3×3 interior)</small></div>
+        <div class="ctl" data-shapes="tower mega pyramid column"><label for="pStoreys">Storeys</label><output id="vStoreys"></output><input id="pStoreys" type="range" min="2" max="14" step="1"><small>Each storey is 4 voxels: a floor slab and 3 of headroom</small></div>
+        <div class="ctl" data-shapes="tower mega pyramid column"><label for="pRooms">Rooms per storey</label><output id="vRooms"></output><input id="pRooms" type="range" min="0" max="5" step="1"><small>Rectangles of 2–9 cells opened into one space; the rest are halls</small></div>
+        <div class="ctl" data-shapes="tower pyramid column"><label for="pShafts">Shafts</label><output id="vShafts"></output><input id="pShafts" type="range" min="0" max="3" step="1"><small>Climbable lift shafts through every storey, with a door on each</small></div>
+        <div class="ctl" data-shapes="tower mega pyramid column"><label for="pBraid">Braid</label><output id="vBraid"></output><input id="pBraid" type="range" min="0" max="100" step="5"><small>Chance each dead end gets a second way out</small></div>
+        <div class="ctl" data-shapes="pillars"><label for="pTowers">Towers</label><output id="vTowers"></output><input id="pTowers" type="range" min="2" max="10" step="1"></div>
+        <div class="ctl" data-shapes="pillars"><label for="pMaxH">Tallest tower</label><output id="vMaxH"></output><input id="pMaxH" type="range" min="18" max="46" step="1"></div>
+        <div class="ctl" data-shapes="pillars"><label for="pLoops">Extra bridges</label><output id="vLoops"></output><input id="pLoops" type="range" min="0" max="100" step="5"><small>Chance of a loop bridge between nearby towers, on top of the spanning tree that keeps every tower reachable</small></div>
+      </section>
+
+      <section class="card">
+        <div class="eyebrow">Debug view</div>
+        <div class="eyebrow" style="margin-top:4px">Colour by</div>
+        <div class="chips" id="colorBy" role="group" aria-label="Colour by">
+          <button type="button" data-v="type">Voxel type</button><button type="button" data-v="kind">Region kind</button><button type="button" data-v="owner">Owner</button><button type="button" data-v="height">Height</button>
+        </div>
+        <div class="eyebrow" style="margin-top:4px">Overlays</div>
+        <div class="chips" id="toggles" role="group" aria-label="Overlays">
+          <button type="button" data-v="tiles">Tiles</button><button type="button" data-v="markers">Markers</button><button type="button" data-v="path">Route</button><button type="button" data-v="grid">Grid</button><button type="button" data-v="bounds">Bounds</button><button type="button" data-v="edges">Voxel edges</button><button type="button" data-v="spin">Auto spin</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="eyebrow">How this works</div>
+        <p class="desc">The three structures share one cell grid. Each cell is a 3×3 room interior with a wall line, one storey tall. Cells are grouped into <b>halls</b> (single cells), <b>rooms</b> (open rectangles on one storey) and <b>shafts</b> (climbable columns). A spanning tree over those regions makes every one reachable, and braiding then gives dead ends a second way out. Storeys connect by 3-step stairs (with a hole above) or by shafts.</p>
+        <p class="desc">The <b>Tower</b> has an entrance on the ground floor and its goal on the top floor. The <b>Megastructure</b> is not a building but a volume: habitation clusters hang at many heights in a mostly empty space, joined by bridges and long stairways routed across the void (each stair cell climbs or drops one storey across one cell, so the runs zig-zag up through the gulfs). Monoliths of solid mass stand in the void and prop up some clusters. There is no floor plan; the only promise is that all of it can be walked. The <b>Pyramid</b> narrows from a triangular base to a single top cell. The <b>Sunken column</b> starts at a stair in the surface and descends to its goal at the bottom.</p>
+        <p class="desc">A walk check then moves a two-voxel-tall explorer through the voxels: walking, stepping up or down one voxel, dropping and climbing shafts. It confirms every cell can be reached <i>and left again</i>. The red line is its route from outside to the goal.</p>
+        <p class="note">For WFC, each voxel has a label (wall, floor, stair, door, shaft…), and each cell records its region, its kind and a socket on each of its six faces (wall, open, arch, door, entrance, stair, shaft, floor, roof). Markers (◦) are air with a meaning: doorways, shaft space, the entrance, the goal.</p>
+        <p class="desc"><b>Tiles</b> swaps the voxels for a kit of 3D pieces (OBJ files in <code>voxels/tiles/</code>, listed in <code>tileset.json</code>). Each cell's sockets pick a piece family and rotation: wall, window, door, arch, rail, floor, roof, deck, stair, stair run, ladder or mass. A wave function collapse then chooses the variants under adjacency rules: pilasters run the full height of a facade, bands run its full width, one kind of window per ribbon, and a monolith keeps one finish. Shading shows the variant.</p>
+        <p class="note">One finger drags to orbit, pinch to zoom, two fingers to pan. The bar on the right of the diorama slices the structure: drag it down to hide everything above that height and look inside; the ticks mark each storey. The arrows step through the structures. Settings live in the URL, so a structure can be bookmarked.</p>
+        <p class="note" id="build"></p>
+      </section>
+    </div>
+  </div>
+</div>
+<script src="voxels/gen.js"></script>
+<script src="voxels/structures.js"></script>
+<script src="voxels/walk.js"></script>
+<script src="voxels/dress3d.js"></script>
+<script src="assets/build.js"></script>
+<script type="module" src="voxels/view.js"></script>
+<script src="assets/sw-register.js"></script>
+</body>
+</html>
