@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#111318">
-<title>Voxel Pillars</title>
+<title>Voxel Structures</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="assets/icon-192.png">
 <link rel="apple-touch-icon" href="assets/icon-192.png">
@@ -29,8 +29,8 @@
 <div class="wrap">
   <header>
     <div>
-      <h1>Voxel Pillars</h1>
-      <p class="sub">Debug prototype: hollow pillar towers joined by bridges, as a 3D voxel chunk</p>
+      <h1>Voxel Structures</h1>
+      <p class="sub">Debug blocking-in layer: explorable voxel structures with the layout and sockets WFC will skin</p>
     </div>
     <nav class="topnav" aria-label="Pages"><a href="./">Infinite</a><a href="workbench.html">Workbench</a><a href="lab.html">Maze Lab</a><a href="tiles.html">Tiles</a><a href="voxels.html" aria-current="page">Voxels</a></nav>
   </header>
@@ -44,34 +44,48 @@
 
     <div class="panel">
       <section class="card">
-        <div class="eyebrow">Chunk</div>
-        <div class="ctl"><label for="pTowers">Towers</label><output id="vTowers"></output><input id="pTowers" type="range" min="2" max="10" step="1"></div>
-        <div class="ctl"><label for="pMaxH">Tallest tower</label><output id="vMaxH"></output><input id="pMaxH" type="range" min="18" max="46" step="1"></div>
-        <div class="ctl"><label for="pLoops">Extra bridges</label><output id="vLoops"></output><input id="pLoops" type="range" min="0" max="100" step="5"><small>Chance of a loop bridge between nearby towers, on top of the spanning tree that keeps every tower reachable</small></div>
+        <div class="eyebrow">Shape</div>
+        <div class="chips" id="shapes" role="group" aria-label="Shape">
+          <button type="button" data-v="tower">Tower</button><button type="button" data-v="pyramid">Pyramid labyrinth</button><button type="button" data-v="column">Sunken column</button><button type="button" data-v="pillars">Pillars and bridges</button>
+        </div>
+        <div class="ctl" data-shapes="tower pyramid column"><label for="pSize">Size</label><output id="vSize"></output><input id="pSize" type="range" min="3" max="14" step="1"><small>Cells across the base; each cell is 4 voxels (a wall plus a 3×3 interior)</small></div>
+        <div class="ctl" data-shapes="tower pyramid column"><label for="pStoreys">Storeys</label><output id="vStoreys"></output><input id="pStoreys" type="range" min="2" max="14" step="1"><small>Each storey is 4 voxels: a floor slab and 3 of headroom</small></div>
+        <div class="ctl" data-shapes="tower pyramid column"><label for="pRooms">Rooms per storey</label><output id="vRooms"></output><input id="pRooms" type="range" min="0" max="5" step="1"><small>Rectangles of 2–9 cells opened into one space; the rest are halls</small></div>
+        <div class="ctl" data-shapes="tower pyramid column"><label for="pShafts">Shafts</label><output id="vShafts"></output><input id="pShafts" type="range" min="0" max="3" step="1"><small>Climbable lift shafts through every storey, with a door on each</small></div>
+        <div class="ctl" data-shapes="tower pyramid column"><label for="pBraid">Braid</label><output id="vBraid"></output><input id="pBraid" type="range" min="0" max="100" step="5"><small>Chance each dead end gets a second way out</small></div>
+        <div class="ctl" data-shapes="pillars"><label for="pTowers">Towers</label><output id="vTowers"></output><input id="pTowers" type="range" min="2" max="10" step="1"></div>
+        <div class="ctl" data-shapes="pillars"><label for="pMaxH">Tallest tower</label><output id="vMaxH"></output><input id="pMaxH" type="range" min="18" max="46" step="1"></div>
+        <div class="ctl" data-shapes="pillars"><label for="pLoops">Extra bridges</label><output id="vLoops"></output><input id="pLoops" type="range" min="0" max="100" step="5"><small>Chance of a loop bridge between nearby towers, on top of the spanning tree that keeps every tower reachable</small></div>
       </section>
 
       <section class="card">
         <div class="eyebrow">Debug view</div>
-        <div class="ctl"><label for="pSlice">Slice above</label><output id="vSlice"></output><input id="pSlice" type="range" min="1" max="47" step="1"><small>Hide every voxel above this height to look inside the towers</small></div>
+        <div class="ctl"><label for="pSlice">Slice above</label><output id="vSlice"></output><input id="pSlice" type="range" min="1" max="63" step="1"><small>Hide every voxel above this height to look inside</small></div>
         <div class="eyebrow" style="margin-top:4px">Colour by</div>
         <div class="chips" id="colorBy" role="group" aria-label="Colour by">
-          <button type="button" data-v="type">Voxel type</button><button type="button" data-v="owner">Tower / bridge</button><button type="button" data-v="height">Height</button>
+          <button type="button" data-v="type">Voxel type</button><button type="button" data-v="kind">Region kind</button><button type="button" data-v="owner">Owner</button><button type="button" data-v="height">Height</button>
         </div>
+        <div class="eyebrow" style="margin-top:4px">Overlays</div>
         <div class="chips" id="toggles" role="group" aria-label="Overlays">
-          <button type="button" data-v="grid">Grid</button><button type="button" data-v="bounds">Bounds</button><button type="button" data-v="edges">Voxel edges</button><button type="button" data-v="spin">Auto spin</button>
+          <button type="button" data-v="markers">Markers</button><button type="button" data-v="path">Route</button><button type="button" data-v="grid">Grid</button><button type="button" data-v="bounds">Bounds</button><button type="button" data-v="edges">Voxel edges</button><button type="button" data-v="spin">Auto spin</button>
         </div>
       </section>
 
       <section class="card">
         <div class="eyebrow">How this works</div>
-        <p class="desc">Towers get random square footprints, kept apart, with a floor slab every 6 voxels and window slits mid-storey. Bridges follow a minimum spanning tree over the tower centres, so every tower is reachable, plus optional loop bridges. Each bridge lands on a floor level both towers share and cuts a doorway through the walls it meets.</p>
-        <p class="note">One finger drags to orbit, pinch to zoom, two fingers to pan. Settings live in the URL, so a chunk can be bookmarked. Only voxels with an exposed face are drawn, as one instanced mesh.</p>
+        <p class="desc">The three structures share one cell grid. Each cell is a 3×3 room interior with a wall line, one storey tall. Cells are grouped into <b>halls</b> (single cells), <b>rooms</b> (open rectangles on one storey) and <b>shafts</b> (climbable columns). A spanning tree over those regions makes every one reachable, and braiding then gives dead ends a second way out. Storeys connect by 3-step stairs (with a hole above) or by shafts.</p>
+        <p class="desc">The <b>Tower</b> has an entrance on the ground floor and its goal on the top floor. The <b>Pyramid</b> narrows from a triangular base to a single top cell. The <b>Sunken column</b> starts at a stair in the surface and descends to its goal at the bottom.</p>
+        <p class="desc">A walk check then moves a two-voxel-tall explorer through the voxels: walking, stepping up or down one voxel, dropping and climbing shafts. It confirms every cell can be reached <i>and left again</i>. The red line is its route from outside to the goal.</p>
+        <p class="note">For WFC, each voxel has a label (wall, floor, stair, door, shaft…), and each cell records its region, its kind and a socket on each of its six faces (wall, open, arch, door, entrance, stair, shaft, floor, roof). Markers (◦) are air with a meaning: doorways, shaft space, the entrance, the goal.</p>
+        <p class="note">One finger drags to orbit, pinch to zoom, two fingers to pan. Settings live in the URL, so a structure can be bookmarked.</p>
         <p class="note" id="build"></p>
       </section>
     </div>
   </div>
 </div>
 <script src="voxels/gen.js"></script>
+<script src="voxels/structures.js"></script>
+<script src="voxels/walk.js"></script>
 <script src="assets/build.js"></script>
 <script type="module" src="voxels/view.js"></script>
 <script src="assets/sw-register.js"></script>
