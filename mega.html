@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#b3bcc2">
+<title>Megastructure</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon-192.png">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #b3bcc2; overflow: hidden; overscroll-behavior: none; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #1d2226; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  .mg { position: fixed; inset: 0; touch-action: none; }
+  .mg canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .mg .mg-dot { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; border-radius: 50%; background: rgba(20,24,28,0.6); pointer-events: none; display: none; }
+  .mg.looking .mg-dot, .mg.touch .mg-dot { display: block; }
+  .mg .mg-top { position: absolute; left: 12px; right: 12px; top: calc(env(safe-area-inset-top, 0px) + 10px); display: flex; gap: 10px; align-items: flex-start; pointer-events: none; }
+  .mg .mg-where { display: grid; gap: 1px; padding: 7px 12px; border-radius: 10px; background: rgba(240,243,245,0.78); font-size: 0.95rem; }
+  .mg .mg-where span, .mg .mg-pos { font-size: 0.74rem; opacity: 0.72; }
+  .mg .mg-pos { position: absolute; left: 0; top: 58px; padding: 0 4px; text-shadow: 0 0 4px rgba(240,243,245,0.8); }
+  .mg .mg-btns { margin-left: auto; display: flex; gap: 8px; pointer-events: auto; }
+  .mg .mg-btns button { appearance: none; border: 0; padding: 8px 12px; border-radius: 10px; background: rgba(240,243,245,0.78); color: inherit; font: inherit; font-size: 0.85rem; cursor: pointer; }
+  .mg .mg-toast { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); max-width: 80%; padding: 8px 14px; border-radius: 10px; background: rgba(30,36,40,0.82); color: #f0f3f5; font-size: 0.9rem; text-align: center; pointer-events: none; }
+  .mg .mg-load { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 10px 18px; border-radius: 10px; background: rgba(240,243,245,0.85); font-size: 0.95rem; }
+  .mg .mg-help { position: absolute; left: 50%; bottom: 14%; transform: translateX(-50%); display: grid; gap: 4px; text-align: center; padding: 14px 22px; border-radius: 12px; background: rgba(240,243,245,0.88); cursor: pointer; }
+  .mg .mg-help b { font-size: 1.05rem; } .mg .mg-help span { font-size: 0.82rem; opacity: 0.75; }
+  .mg.looking .mg-help, .mg.touch .mg-help { display: none; }
+  .mg .mg-touch { position: absolute; inset: 0; display: none; }
+  .mg.touch .mg-touch { display: block; }
+  .mg .mg-stick { position: absolute; width: 0; height: 0; pointer-events: none; }
+  .mg .mg-stick::before { content: ''; position: absolute; left: -52px; top: -52px; width: 104px; height: 104px; border-radius: 50%; border: 2px solid rgba(240,243,245,0.8); background: rgba(30,36,40,0.18); }
+  .mg .mg-stick i { position: absolute; left: 0; top: 0; width: 46px; height: 46px; border-radius: 50%; background: rgba(240,243,245,0.85); transform: translate(-50%, -50%); }
+  .mg .mg-jump { position: absolute; right: calc(env(safe-area-inset-right, 0px) + 28px); bottom: calc(env(safe-area-inset-bottom, 0px) + 30px); width: 84px; height: 84px; border-radius: 50%; border: 2px solid rgba(240,243,245,0.85); background: rgba(30,36,40,0.28); color: #f0f3f5; font-size: 0.85rem; letter-spacing: 0.06em; appearance: none; touch-action: none; }
+  .mg .mg-jump:active { background: rgba(240,243,245,0.55); color: #1d2226; }
+  .mg .mg-hint { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); transform: translateX(-50%); font-size: 0.72rem; opacity: 0.7; pointer-events: none; text-shadow: 0 0 4px rgba(240,243,245,0.9); white-space: nowrap; }
+  .mg.touch .mg-hint { display: none; }
+</style>
+</head>
+<body>
+<div class="mg mg-stage">
+  <canvas aria-label="First-person view of an endless structure"></canvas>
+  <i class="mg-dot"></i>
+  <div class="mg-top"><div class="mg-where"></div><div class="mg-btns"><button class="mg-seed" type="button" title="A new structure">New</button><button class="mg-respawn" type="button" title="Back to the start (R)">Start</button><button class="mg-full" type="button" title="Full screen">⛶</button></div></div>
+  <div class="mg-pos"></div>
+  <div class="mg-load">Building the first rooms…</div>
+  <div class="mg-toast" hidden></div>
+  <div class="mg-help"><b>Click to look around</b><span>W A S D walk · mouse looks · Space jumps · Shift runs · R back to the start · Esc frees the mouse</span></div>
+  <div class="mg-hint">W A S D · mouse · Space · Shift</div>
+  <div class="mg-touch"><div class="mg-stick" hidden><i></i></div><button class="mg-jump" type="button">JUMP</button></div>
+</div>
+<script src="mega/world.js"></script>
+<script src="mega/body.js"></script>
+<script src="mega/game.js"></script>
+<script>MegaGame.init(document.querySelector('.mg'));</script>
+</body>
+</html>
