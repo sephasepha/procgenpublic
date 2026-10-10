@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07080b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Infinite Undercroft</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon-192.png">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Infinite Undercroft</h1>
+      <p class="sub">An endless labyrinth that generates around you as you walk, with every rule still enforced</p>
+    </div>
+    <nav class="topnav" aria-label="Pages"><a href="./">Megastructure</a><a href="delve.html" aria-current="page">Delve</a><a href="workbench.html">Workbench</a><a href="lab.html">Maze Lab</a><a href="tiles.html">Tiles</a><a href="voxels.html">Voxels</a></nav>
+  </header>
+
+  <section class="hero card">
+    <div class="eyebrow">Now generating</div>
+    <h2 id="heroWorld">World 1 · Underdark</h2>
+    <p class="desc" id="heroDesc">Start at the Gatehouse and go deeper. Sectors are built around you as you walk: progression rules, a maze layer, then wave function collapse for the architecture and the dressing.</p>
+    <div class="row"><button class="btn primary descend" id="descend" type="button">Enter the Undercroft ▸</button><button class="btn" id="reseedTop" type="button">New world</button></div>
+  </section>
+
+  <div class="layout">
+    <div style="display:grid;gap:10px;min-width:0">
+      <div class="preview-wrap"><canvas id="preview" aria-label="Sector tree around the start"></canvas></div>
+      <div class="key" id="key"></div>
+    </div>
+
+    <div class="panel">
+      <section class="card">
+        <div class="eyebrow">How it works</div>
+        <p class="desc">The world is an endless grid of sectors, each a full dungeon from the Workbench pipeline. Every sector links to a parent one step closer to the start, so they all form a single tree. Distance from the start sets the tier, so tiers rise outward and never skip. Each shared border has one contract, computed from its coordinates, that fixes where the doorway is. Both neighbours compute it independently, which means any sector can be generated on its own, in any order, and always comes out the same.</p>
+        <p class="note">The map shows sectors near the start: colour is the tier, solid lines are tree links, dashed gold lines are loops (same tier only).</p>
+      </section>
+
+      <section class="card">
+        <div class="eyebrow">World</div>
+        <div class="row"><span class="seed">world seed <b id="seedOut">1</b></span><button class="btn" id="reseed" type="button">New world</button></div>
+        <div class="seg" role="group" aria-label="Preset" style="grid-template-columns:repeat(3,minmax(0,1fr))"><button type="button" data-preset="underdark">Underdark</button><button type="button" data-preset="arsenal">Arsenal</button><button type="button" data-preset="generic">Generic</button></div>
+        <div class="controls">
+          <div class="ctl"><label for="pBand">Sectors per tier</label><output id="vBand"></output><input id="pBand" type="range" min="2" max="6" step="1"><small>How many sectors deep each tier band runs before the next (2 or more keeps cross-tier branches to two)</small></div>
+          <div class="ctl"><label for="pLoops">Loop doorways</label><output id="vLoops"></output><input id="pLoops" type="range" min="0" max="100" step="5"><small>Chance of an extra doorway between same-tier neighbours</small></div>
+          <div class="ctl"><label for="pDoors">Extra doorways per border</label><output id="vDoors"></output><input id="pDoors" type="range" min="0" max="4" step="1"><small>Up to this many more doorways on borders between same-tier sectors, so borders read as ordinary walls</small></div>
+          <div class="ctl"><label for="pHubs">Hubs per sector</label><output id="vHubs"></output><input id="pHubs" type="range" min="5" max="14" step="1"></div>
+          <div class="ctl"><label for="pMaze">Labyrinth strength</label><output id="vMaze"></output><input id="pMaze" type="range" min="0" max="100" step="5"></div>
+          <div class="ctl" id="ruinCtl"><label for="pRuin">Ruin</label><output id="vRuin"></output><input id="pRuin" type="range" min="0" max="40" step="5"><small>Interior regions collapsed into breaches</small></div>
+        </div>
+        <div class="eyebrow" style="margin-top:4px">Maze algorithm</div>
+        <div class="algos" id="algos" role="group" aria-label="Maze algorithm"></div>
+      </section>
+
+      <section class="card">
+        <div class="eyebrow">More tools</div>
+        <div class="tools">
+          <a class="tool" href="workbench.html"><b>Workbench</b><span>Step through one dungeon stage by stage: grammar, field, maze, WFC, validation.</span></a>
+          <a class="tool" href="lab.html"><b>Maze Lab</b><span>Compare nine maze algorithms and walk the results.</span></a>
+          <a class="tool" href="tiles.html"><b>Tiles</b><span>The hand-drawn example rooms the dressing WFC learns from.</span></a>
+          <a class="tool" href="./"><b>Megastructure</b><span>An endless 3D liminal structure to walk through in first person: halls, warrens, stairs, chasms and bridges. Keyboard and mouse, or touch on a phone.</span></a>
+          <a class="tool" href="voxels.html"><b>Voxels</b><span>Debug 3D blocking-in: an explorable tower, a pyramid labyrinth, a sunken column, and pillars with bridges.</span></a>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="eyebrow">Controls</div>
+        <p class="note" id="build"></p>
+        <p class="note">Arrow pad, swipe, or arrow keys and WASD. The small map in the corner is the sector tree around you. <b>Rules</b> checks every global rule live against the sectors currently loaded.</p>
+      </section>
+    </div>
+  </div>
+</div>
+<script src="gen/mazes.js"></script>
+<script src="gen/core.js"></script>
+<script src="gen/dressing.js"></script>
+<script src="gen/rooms.js"></script>
+<script src="gen/world.js"></script>
+<script src="gen/wasm.js"></script>
+<script src="skills/skills.js"></script>
+<script src="camp/data.js"></script>
+<script src="camp/fire.js"></script>
+<script src="camp/cooking.js"></script>
+<script src="camp/sim.js"></script>
+<script src="camp/view.js"></script>
+<script src="camp/draw.js"></script>
+<script src="camp/panels.js"></script>
+<script src="camp/camp.js"></script>
+<script src="body/data.js"></script>
+<script src="body/sim.js"></script>
+<script src="body/chart.js"></script>
+<script src="body/body.js"></script>
+<script src="fishing/data.js"></script>
+<script src="fishing/sim.js"></script>
+<script src="fishing/fishing.js"></script>
+<script src="walk/spawn.js"></script>
+<script src="walk/walk.js"></script>
+<script src="infinite/nav.js"></script>
+<script src="skills/bar.js"></script>
+<script src="infinite/infinite.js"></script>
+<script src="infinite/page.js"></script>
+<script src="assets/build.js"></script>
+<script src="assets/sw-register.js"></script>
+</body>
+</html>

@@ -173,8 +173,8 @@
   function toast(msg) { const t = q('.mg-toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 3200); }
   function hud() {
     const p = st.p, i = fdiv(Math.floor(p.x), CW), j = fdiv(Math.floor(p.y), CH), k = fdiv(Math.floor(p.z), CW), inf = world.info(i, j, k);
-    const place = inf.void ? 'The shaft' : inf.well ? 'A well' : inf.drop ? 'A drop' : ({ open: 'A hall', pillars: 'Pillar hall', tunnels: 'Conduit', warren: 'Cells' })[inf.variant];
-    q('.mg-where').innerHTML = `<b>${place}</b><span>${W.PALETTES[inf.region].name} · level ${j}</span>`;
+    const place = inf.void ? 'The shaft' : inf.well ? 'A well' : inf.drop ? 'A drop' : ({ open: 'A hall', pillars: 'Pillar hall', tunnels: 'Conduit', warren: 'Cells', terrace: 'A terrace' })[inf.variant];
+    q('.mg-where').innerHTML = `<b>${W.BIOME_NAMES[inf.biome]}</b><span>${place} · ${W.PALETTES[inf.region].name} · level ${j}</span>`;
     q('.mg-pos').textContent = `cell ${i}, ${j}, ${k} · seed ${world.seed}`;
   }
 
@@ -215,8 +215,15 @@
     }
     q('.mg-respawn').addEventListener('click', e => { e.stopPropagation(); respawn(); });
     q('.mg-full').addEventListener('click', e => { e.stopPropagation(); fullscreen(true); });
-    q('.mg-seed').addEventListener('click', e => { e.stopPropagation(); const s = Math.floor(Math.random() * 1e6); location.hash = 'seed=' + s; start(s); });
-    window.addEventListener('hashchange', () => { const s = seedFromHash(); if (s !== null && world && s !== world.seed) start(s); });
+    q('.mg-seed').addEventListener('click', e => { e.stopPropagation(); const s = Math.floor(Math.random() * 1e6); history.replaceState(null, '', hashFor(s, biome)); start(s); });
+    // the biome picker: Mixed, or every district forced to one kind, to look at each on its own
+    const bl = q('.mg-biomes');
+    if (bl) {
+      bl.innerHTML = ['', ...W.BIOMES].map(b => `<button type="button" data-b="${b}">${b ? W.BIOME_NAMES[b].replace('The ', '') : 'Mixed'}</button>`).join('');
+      bl.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; e.stopPropagation(); biome = b.dataset.b || null; history.replaceState(null, '', hashFor(world.seed, biome)); start(world.seed); });
+      ['pointerdown', 'touchstart', 'mousedown'].forEach(t => bl.addEventListener(t, e => e.stopPropagation(), { passive: true }));
+    }
+    window.addEventListener('hashchange', () => { const s = seedFromHash(), b = biomeFromHash(); if (s !== null && world && (s !== world.seed || b !== biome)) { biome = b; start(s); } });
   }
   let askedFull = false;
   function fullscreen(force) {
@@ -227,9 +234,13 @@
 
   // ---------- start ----------
   const seedFromHash = () => { const m = /seed=(-?\d+)/.exec(location.hash); return m ? +m[1] : null; };
+  const biomeFromHash = () => { const m = /biome=(\w+)/.exec(location.hash); return m && W.BIOMES.includes(m[1]) ? m[1] : null; };
+  const hashFor = (s, b) => '#seed=' + s + (b ? '&biome=' + b : '');
+  let biome = null;
   function start(seed) {
     if (st) { st.cells.forEach(dropCell); }
-    world = W.createWorld(seed);
+    world = W.createWorld(seed, { biome });
+    el.querySelectorAll('.mg-biomes button').forEach(b => b.classList.toggle('on', (b.dataset.b || null) === biome));
     PAL = W.PALETTES.map(palFlat);
     const s = world.spawn();
     const body = MegaBody.createBody(world, s.x, s.y, s.z, s.yaw);
@@ -241,7 +252,7 @@
     el = rootEl; cv = q('canvas');
     if (!initGL()) { q('.mg-load').textContent = 'This needs WebGL, which this browser does not have.'; return; }
     setup();
-    let seed = seedFromHash(); if (seed === null) { seed = Math.floor(Math.random() * 1e6); history.replaceState(null, '', '#seed=' + seed); }
+    let seed = seedFromHash(); biome = biomeFromHash(); if (seed === null) { seed = Math.floor(Math.random() * 1e6); history.replaceState(null, '', hashFor(seed, biome)); }
     start(seed);
     root.Mega = { state: () => st, world: () => world, start, respawn, CW, CH };
   }

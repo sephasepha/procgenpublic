@@ -17,12 +17,21 @@ console.log('Determinism and variety');
   // the cache must not change what a cell is
   const w = createWorld(5), first = Array.from(w.cell(2, 1, -1)); for (let n = 0; n < 1200; n++) w.cell(n % 40 - 20, 0, (n * 7) % 40 - 20); check(first.every((v, q) => v === w.cell(2, 1, -1)[q]), 'a cell regenerated after eviction is identical'); }
 
-for (const seed of [1, 2, 3, 4, 5]) {
-  const w = createWorld(seed); console.log(`Seed ${seed}`);
+const BIOMES = ['interior', 'colonnade', 'terraces', 'chasm'];
+const cases = [1, 2, 3, 4, 5].map(seed => ({ seed })).concat(...BIOMES.map(biome => [1, 2].map(seed => ({ seed, biome }))));
+let mixVo = 0, mixN = 0, mixTerr = 0; const mixBiomes = new Set();
+for (const { seed, biome } of cases) {
+  const w = createWorld(seed, { biome }); console.log(`Seed ${seed}${biome ? ' (' + biome + ' only)' : ''}`);
   let vo = 0, n = 0; const variants = {};
   for (let i = -R; i <= R; i++) for (let j = -RY; j <= RY; j++) for (let k = -R; k <= R; k++) { n++; if (w.isVoid(i, j, k)) vo++; else { const v = w.variantOf(i, j, k); variants[v] = (variants[v] || 0) + 1; } }
-  check(vo / n > 0.12 && vo / n < 0.6, `voids are a fair share of space (${(vo / n * 100).toFixed(0)}%)`);
-  check(Object.keys(variants).length === 4, `all four interiors occur (${JSON.stringify(variants)})`);
+  const share = `${(vo / n * 100).toFixed(0)}%`;
+  if (!biome) { mixVo += vo; mixN += n; for (let i = -30; i <= 30; i += 3) for (let j = -12; j <= 12; j += 2) for (let k = -30; k <= 30; k += 3) mixBiomes.add(w.districtOf(i, j, k).type); }
+  else if (biome === 'interior') check(vo === 0, `the interior has no open air (${share})`);
+  else if (biome === 'colonnade') check(vo / n > 0.6, `the colonnade is mostly air (${share})`);
+  else check(vo / n > 0.2 && vo / n < 0.8, `voids are a fair share of the ${biome} (${share})`);
+  if (!biome || biome === 'interior' || biome === 'chasm') check(['tunnels', 'warren', 'open', 'pillars'].every(v => variants[v]), `all four interiors occur (${JSON.stringify(variants)})`);
+  if (!biome) mixTerr += variants.terrace || 0;
+  if (biome === 'terraces') check(variants.terrace > 5, `there are open terraces (${variants.terrace || 0})`);
   check(!w.isVoid(0, 0, 0) && [-4, -2, 1, 3].every(j => !w.isVoid(0, j, 0)), 'the start and the vertical axis are solid');
 
   // links are symmetric, and vertical ones join rooms only
@@ -33,7 +42,7 @@ for (const seed of [1, 2, 3, 4, 5]) {
     if (l && d >= 4) { vertical++; if (w.isVoid(i, j, k) || w.isVoid(i + dx, j + dy, k + dz) || w.shaftCol(i, k)) badVert++; }
     if (l && d < 4 && w.isVoid(i, j, k) !== w.isVoid(i + dx, j, k + dz)) bridges++;
   }
-  check(asym === 0, 'a link looks the same from both sides'); check(badVert === 0, 'stairs only join halls, never void or shafts'); check(vertical > 20 && bridges > 10, `there are stairs (${vertical / 2 | 0}) and doors onto voids (${bridges / 2 | 0})`);
+  check(asym === 0, 'a link looks the same from both sides'); check(badVert === 0, 'stairs only join halls, never void or shafts'); check(vertical > 10 && (biome === 'interior' || bridges > 10), `there are stairs (${vertical / 2 | 0}) and doors onto voids (${bridges / 2 | 0})`);
 
   // every cell reaches the start through links
   const seen = new Set(['0,0,0']), q = [[0, 0, 0]];
@@ -67,6 +76,10 @@ for (const seed of [1, 2, 3, 4, 5]) {
   // and it is not a dead world: the standing places span levels
   const ys = new Set([...vis].map(s => +s.split(',')[1])); check(ys.size > 10, `the walk climbs and descends (${ys.size} heights)`);
 }
+
+check(mixVo / mixN > 0.25 && mixVo / mixN < 0.7, `mixed: voids are a fair share of space (${(mixVo / mixN * 100).toFixed(0)}%)`);
+check(mixTerr > 5, `mixed: there are open terraces (${mixTerr})`);
+check(mixBiomes.size === 4, `mixed: every kind of district occurs (${[...mixBiomes]})`);
 
 console.log('Walking it with the real body: stairs up and down, bridges over voids');
 for (const seed of [1, 2, 3]) {

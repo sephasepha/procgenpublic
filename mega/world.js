@@ -31,10 +31,22 @@
     { name: 'Rust', c: ['#4a3a31', '#5e4a3e', '#382c25', '#75594a', '#8a6c5a', '#2a211c', '#ffe6d0'] },
     { name: 'Ash', c: ['#6b6e70', '#85888a', '#55585a', '#9a9da0', '#b0b3b5', '#404345', '#ffffff'] },
     { name: 'Verdigris', c: ['#34433f', '#44574f', '#28332f', '#587068', '#6e8a80', '#1f2825', '#eefff6'] },
+    { name: 'Stone', c: ['#4d4842', '#605a52', '#3c3833', '#716a60', '#837b6f', '#2d2a26', '#fff0dc'] },
   ];
+  // Districts: big regions of space (about ten cells across and six levels tall) that each have an identity you
+  // recognise as you walk in. They share one connection scheme, so you can always cross from one into the next.
+  //   interior   the dense inside of the structure: conduits, cells and halls, no open air
+  //   colonnade  one enormous void under a roof, held up by pillars seven metres thick, crossed by walkways
+  //   terraces   a stepped stone massif: open shelves that fall away level by level, monoliths standing on them,
+  //              and corridors cut into the rock behind
+  //   chasm      sheer faces: a canyon several cells wide and many levels deep, shafts and colossal voids
+  const BIOMES = ['interior', 'colonnade', 'terraces', 'chasm'];
+  const BIOME_NAMES = { interior: 'The Interior', colonnade: 'The Colonnade', terraces: 'The Terraces', chasm: 'The Chasm' };
+  const BIOME_PAL = { interior: [0, 1, 2, 3, 4, 5], colonnade: [1, 4, 0], terraces: [6, 6, 4], chasm: [2, 3, 0, 5] };
+  const DX = 10, DY = 6;
 
-  function createWorld(seed) {
-    const S = seed | 0;
+  function createWorld(seed, opts) {
+    const S = seed | 0, force = opts && BIOMES.includes(opts.biome) ? opts.biome : null;
     const H = (a, b, c, d) => { let h = S ^ Math.imul(a | 0, 0x27d4eb2d) ^ Math.imul(b | 0, 0x165667b1) ^ Math.imul(c | 0, 0x9e3779b1) ^ Math.imul(d | 0, 0x85ebca6b); h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d); h = Math.imul(h ^ (h >>> 12), 0x297a2d39); h ^= h >>> 15; return h >>> 0; };
     const H01 = (a, b, c, d) => H(a, b, c, d) / 4294967296;
     const smooth = t => t * t * (3 - 2 * t);
@@ -46,11 +58,39 @@
       return r;
     }
 
+    // ---------- districts ----------
+    // boxes of the lattice with wobbling sides (the wobble depends on i and k only, so walls of a district are plumb)
+    const distMemo = new Map();
+    function districtOf(i, j, k) {
+      const key = i + ',' + j + ',' + k, m = distMemo.get(key); if (m) return m;
+      const wi = i + Math.round(5 * (noise(i / 6, 0, k / 6, 401) - 0.5)), wk = k + Math.round(5 * (noise(i / 6, 0, k / 6, 402) - 0.5));
+      const bi = fdiv(wi, DX), bk = fdiv(wk, DX), bj = fdiv(j, DY);
+      let type = force;
+      if (!type) { const r = H01(bi, bj, bk, 403); type = r < 0.28 ? 'interior' : r < 0.52 ? 'colonnade' : r < 0.76 ? 'terraces' : 'chasm'; }
+      const d = { type, bi, bj, bk, li: wi - bi * DX, lj: j - bj * DY, lk: wk - bk * DX };
+      if (distMemo.size > 60000) distMemo.clear();
+      distMemo.set(key, d); return d;
+    }
+    const pillarCol = (i, k) => H01(i, 0, k, 410) < 0.6;   // in the colonnade: a great pillar stands in this column
+
     // ---------- what a cell is ----------
     const voidMemo = new Map();
     function isVoid(i, j, k) {
       if (i === 0 && k === 0) return false;                // the vertical axis is solid, so up and down always connect
       const key = i + ',' + j + ',' + k, m = voidMemo.get(key); if (m !== undefined) return m;
+      const v = voidIn(districtOf(i, j, k), i, j, k);
+      if (voidMemo.size > 60000) voidMemo.clear();
+      voidMemo.set(key, v); return v;
+    }
+    function voidIn(D, i, j, k) {
+      if (D.type === 'interior') return false;
+      if (D.type === 'colonnade') return D.lj !== DY - 1 && H01(i, 0, k, 405) > 0.04; // all air under a roof, a few towers
+      if (D.type === 'terraces') { // a stepped massif, narrowing as it rises, its centre off to one side
+        const cx = 3 + H(D.bi, D.bj, D.bk, 406) % 4, cz = 3 + H(D.bi, D.bj, D.bk, 407) % 4;
+        const dd = Math.max(Math.abs(D.li - cx), Math.abs(D.lk - cz)), R = 5.6 - 0.75 * D.lj + 1.2 * (noise(i / 2.5, j / 2, k / 2.5, 408) - 0.5);
+        return dd >= R;
+      }
+      // the chasm: a canyon across the district, plus blobs, shafts and colossal voids
       // big blobs, with a finer grain; and shafts that run through many levels
       const n = 0.66 * noise(i / 5, j / 3.6, k / 5, 101) + 0.34 * noise(i / 3.2, j / 2.4, k / 3.2, 102);
       const shaft = noise(i / 6.5, 0, k / 6.5, 103) > 0.68 && Math.abs(j - Math.round(10 * (noise(i / 14, 0, k / 14, 104) - 0.5))) <= 4;
@@ -62,9 +102,9 @@
         const ox = bi * 8 + (H(bi, bj, bk, 125) % 4), oz = bk * 8 + (H(bi, bj, bk, 126) % 4), oy = bj * 12 + (H(bi, bj, bk, 127) % 3);
         big = i >= ox && i < ox + w && k >= oz && k < oz + d && j >= oy && j < oy + hh;
       }
-      const v = n > 0.675 || shaft || big;
-      if (voidMemo.size > 60000) voidMemo.clear();
-      voidMemo.set(key, v); return v;
+      const along = H(D.bi, 0, D.bk, 409) & 1, a = along ? D.lk : D.li, b = along ? D.li : D.lk;
+      const canyon = Math.abs(a - 4.5 - 3 * (noise(b / 4, j / 5, 0, 411) - 0.5)) < 1.6;
+      return canyon || n > 0.76 || shaft || big;
     }
     const wellCol = (i, k) => !(i === 0 && k === 0) && H01(i, 0, k, 111) < 0.07;     // a column of wide wells (in halls)
     const dropCol = (i, k) => !(i === 0 && k === 0) && !wellCol(i, k) && H01(i, 0, k, 112) < 0.1; // a narrow drop (in tunnels)
@@ -113,23 +153,26 @@
       if (i === 0 && j === 0 && k === 0) return 'open';
       if (wellCol(i, k)) return 'open';
       if (dropCol(i, k)) return 'tunnels';
-      const up = link(i, j, k, 4) && roomAt(i, j + 1, k), down = link(i, j, k, 5) && roomAt(i, j - 1, k);
+      const D = districtOf(i, j, k), up = link(i, j, k, 4) && roomAt(i, j + 1, k), down = link(i, j, k, 5) && roomAt(i, j - 1, k);
       const r = H01(i, j, k, 160);
       if (up || down) return r < 0.5 ? 'open' : 'pillars';
+      if (D.type === 'terraces') return isVoid(i, j + 1, k) ? 'terrace' : r < 0.5 ? 'tunnels' : r < 0.8 ? 'warren' : 'open';
+      if (D.type === 'colonnade') return r < 0.6 ? 'pillars' : 'open';
+      if (D.type === 'interior') return r < 0.34 ? 'tunnels' : r < 0.56 ? 'warren' : r < 0.78 ? 'open' : 'pillars';
       return r < 0.46 ? 'tunnels' : r < 0.72 ? 'warren' : r < 0.82 ? 'open' : 'pillars';
     }
     const clearVariant = v => v === 'open' || v === 'pillars';
-    const DOORH = { tunnels: 3, warren: 3, open: 4, pillars: 4 };
+    const DOORH = { tunnels: 3, warren: 3, open: 4, pillars: 4, terrace: 3 };
     // a doorway can be widened into a colonnade between two open rooms
     function wide(i, j, k, d) {
       const p = pairKey(i, j, k, d), q = [p[0] + DIRS[p[3]][0], p[1] + DIRS[p[3]][1], p[2] + DIRS[p[3]][2]];
       return d < 4 && roomAt(p[0], p[1], p[2]) && roomAt(q[0], q[1], q[2]) && clearVariant(variantOf(p[0], p[1], p[2])) && clearVariant(variantOf(q[0], q[1], q[2])) && H01(p[0], p[1], p[2], 170 + p[3]) < 0.4;
     }
-    const regionOf = (i, j, k) => H(fdiv(i, 3), fdiv(j, 2), fdiv(k, 3), 180) % PALETTES.length;
+    const regionOf = (i, j, k) => { const D = districtOf(i, j, k), L = BIOME_PAL[D.type]; return L[H(D.bi, D.bj, D.bk, 180) % L.length]; };
     const lightOf = (i, j, k) => 1;
     function info(i, j, k) {
       const v = isVoid(i, j, k);
-      return { i, j, k, void: v, variant: v ? null : variantOf(i, j, k), region: regionOf(i, j, k), light: lightOf(i, j, k), well: !v && wellCol(i, k), drop: !v && dropCol(i, k) };
+      return { i, j, k, void: v, variant: v ? null : variantOf(i, j, k), region: regionOf(i, j, k), light: lightOf(i, j, k), well: !v && wellCol(i, k), drop: !v && dropCol(i, k), biome: districtOf(i, j, k).type };
     }
 
     // ---------- the voxels of a cell ----------
@@ -154,6 +197,23 @@
           if (H01(i, j, k, 300 + d) < 0.4) cut(0, CW - 1, 0, 0, 3, 3, M.TRIM); // and sometimes a ledge halfway
           [4, 8, 12].forEach((p, n) => { const r = H01(i, j, k, 310 + d * 3 + n); if (r < 0.34) cut(p, p, 0, 1, 1, CH - 2, M.PILLAR); else if (r < 0.62) cut(p, p, 1, 1, 1, CH - 2, M.TRIM); });
         }
+        const D = districtOf(i, j, k);
+        if (D.type === 'colonnade' && pillarCol(i, k)) {
+          // a great pillar through every level, a ring around it where walkways meet, and a collar under the roof
+          const nl = links.filter(Boolean).length;
+          if (nl) for (let d = 0; d < 4; d++) {
+            if (!links[d]) continue;
+            const c = laneC(d);
+            if (d === 0) box(8, CW - 1, 0, 0, c - 1, c + 1, M.BRIDGE); else if (d === 1) box(0, 8, 0, 0, c - 1, c + 1, M.BRIDGE);
+            else if (d === 2) box(c - 1, c + 1, 0, 0, 8, CW - 1, M.BRIDGE); else box(c - 1, c + 1, 0, 0, 0, 8, M.BRIDGE);
+            if (d < 2) box(7, 9, 0, 0, Math.min(c, 8) - 1, Math.max(c, 8) + 1, M.BRIDGE); else box(Math.min(c, 8) - 1, Math.max(c, 8) + 1, 0, 0, 7, 9, M.BRIDGE);
+          }
+          if (nl >= 2) { box(3, 13, 0, 0, 3, 13, M.BRIDGE); }
+          box(5, 11, 0, CH - 1, 5, 11, M.PILLAR);
+          if (D.lj === DY - 2) box(4, 12, CH - 2, CH - 1, 4, 12, M.TRIM);
+          if (H01(i, j, k, 412) < 0.5) box(5, 11, 3, 3, 4, 4, M.TRIM);
+          return g;
+        }
         // a slender column, kept out of the lanes the walkways use (lanes never cover 4 or 12)
         if (H01(i, 0, k, 210) < 0.3) { const c = H(i, 0, k, 211) % 4, px = c & 1 ? 12 : 4, pz = c & 2 ? 12 : 4; box(px, px, 0, CH - 1, pz, pz, M.PILLAR); }
         if (links.some(Boolean)) {
@@ -169,6 +229,31 @@
       }
 
       const variant = variantOf(i, j, k), hall = variant === 'open' || variant === 'pillars';
+      if (variant === 'terrace') {
+        // an open stone shelf under the sky: the rock it is cut from rises behind it, the void falls away in front,
+        // and monoliths stand on it (two rectangles inside the shelf never cut it in two)
+        box(0, CW - 1, 0, 0, 0, CW - 1, M.FLOOR);
+        for (let d = 0; d < 4; d++) {
+          const nI = i + DIRS[d][0], nK = k + DIRS[d][2];
+          if (isVoid(nI, j, nK) || variantOf(nI, j, nK) === 'terrace') continue;
+          const lat = links[d] ? LANE(laneOf(i, j, k, d)) : null;
+          for (let l = 0; l < CW; l++) for (let y = 1; y < CH; y++) {
+            if (lat && l >= lat[0] && l <= lat[1] && y <= 3) continue; // a corridor cut into the rock
+            if (d === 0) put(CW - 1, y, l, M.WALL); else if (d === 1) put(0, y, l, M.WALL); else if (d === 2) put(l, y, CW - 1, M.WALL); else put(l, y, 0, M.WALL);
+          }
+        }
+        const nm = rng() < 0.75 ? 1 + (rng() < 0.5 ? 1 : 0) : 0;
+        for (let n = 0; n < nm; n++) {
+          const sx = 2 + Math.floor(rng() * 3), sz = 2 + Math.floor(rng() * 3), x0 = 4 + Math.floor(rng() * (10 - sx)), z0 = 4 + Math.floor(rng() * (10 - sz));
+          box(x0, x0 + sx - 1, 1, 2 + Math.floor(rng() * 6), z0, z0 + sz - 1, M.PILLAR);
+        }
+        // the lip of the shelf where it falls away
+        for (let d = 0; d < 4; d++) if (isVoid(i + DIRS[d][0], j, k + DIRS[d][2])) {
+          if (d === 0) box(CW - 1, CW - 1, 0, 0, 0, CW - 1, M.TRIM); else if (d === 1) box(0, 0, 0, 0, 0, CW - 1, M.TRIM);
+          else if (d === 2) box(0, CW - 1, 0, 0, CW - 1, CW - 1, M.TRIM); else box(0, CW - 1, 0, 0, 0, 0, M.TRIM);
+        }
+        return g;
+      }
       if (hall) {
         // a big chamber: slabs and thin walls, a clear inside
         box(0, CW - 1, FLOORY, FLOORY, 0, CW - 1, M.FLOOR);
@@ -177,7 +262,7 @@
         box(0, CW - 1, 1, CEILY - 1, 0, 0, M.WALL); box(0, CW - 1, 1, CEILY - 1, CW - 1, CW - 1, M.WALL);
         if (variant === 'pillars') { for (const x of [4, 8, 12]) for (const z of [4, 8, 12]) if (rng() < 0.75) box(x, x, 1, CEILY - 1, z, z, M.PILLAR); }
         // a few small lamps in the ceiling
-        for (const x of [2, 6, 10, 14]) for (const z of [2, 6, 10, 14]) if (rng() < 0.22) put(x, CEILY, z, M.LIGHT);
+        const roofOpen = isVoid(i, j + 1, k); for (const x of [2, 6, 10, 14]) for (const z of [2, 6, 10, 14]) if (rng() < 0.22 && !roofOpen) put(x, CEILY, z, M.LIGHT);
       } else {
         // solid structure, to be carved
         box(0, CW - 1, 0, CH - 1, 0, CW - 1, M.WALL);
@@ -266,9 +351,9 @@
       let yaw = 0; for (let d = 0; d < 4; d++) if (link(0, 0, 0, d)) { yaw = [Math.PI / 2, 3 * Math.PI / 2, Math.PI, 0][d]; break; }
       return { x: 8.5, y: 1, z: 8.5, yaw };
     }
-    return { seed: S, CW, CH, M, DIRS, PALETTES, info, link, isVoid, wellCol, dropCol, shaftCol, wellHole, dropHole, stairUp, stairOf, laneOf, variantOf, wide, parentDir, genCell, cell, voxel, spawn, regionOf, lightOf, LANE };
+    return { seed: S, biome: force, districtOf, BIOMES, BIOME_NAMES, CW, CH, M, DIRS, PALETTES, info, link, isVoid, wellCol, dropCol, shaftCol, wellHole, dropHole, stairUp, stairOf, laneOf, variantOf, wide, parentDir, genCell, cell, voxel, spawn, regionOf, lightOf, LANE };
   }
 
-  const api = { createWorld, CW, CH, MATERIALS: M, PALETTES };
+  const api = { createWorld, CW, CH, MATERIALS: M, PALETTES, BIOMES, BIOME_NAMES };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MegaWorld = api;
 })(typeof window !== 'undefined' ? window : globalThis);
