@@ -19,7 +19,8 @@
   const SHAPES = {
     pyramid: { name: 'Pyramid labyrinth', size: 12, storeys: 9, rooms: 1, shafts: 0, braid: 100 },
     column: { name: 'Sunken column', size: 5, storeys: 10, rooms: 1, shafts: 0, braid: 100 },
-    tower: { name: 'Tower', size: 6, storeys: 8, rooms: 3, shafts: 1, braid: 100 }
+    tower: { name: 'Tower', size: 6, storeys: 8, rooms: 3, shafts: 1, braid: 100 },
+    mega: { name: 'Megastructure', size: 9, storeys: 12, rooms: 2, shafts: 2, braid: 100 }
   };
 
   function mulberry32(a) {
@@ -57,6 +58,13 @@
       // A square shaft of labyrinth dug down from the surface; you enter by a stair from the top.
       return { ni: n, nj: J, nk: n, groundY: J * S, goal: 'bottom', mask: () => true, entrance: { i: Math.floor(n / 2), j: J - 1, k: Math.floor(n / 2), dir: 'up' } };
     }
+    if (shape === 'mega') {
+      // A tower hollowed by a central atrium (open from the first storey to the sky), with bridges across it.
+      const vw = Math.max(1, Math.min(n - 2, Math.round(n * 0.34))), v0 = Math.floor((n - vw) / 2);
+      const mega = { vi0: v0, vi1: v0 + vw - 1, vk0: v0, vk1: v0 + vw - 1, from: 1 };
+      const inVoid = (i, j, k) => j >= mega.from && i >= mega.vi0 && i <= mega.vi1 && k >= mega.vk0 && k <= mega.vk1;
+      return { ni: n, nj: J, nk: n, groundY: 0, goal: 'top', mega, inVoid, mask: (i, j, k) => !inVoid(i, j, k), entrance: { i: Math.floor(n / 2), j: 0, k: 0, dir: 'nz' } };
+    }
     // tower
     return { ni: n, nj: J, nk: n, groundY: 0, goal: 'top', mask: () => true, entrance: { i: Math.floor(n / 2), j: 0, k: 0, dir: 'nz' } };
   }
@@ -81,8 +89,62 @@
     const has = (i, j, k) => inGrid(i, j, k) && mask[cid(i, j, k)] === 1;
     const DIRS = { px: [1, 0, 0], nx: [-1, 0, 0], pz: [0, 0, 1], nz: [0, 0, -1], up: [0, 1, 0], down: [0, -1, 0] };
     const OPP = { px: 'nx', nx: 'px', pz: 'nz', nz: 'pz', up: 'down', down: 'up' };
+    const MG = sp.mega, inVoid = sp.inVoid || (() => false);
+    const skyVoid = new Uint8Array(NC), bands = new Set();
+    if (MG && nj > 3) {
+      // setbacks: cut blocks out of corners from some storey upwards, leaving roof terraces
+      const cs = Math.max(1, Math.round(ni / 4));
+      const corners = shuffle([[0, 0], [ni - cs, 0], [0, nk - cs], [ni - cs, nk - cs]]).slice(0, 1 + Math.floor(rng() * 3));
+      for (const [ci, ck] of corners) {
+        const jb = Math.max(2, Math.floor(nj * (0.3 + rng() * 0.45)));
+        for (let j = jb; j < nj; j++) for (let k = ck; k < ck + cs; k++) for (let i = ci; i < ci + cs; i++) if (cid(i, j, k) !== entC) mask[cid(i, j, k)] = 0;
+      }
+      // a stepped crown: the top storey or two lose their outer ring
+      if (ni >= 5 && nk >= 5) {
+        const jc = nj - 1 - Math.floor(rng() * 2);
+        for (let j = jc; j < nj; j++) for (let k = 0; k < nk; k++) for (let i = 0; i < ni; i++) if (i === 0 || k === 0 || i === ni - 1 || k === nk - 1) mask[cid(i, j, k)] = 0;
+      }
+      // sky voids: openings punched into the facade, 2–3 storeys tall, sometimes right through to the atrium.
+      // The storeys above them are held up (no overhang rule here), so they read as voids in the mass.
+      if (nj >= 6) for (let t = 0, made = 0; t < 12 && made < 1 + Math.floor(rng() * 3); t++) {
+        const side = Math.floor(rng() * 4), h = 2 + Math.floor(rng() * 2), j0 = 2 + Math.floor(rng() * Math.max(1, nj - h - 3));
+        const along = side < 2 ? ni : nk, w = Math.min(along - 2, 1 + Math.floor(rng() * 2)), a0 = 1 + Math.floor(rng() * Math.max(1, along - w - 1));
+        const ring = Math.max(1, (side < 2 ? MG.vk0 : MG.vi0)), depth = rng() < 0.5 ? ring : 1;
+        const cellsV = [];
+        for (let j = j0; j < Math.min(nj - 1, j0 + h); j++) for (let a = a0; a < a0 + w; a++) for (let d = 0; d < depth; d++) {
+          const i = side === 0 ? a : side === 1 ? a : side === 2 ? d : ni - 1 - d, k = side === 0 ? d : side === 1 ? nk - 1 - d : a;
+          if (i >= 0 && k >= 0 && i < ni && k < nk && mask[cid(i, j, k)] && !(i === E.i && k === E.k)) cellsV.push(cid(i, j, k));
+        }
+        if (!cellsV.length) continue;
+        for (const c of cellsV) { mask[c] = 0; skyVoid[c] = 1; }
+        made++;
+      }
+      // open-deck bands: one or two storeys whose outer walls are only parapets
+      for (let t = 0; t < 1 + Math.floor(rng() * 2); t++) bands.add(2 + Math.floor(rng() * Math.max(1, nj - 3)));
+    }
     // A cell above must sit on a cell below (no overhangs), so drop any that float, then anything not connected to the entrance.
-    for (let j = 1; j < nj; j++) for (let k = 0; k < nk; k++) for (let i = 0; i < ni; i++) if (mask[cid(i, j, k)] && !mask[cid(i, j - 1, k)]) mask[cid(i, j, k)] = 0;
+    // (Cells over a sky void are the exception: the megastructure holds them up.)
+    for (let j = 1; j < nj; j++) for (let k = 0; k < nk; k++) for (let i = 0; i < ni; i++) {
+      const c = cid(i, j, k), below = cid(i, j - 1, k);
+      if (mask[c] && !mask[below] && !skyVoid[below]) mask[c] = 0;
+    }
+    // Bridges across the atrium: the only cells allowed to float. One every couple of storeys, alternating direction.
+    const floatC = new Uint8Array(NC), bridges = [];
+    if (MG) {
+      let axis = rng() < 0.5 ? 'x' : 'z';
+      for (let j = MG.from + 1; j < nj; j += 2 + Math.floor(rng() * 2)) {
+        const lo = axis === 'x' ? MG.vk0 : MG.vi0, hi = axis === 'x' ? MG.vk1 : MG.vi1;
+        const rows = []; for (let r = lo; r <= hi; r++) if (hi - lo < 2 || (r > lo && r < hi)) rows.push(r);
+        const row = pick(rows);
+        const span = []; const a0 = axis === 'x' ? MG.vi0 : MG.vk0, a1 = axis === 'x' ? MG.vi1 : MG.vk1;
+        for (let a = a0; a <= a1; a++) span.push(axis === 'x' ? cid(a, j, row) : cid(row, j, a));
+        const endA = axis === 'x' ? [a0 - 1, j, row] : [row, j, a0 - 1], endB = axis === 'x' ? [a1 + 1, j, row] : [row, j, a1 + 1];
+        if (!has(endA[0], endA[1], endA[2]) || !has(endB[0], endB[1], endB[2])) continue;
+        for (const c of span) { mask[c] = 1; floatC[c] = 1; }
+        bridges.push({ axis, j, cells: span, ends: [cid(...endA), cid(...endB)] });
+        axis = axis === 'x' ? 'z' : 'x';
+      }
+    }
     { const seen = new Uint8Array(NC), q = [entC]; seen[entC] = 1;
       while (q.length) { const c = q.pop(), [i, j, k] = cpos(c); for (const d of Object.values(DIRS)) { const a = i + d[0], b = j + d[1], e = k + d[2]; if (has(a, b, e) && !seen[cid(a, b, e)]) { seen[cid(a, b, e)] = 1; q.push(cid(a, b, e)); } } }
       for (let c = 0; c < NC; c++) if (!seen[c]) mask[c] = 0; }
@@ -91,6 +153,12 @@
     const region = new Int32Array(NC).fill(-1), regions = [];
     const newRegion = kind => { regions.push({ id: regions.length, kind, cells: [] }); return regions.length - 1; };
     const claim = (c, r) => { region[c] = r; regions[r].cells.push(c); };
+    if (MG) {
+      // the atrium floor: the ground-storey cells under the void, one open space
+      const base = []; for (let k = MG.vk0; k <= MG.vk1; k++) for (let i = MG.vi0; i <= MG.vi1; i++) if (mask[cid(i, 0, k)] && cid(i, 0, k) !== entC) base.push(cid(i, 0, k));
+      if (base.length) { const r = newRegion('atrium'); for (const c of base) claim(c, r); }
+      for (const b of bridges) { const r = newRegion('bridge'); for (const c of b.cells) claim(c, r); b.region = r; }
+    }
     if (o.shafts > 0) {
       const cols = [];
       for (let k = 1; k < nk - 1; k++) for (let i = 1; i < ni - 1; i++) {
@@ -138,10 +206,12 @@
       return L;
     };
     const isShaft = c => regions[region[c]].kind === 'shaft';
+    const isBridge = c => floatC[c] === 1;
     const linkKind = (a, b, dir) => {
       if (dir === 'up') return 'stair';
       const ka = regions[region[a]].kind, kb = regions[region[b]].kind;
-      return ka === 'hall' && kb === 'hall' ? 'arch' : 'door';
+      // rooms and shafts are entered by narrow doors; halls, the atrium and bridges open wide into each other
+      return ka === 'room' || kb === 'room' || ka === 'shaft' || kb === 'shaft' ? 'door' : 'arch';
     };
     // union-find over regions
     const par = regions.map((_, i) => i);
@@ -153,8 +223,9 @@
         const d = DIRS[dir], a = i + d[0], b = j + d[1], e = k + d[2];
         if (!has(a, b, e)) continue;
         const n = cid(a, b, e);
-        if (region[c] === region[n]) { addLink(c, dir, isShaft(c) ? 'shaft' : 'open'); continue; }
-        if (dir === 'up' && (isShaft(c) || isShaft(n))) continue; // shafts are entered sideways only
+        if (region[c] === region[n]) { addLink(c, dir, isShaft(c) ? 'shaft' : isBridge(c) ? 'deck' : 'open'); continue; }
+        if (dir === 'up' && (isShaft(c) || isShaft(n) || isBridge(c) || isBridge(n))) continue; // shafts and bridges are entered sideways only
+        if (isBridge(c) !== isBridge(n) && !bridges.some(b => b.ends.includes(isBridge(c) ? n : c))) continue; // a bridge only lands at its two ends
         cand.push({ a: c, b: n, dir, key: rng() + (dir === 'up' ? 0.55 : 0) });
       }
     }
@@ -164,6 +235,11 @@
     cand.sort((x, y) => x.key - y.key);
     for (const e of cand) { const x = find(region[e.a]), y = find(region[e.b]); if (x !== y) { par[x] = y; join(e); } }
 
+    // Both ends of every bridge land in the tower
+    for (const b of bridges) for (const end of b.ends) for (const e of cand) {
+      if (!((e.a === end && isBridge(e.b)) || (e.b === end && isBridge(e.a)))) continue;
+      if (!linkAt.has(e.a + ':' + e.dir)) join(e);
+    }
     // Shafts get a door on every storey, so they work as lifts
     for (const r of regions) if (r.kind === 'shaft') for (const c of r.cells) {
       const [i, j, k] = cpos(c);
@@ -219,11 +295,12 @@
     const stairUp = c => { const L = linkAt.get(c + ':up'); return (L && L.kind === 'stair') || (c === entC && E.dir === 'up'); };
 
     // slabs, roofs and walls
-    for (let c = 0; c < NC; c++) if (mask[c]) {
+    for (let c = 0; c < NC; c++) if (mask[c] && !floatC[c]) {
       const [x0, y0, z0] = origin(c), [i, j, k] = cpos(c), r = region[c];
+      const openAbove = inVoid(i, j + 1, k); // the atrium floor is open to the sky
       for (let z = z0; z <= z0 + P; z++) for (let x = x0; x <= x0 + P; x++) {
         if (get(x, y0, z) !== V.GROUND || j > 0) set(x, y0, z, V.FLOOR, r);
-        if (!has(i, j + 1, k)) { if (get(x, y0 + S, z) !== V.GROUND) set(x, y0 + S, z, V.ROOF, r); }
+        if (!has(i, j + 1, k) && !openAbove) { if (get(x, y0 + S, z) !== V.GROUND) set(x, y0 + S, z, V.ROOF, r); }
       }
       for (let y = y0 + 1; y < y0 + S; y++) for (let t = 0; t <= P; t++) {
         set(x0 + t, y, z0, V.WALL, r); set(x0 + t, y, z0 + P, V.WALL, r);
@@ -251,6 +328,7 @@
     for (const L of links) {
       if (L.dir === 'up') continue;
       const r = region[L.a];
+      if (L.kind === 'deck') continue;
       if (L.kind === 'open' || L.kind === 'shaft') { for (const [x, y, z] of faceVoxels(L.a, L.dir, [1, 2, 3], [1, 2, 3])) set(x, y, z, L.kind === 'shaft' ? V.SHAFT : V.EMPTY, r); }
       else if (L.kind === 'arch') { for (const [x, y, z] of faceVoxels(L.a, L.dir, [1, 2, 3], [1, 2])) set(x, y, z, V.DOOR, r); }
       else if (L.kind === 'door') {
@@ -261,7 +339,7 @@
       }
     }
     // room interiors: clear the corner posts where four cells of one room meet
-    for (const R of regions) if (R.kind === 'room') for (const c of R.cells) {
+    for (const R of regions) if (R.kind === 'room' || R.kind === 'atrium') for (const c of R.cells) {
       const [i, j, k] = cpos(c), [x0, y0, z0] = origin(c);
       if (has(i + 1, j, k) && has(i, j, k + 1) && has(i + 1, j, k + 1) && region[cid(i + 1, j, k)] === R.id && region[cid(i, j, k + 1)] === R.id && region[cid(i + 1, j, k + 1)] === R.id)
         for (let y = y0 + 1; y < y0 + S; y++) set(x0 + P, y, z0 + P, V.EMPTY, R.id);
@@ -271,6 +349,55 @@
       const [x0, y0, z0] = origin(c), [i, j, k] = cpos(c);
       const top = has(i, j + 1, k) && region[cid(i, j + 1, k)] === R.id ? S : S - 1;
       for (let y = (j === 0 ? 1 : 0); y <= top; y++) for (let z = 1; z < P; z++) for (let x = 1; x < P; x++) set(x0 + x, y0 + y, z0 + z, V.SHAFT, R.id);
+    }
+    // What lies beyond a face that has no link: another cell, the atrium void, a roof terrace, or the outside
+    const beyond = (c, dir) => {
+      const [i, j, k] = cpos(c), d = DIRS[dir], a = i + d[0], b = j + d[1], e = k + d[2];
+      if (has(a, b, e)) return 'cell';
+      if (!MG) return 'outside';
+      if (inGrid(a, b, e) && inVoid(a, b, e)) return 'void';
+      if (inGrid(a, b, e) && has(a, b - 1, e)) return 'terrace';
+      if (inGrid(a, b, e) && skyVoid[cid(a, b, e)]) return 'void';
+      return 'outside';
+    };
+    const HDIRS = ['px', 'nx', 'pz', 'nz'];
+    if (MG) {
+      for (let c = 0; c < NC; c++) if (mask[c] && !floatC[c]) for (const dir of HDIRS) {
+        if (linkAt.has(c + ':' + dir) || (c === entC && dir === E.dir)) continue;
+        const what = beyond(c, dir), r = region[c];
+        // galleries: the wall facing the atrium becomes a waist-high parapet
+        if (what === 'void') for (const [x, y, z] of faceVoxels(c, dir, [1, 2, 3], [2, 3])) set(x, y, z, V.EMPTY, r);
+        // terraces: a wide opening onto the roof of the setback below
+        if (what === 'terrace') for (const [x, y, z] of faceVoxels(c, dir, [1, 2, 3], [1, 2])) set(x, y, z, V.DOOR, r);
+        // the outside: a ribbon window under the ceiling, or a parapet on an open-deck band
+        if (what === 'outside') for (const [x, y, z] of faceVoxels(c, dir, [1, 2, 3], bands.has(cpos(c)[1]) ? [2, 3] : [3])) set(x, y, z, V.EMPTY, r);
+      }
+      // rails round the open edges of terraces
+      for (let c = 0; c < NC; c++) if (mask[c] && !floatC[c]) {
+        const [i, j, k] = cpos(c), [x0, y0, z0] = origin(c);
+        if (j + 1 >= nj || has(i, j + 1, k) || inVoid(i, j + 1, k)) continue; // not a terrace roof
+        for (const dir of HDIRS) {
+          const d = DIRS[dir], a = i + d[0], e = k + d[2];
+          if (has(a, j + 1, e) || has(a, j, e)) continue;
+          for (let t = 0; t <= P; t++) {
+            const x = dir === 'px' ? x0 + P : dir === 'nx' ? x0 : x0 + t, z = dir === 'pz' ? z0 + P : dir === 'nz' ? z0 : z0 + t;
+            if (get(x, y0 + S + 1, z) === V.EMPTY) set(x, y0 + S + 1, z, V.RAIL, region[c]);
+          }
+        }
+      }
+      // bridge decks with rails along both sides
+      for (const b of bridges) for (const c of b.cells) {
+        const [x0, y0, z0] = origin(c), [i, j, k] = cpos(c);
+        for (let z = z0; z <= z0 + P; z++) for (let x = x0; x <= x0 + P; x++) if (get(x, y0, z) === V.EMPTY) set(x, y0, z, V.DECK, b.region);
+        const sides = b.axis === 'x' ? ['pz', 'nz'] : ['px', 'nx'];
+        for (const dir of sides) {
+          const d = DIRS[dir]; if (has(i + d[0], j, k + d[2])) continue;
+          for (let t = 0; t <= P; t++) {
+            const x = dir === 'px' ? x0 + P : dir === 'nx' ? x0 : x0 + t, z = dir === 'pz' ? z0 + P : dir === 'nz' ? z0 : z0 + t;
+            if (get(x, y0 + 1, z) === V.EMPTY) set(x, y0 + 1, z, V.RAIL, b.region);
+          }
+        }
+      }
     }
     // stairs: 3 steps along x in the lower cell's stair row, and a hole in the slab above the top two
     const stairs = [];
@@ -294,7 +421,10 @@
         const L = linkAt.get(c + ':' + dir);
         if (L) faces[dir] = L.kind;
         else if (c === entC && dir === E.dir) faces[dir] = E.dir === 'up' ? 'stair' : 'entrance';
-        else faces[dir] = dir === 'up' ? (has(i, j + 1, k) ? 'floor' : 'roof') : dir === 'down' ? 'floor' : 'wall';
+        else if (dir === 'up') faces[dir] = has(i, j + 1, k) ? 'floor' : floatC[c] || inVoid(i, j + 1, k) ? 'sky' : 'roof';
+        else if (dir === 'down') faces[dir] = floatC[c] ? 'deck' : 'floor';
+        else if (floatC[c]) faces[dir] = has(i + DIRS[dir][0], j, k + DIRS[dir][2]) ? 'wall' : 'rail';
+        else { const w = beyond(c, dir); faces[dir] = w === 'void' ? 'gallery' : w === 'terrace' ? 'terrace' : w === 'outside' && MG ? (bands.has(j) ? 'parapet' : 'window') : 'wall'; }
       }
       cells.push({ c, i, j, k, origin: origin(c), region: region[c], kind: c === goalC ? 'goal' : c === entC ? 'entrance' : regions[region[c]].kind, faces, dist: dist[c] });
     }
@@ -309,6 +439,7 @@
     return {
       shape, W, H, D, vox, owner, idx: vi, count, P, S, cells, regions: regions.map(r => ({ id: r.id, kind: r.kind, cells: r.cells.length })),
       links: links.map(L => ({ a: L.a, b: L.b, dir: L.dir, kind: L.kind })), stairs: stairs.length, deadEnds,
+      bridges: bridges.map(b => ({ axis: b.axis, j: b.j, cells: b.cells.length, region: b.region })),
       entrance: entC, goal: goalC, start, focusY: shape === 'column' ? sp.groundY / 2 : nj * S / 2, groundY: sp.groundY,
       bounds: { x0: ox, y0: oy, z0: oz, x1: ox + ni * P, y1: oy + nj * S, z1: oz + nk * P }
     };

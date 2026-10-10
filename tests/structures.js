@@ -63,6 +63,32 @@ for (const shape of Object.keys(St.STRUCTURE_SHAPES)) {
   const js = Object.keys(per).map(Number).sort((a, b) => a - b);
   check(js.every((j, i) => i === 0 || per[j] <= per[js[i - 1]]), 'the pyramid narrows (never widens) going up');
   check(per[js[js.length - 1]] <= 2 && st.cells.find(c => c.c === st.goal).j === js[js.length - 1], 'and ends in a point, which is the goal'); }
+{ // megastructure: an atrium void through the core, bridges across it, galleries and terraces
+  let voidOk = true, bridgesOk = true, galleries = true, terraces = 0, groundFull = true, sky = true;
+  for (let seed = 1; seed <= SEEDS; seed++) {
+    const st = St.generateStructure('mega', { seed }), n = 9;
+    const at = new Map(st.cells.map(c => [c.i + ',' + c.j + ',' + c.k, c]));
+    if (st.cells.filter(c => c.j === 0).length !== n * n) groundFull = false;
+    const mid = Math.floor(n / 2);
+    for (let j = 1; j < 12; j++) { const c = at.get(mid + ',' + j + ',' + mid); if (c && c.kind !== 'bridge' && c.kind !== 'goal') voidOk = false; }
+    if (!st.bridges.length) bridgesOk = false;
+    for (const b of st.bridges) {
+      const cells = st.cells.filter(c => c.region === b.region);
+      const ends = cells.flatMap(c => ['px', 'nx', 'pz', 'nz'].filter(d => c.faces[d] === 'arch' || c.faces[d] === 'door'));
+      if (ends.length !== 2 || !cells.every(c => Object.values(c.faces).filter(f => f === 'rail').length === 2)) bridgesOk = false;
+    }
+    if (!st.cells.some(c => Object.values(c.faces).includes('gallery'))) galleries = false;
+    if (st.cells.some(c => Object.values(c.faces).includes('terrace'))) terraces++;
+    // nothing roofs the atrium: straight up from the middle of its floor you only meet bridge decks
+    const x = st.bounds.x0 + mid * st.P + 2, z = st.bounds.z0 + mid * st.P + 2;
+    for (let y = 5; y < st.H; y++) { const t = st.vox[st.idx(x, y, z)]; if (St.SVOX_SOLID[t] && t !== St.SVOX.DECK) sky = false; }
+  }
+  check(groundFull, 'megastructure: the ground floor covers the whole square footprint');
+  check(voidOk && sky, 'megastructure: an atrium runs from the first storey up to the sky');
+  check(bridgesOk, 'megastructure: bridges cross the atrium, land at both ends (wide arch, or a door into a room), and have rails on both sides');
+  check(galleries, 'megastructure: walls facing the atrium open into galleries');
+  check(terraces > SEEDS / 2, `megastructure: setbacks leave walk-out roof terraces (in ${terraces} of ${SEEDS})`);
+}
 { let ok = true; for (const shape of Object.keys(St.STRUCTURE_SHAPES)) { const st = St.generateStructure(shape, { seed: 5 });
     const b = st.bounds; if (b.x0 < 0 || b.z0 < 0 || b.x1 >= st.W || b.z1 >= st.D || Math.max(b.y1, st.groundY) >= st.H) ok = false; }
   check(ok, 'every shape fits in its chunk'); }
