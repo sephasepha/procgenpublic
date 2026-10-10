@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111318">
+<title>Voxel Pillars</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon-192.png">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+.stage { position: relative; border: 1px solid var(--rule); border-radius: 6px; background: #0b0c10; overflow: hidden; height: min(68vh, 560px); }
+.stage canvas { width: 100%; height: 100%; touch-action: none; image-rendering: auto; }
+.hud { position: absolute; left: 8px; top: 6px; font-family: var(--f-mono); font-size: 0.72rem; color: var(--dim); pointer-events: none; line-height: 1.4; text-shadow: 0 1px 2px #000; }
+.hud b { color: var(--brass); font-weight: 500; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 0.76rem; color: var(--dim); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button { appearance: none; font: inherit; font-size: 0.8rem; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--rule); background: var(--slab); color: var(--dim); cursor: pointer; }
+.chips button.on { background: var(--brass); border-color: var(--brass); color: var(--ink); font-weight: 700; }
+</style>
+<script type="importmap">{ "imports": { "three": "./voxels/vendor/three.module.min.js" } }</script>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Voxel Pillars</h1>
+      <p class="sub">Debug prototype: hollow pillar towers joined by bridges, as a 3D voxel chunk</p>
+    </div>
+    <nav class="topnav" aria-label="Pages"><a href="./">Infinite</a><a href="workbench.html">Workbench</a><a href="lab.html">Maze Lab</a><a href="tiles.html">Tiles</a><a href="voxels.html" aria-current="page">Voxels</a></nav>
+  </header>
+
+  <div class="layout">
+    <div style="display:grid;gap:10px;min-width:0">
+      <div class="stage" id="stage"><div class="hud" id="hud"></div></div>
+      <div class="nav"><span class="seed">seed <b id="seedOut"></b></span><span class="grow"></span><button class="btn" id="resetCam" type="button">Reset view</button><button class="btn primary" id="regen" type="button">New seed</button></div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div class="panel">
+      <section class="card">
+        <div class="eyebrow">Chunk</div>
+        <div class="ctl"><label for="pTowers">Towers</label><output id="vTowers"></output><input id="pTowers" type="range" min="2" max="10" step="1"></div>
+        <div class="ctl"><label for="pMaxH">Tallest tower</label><output id="vMaxH"></output><input id="pMaxH" type="range" min="18" max="46" step="1"></div>
+        <div class="ctl"><label for="pLoops">Extra bridges</label><output id="vLoops"></output><input id="pLoops" type="range" min="0" max="100" step="5"><small>Chance of a loop bridge between nearby towers, on top of the spanning tree that keeps every tower reachable</small></div>
+      </section>
+
+      <section class="card">
+        <div class="eyebrow">Debug view</div>
+        <div class="ctl"><label for="pSlice">Slice above</label><output id="vSlice"></output><input id="pSlice" type="range" min="1" max="47" step="1"><small>Hide every voxel above this height to look inside the towers</small></div>
+        <div class="eyebrow" style="margin-top:4px">Colour by</div>
+        <div class="chips" id="colorBy" role="group" aria-label="Colour by">
+          <button type="button" data-v="type">Voxel type</button><button type="button" data-v="owner">Tower / bridge</button><button type="button" data-v="height">Height</button>
+        </div>
+        <div class="chips" id="toggles" role="group" aria-label="Overlays">
+          <button type="button" data-v="grid">Grid</button><button type="button" data-v="bounds">Bounds</button><button type="button" data-v="edges">Voxel edges</button><button type="button" data-v="spin">Auto spin</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="eyebrow">How this works</div>
+        <p class="desc">Towers get random square footprints, kept apart, with a floor slab every 6 voxels and window slits mid-storey. Bridges follow a minimum spanning tree over the tower centres, so every tower is reachable, plus optional loop bridges. Each bridge lands on a floor level both towers share and cuts a doorway through the walls it meets.</p>
+        <p class="note">One finger drags to orbit, pinch to zoom, two fingers to pan. Settings live in the URL, so a chunk can be bookmarked. Only voxels with an exposed face are drawn, as one instanced mesh.</p>
+        <p class="note" id="build"></p>
+      </section>
+    </div>
+  </div>
+</div>
+<script src="voxels/gen.js"></script>
+<script src="assets/build.js"></script>
+<script type="module" src="voxels/view.js"></script>
+<script src="assets/sw-register.js"></script>
+</body>
+</html>

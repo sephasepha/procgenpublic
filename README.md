@@ -12,6 +12,7 @@ Open it on your phone and use **Add to Home Screen** to install it as an app. It
 - **Workbench** (`workbench.html`): the full pipeline for one dungeon in seven stages: hubs → candidate links → progression rules → style field → corridors and maze → WFC → validation. Generic, Arsenal and Underdark presets.
 - **Maze Lab** (`lab.html`): nine classic maze algorithms on a plain grid, with carving replay, overlays and a comparison table.
 - **Tiles** (`tiles.html`): the hand-drawn tilesets and example rooms the dressing WFC learns from, the learned neighbour rules for each tile, and a freshly dressed patch.
+- **Voxels** (`voxels.html`): a debug 3D prototype. A 64×48×64 voxel chunk of hollow pillar towers (a floor every 6 voxels, window slits) joined by bridges along a spanning tree plus optional loops; each bridge cuts doorways into both towers. Orbit, pinch-zoom and pan; slice away everything above a height; colour by voxel type, owner or height. Generator in `voxels/gen.js` (pure and seeded, tested in `tests/voxels.js`); rendering is Three.js, vendored in `voxels/vendor/` so it works offline.
 
 The Workbench and Maze Lab also have a simple **Explore** mode. Every setting lives in the page URL, so any generation can be bookmarked, shared or replayed exactly.
 
