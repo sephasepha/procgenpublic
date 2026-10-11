@@ -33,7 +33,11 @@
       push(f, v) { h.push([f, v]); let i = h.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (h[p][0] <= h[i][0]) break; [h[p], h[i]] = [h[i], h[p]]; i = p; } },
       pop() { const top = h[0], last = h.pop(); if (h.length) { h[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < h.length && h[l][0] < h[m][0]) m = l; if (r < h.length && h[r][0] < h[m][0]) m = r; if (m === i) break; [h[m], h[i]] = [h[i], h[m]]; i = m; } } return top[1]; } };
   }
-  const CK = (i, j, k) => ((i + 4096) * 8192 + (j + 4096)) * 8192 + (k + 4096); // a cell or voxel as one number
+  // a cell as one number, and back (each coordinate within 32768 of zero: 48 bits, exact in a double). Voxels are keyed
+  // the same way but relative to where the search starts, since a doorway can put you thousands of metres out.
+  const B = 65536, O = 32768;
+  const CK = (i, j, k) => ((i + O) * B + (j + O)) * B + (k + O);
+  const UK = key => { const kz = key % B, rest = (key - kz) / B, kj = rest % B, ki = (rest - kj) / B; return [ki - O, kj - O, kz - O]; };
 
   // The search, as a generator so the game can run it a few milliseconds a frame (it yields every so often).
   //  1. cells: breadth first over the cells and their links to the nearest twin doorway (the far ends of the plain's
@@ -70,31 +74,32 @@
       }
       const tx = Math.floor(target[0]), ty = target[1], tz = Math.floor(target[2]);
       const hfn = (a, b, c) => Math.abs(a - tx) + Math.abs(b - ty) * 2 + Math.abs(c - tz);
-      const gv = new Map(), par = new Map(), heap = Heap(), s0 = CK(...s); gv.set(s0, 0); par.set(s0, null); heap.push(hfn(...s), s);
+      const [sx, sy, sz] = s, VK = (a, b, c) => CK(a - sx, b - sy, c - sz);
+      const gv = new Map(), par = new Map(), heap = Heap(), s0 = VK(...s); gv.set(s0, 0); par.set(s0, null); heap.push(hfn(...s), s);
       let end = null, m = 0;
       while (heap.size && m < 400000) {
-        const cur = heap.pop(), ck = CK(...cur), gc = gv.get(ck); m++;
+        const cur = heap.pop(), ck = VK(...cur), gc = gv.get(ck); m++;
         if (cur[1] === ty && Math.abs(cur[0] - tx) <= 1 && cur[2] === tz) { end = ck; break; }
         const [a, b, c] = cur;
         for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (const dy of [0, 1, -1]) {
           const na = a + dx, nb = b + dy, nc = c + dz;
           if (!inside(na, nb, nc) || !stand(na, nb, nc)) continue;
           if (dy === 1 && solid(a, b + 2, c)) continue; if (dy === -1 && solid(na, b + 1, nc)) continue;
-          const nk = CK(na, nb, nc), ng = gc + 1;
+          const nk = VK(na, nb, nc), ng = gc + 1;
           if (gv.has(nk) && gv.get(nk) <= ng) continue;
           gv.set(nk, ng); par.set(nk, ck); heap.push(ng + hfn(na, nb, nc), [na, nb, nc]);
         }
         if ((m & 255) === 0) yield;
       }
       if (end === null) return null;
-      const pts = []; for (let k = end; k !== null && k !== undefined; k = par.get(k)) { const kz = k % 8192, rest = (k - kz) / 8192, kj = rest % 8192, ki = (rest - kj) / 8192; pts.push([ki - 4096 + 0.5, kj - 4096, kz - 4096 + 0.5]); }
-      pts.reverse(); pts.push([target[0], target[1], target[2] + 1.4]); // on through the doorway
+      const pts = []; for (let k = end; k !== null && k !== undefined; k = par.get(k)) { const v = UK(k); pts.push([v[0] + sx + 0.5, v[1] + sy, v[2] + sz + 0.5]); }
+      pts.reverse(); pts.push([target[0], target[1], target[2] + 1]); // up to the doorway's plane
       return pts;
     }
     let pts = yield* voxels(route);
     if (!pts) { // widen the corridor by a cell all round
       const wide = new Set();
-      for (const k of route) { const kz = k % 8192, rest = (k - kz) / 8192, kj = rest % 8192, ki = (rest - kj) / 8192, c = [ki - 4096, kj - 4096, kz - 4096];
+      for (const k of route) { const c = UK(k);
         for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let d = -1; d <= 1; d++) if (c[1] + b < GJ) wide.add(CK(c[0] + a, c[1] + b, c[2] + d)); }
       pts = yield* voxels([...wide]);
     }

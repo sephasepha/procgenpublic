@@ -180,10 +180,15 @@ for (const seed of [1, 2, 3]) {
   check(Math.hypot(b.p.x - (PP.B.x0 + PP.B.x1) / 2, b.p.z - PP.B.zP) < 2 * CW, `seed ${seed}: and it came out at the twin, ${Math.round(Math.hypot(PP.d[0], PP.d[2]))} m away and ${-PP.d[1]} m down`);
   for (let n = 0; n < 60 * 3; n++) Body.step(c, 1 / 60, 1, 0, false, 1);
   check(c.portalled === 1 && c.p.y >= S + 1 && c.p.z > f.zP + 2, `seed ${seed}: walking back up through the twin doorway comes out on the plain (y ${c.p.y.toFixed(1)}, z ${c.p.z.toFixed(1)})`);
-  // the plain's doorway seen from behind is only a frame: walking through it that way goes nowhere
-  const d = Body.createBody(w, (f.x0 + f.x1) / 2, w.terrainH((f.x0 + f.x1) / 2, f.zP - 4), f.zP - 4, Math.PI);
-  for (let n = 0; n < 60 * 2; n++) Body.step(d, 1 / 60, 1, 0, false, 1);
-  check(!d.portalled && d.p.y >= S + 1, `seed ${seed}: walking through a doorway from behind stays on the plain`);
+  // the doorways work from behind too: from behind the plain's, walking +z, you come out behind the twin, level, and
+  // walking back -z from there brings you out behind the plain's doorway again
+  const d = Body.createBody(w, (f.x0 + f.x1) / 2, w.terrainH((f.x0 + f.x1) / 2, f.zP - 3), f.zP - 3, Math.PI);
+  let yBefore = null, yAfter = null;
+  for (let n = 0; n < 60 * 2 && !d.portalled; n++) { yBefore = d.p.y; Body.step(d, 1 / 60, 1, 0, false, 1); yAfter = d.p.y; }
+  check(d.portalled === 1 && d.p.z > PP.B.zP && Math.abs(d.p.x - (PP.B.x0 + PP.B.x1) / 2) < 2, `seed ${seed}: through the plain's doorway from behind comes out behind the twin`);
+  check(Math.abs(yAfter - PP.d[1] - yBefore) < 0.05, `seed ${seed}: and level, no step up or down at the crossing (${(yAfter - PP.d[1] - yBefore).toFixed(2)} m)`);
+  d.p.yaw = 0; for (let n = 0; n < 60 * 2 && d.portalled < 2; n++) Body.step(d, 1 / 60, 1, 0, false, 1);
+  check(d.portalled === 2 && d.p.z < f.zP && d.p.y >= S + 1, `seed ${seed}: and back through it the other way, behind the plain's doorway again`);
 }
 
 console.log('The way out (F)');
@@ -196,6 +201,10 @@ console.log('The way out (F)');
   const atSite = (W, e) => e && W.isSite(Math.floor(e[0] / CW), Math.floor(e[1] / CH), Math.floor(e[2] / CW));
   check(atSite(w, r && r[r.length - 1]), `from level -16 the route reaches a twin doorway (${r ? r.length : 0} steps)`);
   check(worst <= 30 && steps > 1, `spread over ${steps} steps, the longest ${worst} ms`);
+  // far out in the structure (thousands of metres from the start, where a doorway can put you): the route still works
+  { const sF = (() => { const i = 1500, j = -10, k = -1600; for (let x = 1; x < 16; x++) for (let z = 1; z < 16; z++) { const X = i * CW + x, Y = j * CH + 1, Z = k * CW + z; if (solid(X, Y - 1, Z) && !solid(X, Y, Z) && !solid(X, Y + 1, Z)) return [X + 0.5, Y, Z + 0.5]; } })();
+    const rF = sF && G.findRoute(w, ...sF); let L = 0; if (rF) for (let n = 1; n < rF.length; n++) L += Math.hypot(rF[n][0] - rF[n - 1][0], rF[n][1] - rF[n - 1][1], rF[n][2] - rF[n - 1][2]);
+    check(rF && atSite(w, [rF[rF.length - 1][0], rF[rF.length - 1][1], rF[rF.length - 1][2] - 0.5]) && L < 2000, `25 km out, the route reaches a twin doorway ${L.toFixed(0)} m away`); }
   for (const seed of [1, 2, 3]) { const w2 = createWorld(seed), sp2 = w2.spawn(), r2 = G.findRoute(w2, sp2.x, sp2.y, sp2.z); check(atSite(w2, r2 && r2[r2.length - 1]), `seed ${seed}: from the start the route reaches a twin doorway`); }
 }
 

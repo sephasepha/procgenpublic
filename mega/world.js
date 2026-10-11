@@ -280,8 +280,10 @@
     function stampTwin(g) {
       const at = (x, y, z) => (y * CW + z) * CW + x, box = (x0, x1, y0, y1, z0, z1, m) => { for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) g[at(x, y, z)] = m; };
       const [x0, x1] = portalLane(), Z = PZ;
-      box(x0, x1, 1, 5, Z + 7, Z + 10, 0);
-      box(x0, x1, 0, 0, Z + 7, Z + 10, M.BRIDGE); box(x0, x1, 1, 1, Z + 8, Z + 10, M.BRIDGE);
+      // the landing runs on through the doorway to a step down behind it, at the same height either side, as the plain
+      // is either side of the doorway up there
+      box(x0, x1, 1, 5, Z + 7, Z + 12, 0);
+      box(x0, x1, 0, 0, Z + 7, Z + 12, M.BRIDGE); box(x0, x1, 1, 1, Z + 8, Z + 12, M.BRIDGE);
       doorway(box, x0, x1, Z);
       return g;
     }
@@ -291,18 +293,13 @@
     // the doorway on the plain at (i, k) and its twin; or the twin at cell (a, j, c) and its doorway on the plain
     function portalPair(i, k) { const [a, j, c] = siteOf(i, k); return { A: frameIn(i, PJ, k), B: frameIn(a, j, c), d: [(a - i) * CW, (j - PJ) * CH, (c - k) * CW] }; }
     function pairOfSite(a, j, c) { const p = siteA(a, j, c); return p ? portalPair(p[0], p[1]) : null; }
-    // crossing a doorway's plane through its opening: from the front of the plain's (going -z) to its twin, and from
-    // the front of a twin (going +z) back to the plain. Returns the move { d: [dx, dy, dz], a: [i, k], down } or null.
+    // crossing a doorway's plane through its opening, either way: the plain's takes you to its twin, the twin's back to
+    // the plain, coming out on the same side you were going to. Returns the move { d: [dx, dy, dz], a: [i, k], down }.
     function portalCross(ox, oy, oz, nx, ny, nz) {
       const i = fdiv(Math.floor(nx), CW), k = fdiv(Math.floor(nz), CW), j = fdiv(Math.floor(ny + 0.01), CH);
-      if (j === PJ && portalAt(i, k)) {
-        const P = portalPair(i, k), f = P.A;
-        if (nx >= f.x0 && nx <= f.x1 && oz >= f.zP && nz < f.zP && ny >= f.y0 - 1 && ny < f.y0 + f.h) return { d: P.d, a: [i, k], down: true };
-      }
-      if (j < GJ && isSite(i, j, k)) {
-        const P = pairOfSite(i, j, k), f = P.B;
-        if (nx >= f.x0 && nx <= f.x1 && oz < f.zP && nz >= f.zP && ny >= f.y0 - 1 && ny < f.y0 + f.h) return { d: P.d.map(v => -v), a: siteA(i, j, k), down: false };
-      }
+      const through = f => nx >= f.x0 && nx <= f.x1 && (oz >= f.zP) !== (nz >= f.zP) && ny >= f.y0 - 1 && ny < f.y0 + f.h;
+      if (j === PJ && portalAt(i, k)) { const P = portalPair(i, k); if (through(P.A)) return { d: P.d, a: [i, k], down: true }; }
+      if (j < GJ && isSite(i, j, k)) { const P = pairOfSite(i, j, k); if (through(P.B)) return { d: P.d.map(v => -v), a: siteA(i, j, k), down: false }; }
       return null;
     }
     function surfaceSpawn() { const [x0, x1] = portalLane(0, 0), x = (x0 + x1 + 1) / 2, z = CW + 7.5; return { x, y: terrainH(x, z), z, yaw: 0 }; }

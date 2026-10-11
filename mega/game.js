@@ -253,13 +253,13 @@
   // (where it is not hidden), the depth there is reset to the far plane and painted with the fog of the other side, and
   // the world is drawn again from the eye moved to the twin doorway, only inside the mark, with everything on the near
   // side of the twin's plane cut away. The two doorways have the same shape and facing, so the move is a translation.
-  // the portal doorways near an eye that it sees from their open side: on the plain from in front (+z), a twin from
-  // its stair (-z). Each with the move to its other end, d.
+  // the portal doorways near an eye, seen from either side; side is +1 when the eye is on the +z side of the plane.
+  // Each with the move to its other end, d.
   function nearPortals(eye) {
     const ci = Math.floor(Math.floor(eye[0]) / CW), cj = Math.floor(Math.floor(eye[1]) / CH), ck = Math.floor(Math.floor(eye[2]) / CW), out = [];
     for (let i = ci - 3; i <= ci + 3; i++) for (let k = ck - 3; k <= ck + 3; k++) {
-      if (cj >= world.PJ - 1 && world.portalAt(i, k)) { const P = world.portalPair(i, k), f = P.A; if (eye[1] > f.y0 - 1 && eye[1] < f.y0 + 12 && eye[2] > f.zP) out.push({ f, far: P.B, d: P.d, side: 1 }); }
-      if (cj < world.GJ) for (let j = cj - 2; j <= cj + 1; j++) if (world.isSite(i, j, k)) { const P = world.pairOfSite(i, j, k), f = P.B; if (eye[1] > f.y0 - 12 && eye[1] < f.y0 + 6 && eye[2] < f.zP) out.push({ f, far: P.A, d: P.d.map(v => -v), side: -1 }); }
+      if (cj >= world.PJ - 1 && world.portalAt(i, k)) { const P = world.portalPair(i, k), f = P.A; if (eye[1] > f.y0 - 1 && eye[1] < f.y0 + 12) out.push({ f, far: P.B, d: P.d, side: eye[2] >= f.zP ? 1 : -1 }); }
+      if (cj < world.GJ) for (let j = cj - 2; j <= cj + 1; j++) if (world.isSite(i, j, k)) { const P = world.pairOfSite(i, j, k), f = P.B; if (eye[1] > f.y0 - 12 && eye[1] < f.y0 + 6) out.push({ f, far: P.A, d: P.d.map(v => -v), side: eye[2] >= f.zP ? 1 : -1 }); }
     }
     return out;
   }
