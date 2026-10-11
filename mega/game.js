@@ -178,7 +178,7 @@
   function toast(msg) { const t = q('.mg-toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 3200); }
   function hud() {
     const p = st.p, i = fdiv(Math.floor(p.x), CW), j = fdiv(Math.floor(p.y), CH), k = fdiv(Math.floor(p.z), CW), inf = world.info(i, j, k);
-    const place = inf.air ? 'Open air' : inf.void ? (inf.biome === 'expanse' ? 'A deck' : 'The shaft') : inf.biome === 'expanse' ? 'Inside an obelisk' : inf.well ? 'A well' : inf.drop ? 'A drop' : ({ open: 'A hall', pillars: 'Pillar hall', tunnels: 'Conduit', warren: 'Cells', terrace: 'A terrace' })[inf.variant];
+    const place = inf.air ? 'Open air' : inf.void ? (inf.biome === 'expanse' ? 'A deck' : 'The shaft') : inf.biome === 'expanse' ? 'Inside an obelisk' : inf.well ? 'A well' : inf.drop ? 'A drop' : ({ open: 'A hall', pillars: 'Pillar hall', tunnels: 'Conduit', warren: 'Cells', terrace: 'A terrace', catacomb: 'Passages', crypt: 'A stairwell' })[inf.variant];
     q('.mg-where').innerHTML = `<b>${W.BIOME_NAMES[inf.biome]}</b><span>${place} · ${W.PALETTES[inf.region].name} · level ${j}</span>`;
     q('.mg-pos').textContent = `cell ${i}, ${j}, ${k} · seed ${world.seed}`;
   }

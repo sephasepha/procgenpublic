@@ -33,6 +33,7 @@
     { name: 'Verdigris', c: ['#34433f', '#44574f', '#28332f', '#587068', '#6e8a80', '#1f2825', '#eefff6'] },
     { name: 'Stone', c: ['#4d4842', '#605a52', '#3c3833', '#716a60', '#837b6f', '#2d2a26', '#fff0dc'] },
     { name: 'Obsidian', c: ['#2c2e33', '#2a2c31', '#1e2023', '#3a3d44', '#565a62', '#18191c', '#e8f0ff'] },
+    { name: 'Ossuary', c: ['#3e3a33', '#4a443b', '#2f2b26', '#5a5246', '#6a6152', '#24211d', '#ffcf8a'] },
   ];
   // Districts: big regions of space (about ten cells across and six levels tall) that each have an identity you
   // recognise as you walk in. They share one connection scheme, so you can always cross from one into the next.
@@ -41,11 +42,13 @@
   //   terraces   a stepped stone massif: open shelves that fall away level by level, monoliths standing on them,
   //              and corridors cut into the rock behind
   //   chasm      sheer faces: canyons several cells wide and many levels deep, crossing, and colossal voids
+  //   catacombs  rock threaded with passages one metre wide and two high, winding, dead-ending, their walls cut
+  //              with burial niches; now and then a small ossuary; narrow stairwells between levels
   //   expanse    empty space: open air with decks of walkways every third level, and huge obelisks floating in it
-  const BIOMES = ['interior', 'colonnade', 'terraces', 'chasm', 'expanse'];
-  const BIOME_NAMES = { interior: 'The Interior', colonnade: 'The Colonnade', terraces: 'The Terraces', chasm: 'The Chasm', expanse: 'The Expanse' };
-  const BIOME_PAL = { interior: [0, 1, 2, 3, 4, 5], colonnade: [1, 4, 0], terraces: [6, 6, 4], chasm: [2, 3, 0, 5], expanse: [7] };
-  const DX = 10, DY = 6;
+  const BIOMES = ['interior', 'colonnade', 'terraces', 'chasm', 'expanse', 'catacombs'];
+  const BIOME_NAMES = { interior: 'The Interior', colonnade: 'The Colonnade', terraces: 'The Terraces', chasm: 'The Chasm', expanse: 'The Expanse', catacombs: 'The Catacombs' };
+  const BIOME_PAL = { interior: [0, 1, 2, 3, 4, 5], colonnade: [1, 4, 0], terraces: [6, 6, 4], chasm: [2, 3, 0, 5], expanse: [7], catacombs: [8] };
+  const DX = 16, DY = 9; // a district: 272 m across, 72 m tall
 
   function createWorld(seed, opts) {
     const S = seed | 0, force = opts && BIOMES.includes(opts.biome) ? opts.biome : null;
@@ -68,7 +71,7 @@
       const wi = i + Math.round(5 * (noise(i / 6, 0, k / 6, 401) - 0.5)), wk = k + Math.round(5 * (noise(i / 6, 0, k / 6, 402) - 0.5));
       const bi = fdiv(wi, DX), bk = fdiv(wk, DX), bj = fdiv(j, DY);
       let type = force;
-      if (!type) { const r = H01(bi, bj, bk, 403); type = r < 0.22 ? 'interior' : r < 0.41 ? 'colonnade' : r < 0.6 ? 'terraces' : r < 0.8 ? 'chasm' : 'expanse'; }
+      if (!type) { const r = H01(bi, bj, bk, 403); type = r < 0.18 ? 'interior' : r < 0.35 ? 'colonnade' : r < 0.52 ? 'terraces' : r < 0.69 ? 'chasm' : r < 0.84 ? 'expanse' : 'catacombs'; }
       const d = { type, bi, bj, bk, li: wi - bi * DX, lj: j - bj * DY, lk: wk - bk * DX };
       if (distMemo.size > 60000) distMemo.clear();
       distMemo.set(key, d); return d;
@@ -87,15 +90,15 @@
     // obelisks: on a lattice seven cells apart, two or three cells across and nine or twelve levels tall, hanging in
     // the air (they exist only where the district is an expanse); you can go inside them
     function obeliskAt(i, j, k) {
-      const bi = fdiv(i, 7), bk = fdiv(k, 7), w = 2 + (H(bi, 0, bk, 430) & 1), d = 2 + (H(bi, 0, bk, 431) & 1);
-      const ox = bi * 7 + H(bi, 0, bk, 432) % (6 - w), oz = bk * 7 + H(bi, 0, bk, 433) % (6 - d);
+      const bi = fdiv(i, 10), bk = fdiv(k, 10), w = 3 + (H(bi, 0, bk, 430) & 1), d = 3 + (H(bi, 0, bk, 431) & 1);
+      const ox = bi * 10 + H(bi, 0, bk, 432) % (9 - w), oz = bk * 10 + H(bi, 0, bk, 433) % (9 - d);
       if (i < ox || i >= ox + w || k < oz || k >= oz + d) return false;
-      const bj = fdiv(j, 15); if (H01(bi, bj, bk, 434) > 0.75) return false;
-      const h = H(bi, bj, bk, 435) & 1 ? 12 : 9, y0 = bj * 15 + 2 + (h === 9 && (H(bi, bj, bk, 436) & 1) ? 3 : 0);
+      const bj = fdiv(j, 22); if (H01(bi, bj, bk, 434) > 0.8) return false;
+      const h = 12 + 3 * (H(bi, bj, bk, 435) % 3), y0 = bj * 22 + 1 + H(bi, bj, bk, 436) % (21 - h);
       return j >= y0 && j < y0 + h;
     }
-    const obeliskCol = (i, k) => { const bi = fdiv(i, 7), bk = fdiv(k, 7), w = 2 + (H(bi, 0, bk, 430) & 1), d = 2 + (H(bi, 0, bk, 431) & 1);
-      const ox = bi * 7 + H(bi, 0, bk, 432) % (6 - w), oz = bk * 7 + H(bi, 0, bk, 433) % (6 - d); return i >= ox && i < ox + w && k >= oz && k < oz + d; };
+    const obeliskCol = (i, k) => { const bi = fdiv(i, 10), bk = fdiv(k, 10), w = 3 + (H(bi, 0, bk, 430) & 1), d = 3 + (H(bi, 0, bk, 431) & 1);
+      const ox = bi * 10 + H(bi, 0, bk, 432) % (9 - w), oz = bk * 10 + H(bi, 0, bk, 433) % (9 - d); return i >= ox && i < ox + w && k >= oz && k < oz + d; };
     const isExpanse = (i, j, k) => districtOf(i, j, k).type === 'expanse';
     const deckLevel = j => ((j % 3) + 3) % 3 === 0;
     // open air: an expanse cell that is no part of the network at all, so the expanse is truly empty. Only away from
@@ -110,34 +113,35 @@
       airMemo.set(key, a); return a;
     }
     function voidIn(D, i, j, k) {
-      if (D.type === 'interior') return false;
+      if (D.type === 'interior' || D.type === 'catacombs') return false;
       if (D.type === 'expanse') return !obeliskAt(i, j, k);
       if (D.type === 'colonnade') return D.lj !== DY - 1 && H01(i, 0, k, 405) > 0.04; // all air under a roof, a few towers
       if (D.type === 'terraces') { // a stepped massif, narrowing as it rises, its centre off to one side
-        const cx = 3 + H(D.bi, D.bj, D.bk, 406) % 4, cz = 3 + H(D.bi, D.bj, D.bk, 407) % 4;
-        const dd = Math.max(Math.abs(D.li - cx), Math.abs(D.lk - cz)), R = 5.6 - 0.75 * D.lj + 1.2 * (noise(i / 2.5, j / 2, k / 2.5, 408) - 0.5);
+        const cx = 5 + H(D.bi, D.bj, D.bk, 406) % 6, cz = 5 + H(D.bi, D.bj, D.bk, 407) % 6;
+        const dd = Math.max(Math.abs(D.li - cx), Math.abs(D.lk - cz)), R = 8.6 - 0.8 * D.lj + 1.6 * (noise(i / 3.5, j / 2.5, k / 3.5, 408) - 0.5);
         return dd >= R;
       }
       // the chasm: a canyon across the district, plus blobs, shafts and colossal voids
       // big blobs, with a finer grain; and shafts that run through many levels
       const n = 0.66 * noise(i / 5, j / 3.6, k / 5, 101) + 0.34 * noise(i / 3.2, j / 2.4, k / 3.2, 102);
       const shaft = noise(i / 6.5, 0, k / 6.5, 103) > 0.68 && Math.abs(j - Math.round(10 * (noise(i / 14, 0, k / 14, 104) - 0.5))) <= 4;
-      // colossal voids: boxes 3-4 cells across and 6-9 levels tall, one in about every other lattice node
-      const bi = Math.floor(i / 8), bj = Math.floor(j / 12), bk = Math.floor(k / 8);
+      // colossal voids: boxes 4-6 cells across and 9-14 levels tall, one in about every other lattice node
+      const bi = Math.floor(i / 12), bj = Math.floor(j / 18), bk = Math.floor(k / 12);
       let big = false;
       if (H01(bi, bj, bk, 121) < 0.5) {
-        const w = 3 + (H(bi, bj, bk, 122) & 1), d = 3 + (H(bi, bj, bk, 123) & 1), hh = 6 + (H(bi, bj, bk, 124) % 4);
-        const ox = bi * 8 + (H(bi, bj, bk, 125) % 4), oz = bk * 8 + (H(bi, bj, bk, 126) % 4), oy = bj * 12 + (H(bi, bj, bk, 127) % 3);
+        const w = 4 + (H(bi, bj, bk, 122) % 3), d = 4 + (H(bi, bj, bk, 123) % 3), hh = 9 + (H(bi, bj, bk, 124) % 6);
+        const ox = bi * 12 + (H(bi, bj, bk, 125) % (12 - w)), oz = bk * 12 + (H(bi, bj, bk, 126) % (12 - d)), oy = bj * 18 + (H(bi, bj, bk, 127) % (18 - hh));
         big = i >= ox && i < ox + w && k >= oz && k < oz + d && j >= oy && j < oy + hh;
       }
       const along = H(D.bi, 0, D.bk, 409) & 1, a = along ? D.lk : D.li, b = along ? D.li : D.lk;
-      const canyon = Math.abs(a - 4.5 - 3 * (noise(b / 4, j / 5, 0, 411) - 0.5)) < 2.4;
+      const canyon = Math.abs(a - 7.5 - 5 * (noise(b / 6, j / 7, 0, 411) - 0.5)) < 4.8;
       // and a second canyon crossing it in some districts
-      const cross = H01(D.bi, 0, D.bk, 413) < 0.5 && Math.abs(b - 4.5 - 3 * (noise(a / 4, j / 5, 0, 414) - 0.5)) < 1.3;
+      const cross = H01(D.bi, 0, D.bk, 413) < 0.5 && Math.abs(b - 7.5 - 5 * (noise(a / 6, j / 7, 0, 414) - 0.5)) < 3;
       return canyon || cross || big;
     }
     // wells and drops are columns, but they stop in an expanse and the level either side of it
-    const nearExpanse = (i, j, k) => isExpanse(i, j, k) || isExpanse(i, j - 1, k) || isExpanse(i, j + 1, k);
+    const noShafts = (i, j, k) => { const t = districtOf(i, j, k).type; return t === 'expanse' || t === 'catacombs'; };
+    const nearExpanse = (i, j, k) => noShafts(i, j, k) || noShafts(i, j - 1, k) || noShafts(i, j + 1, k);
     const wellCol = (i, k, j) => !(i === 0 && k === 0) && H01(i, 0, k, 111) < 0.07 && (j === undefined || !nearExpanse(i, j, k)); // wide wells (in halls)
     const dropCol = (i, k, j) => !(i === 0 && k === 0) && !(H01(i, 0, k, 111) < 0.07) && H01(i, 0, k, 112) < 0.1 && (j === undefined || !nearExpanse(i, j, k)); // narrow drops (in tunnels)
     const shaftCol = (i, k, j) => wellCol(i, k, j) || dropCol(i, k, j);
@@ -201,6 +205,7 @@
       if (dropCol(i, k, j)) return 'tunnels';
       const D = districtOf(i, j, k), up = link(i, j, k, 4), down = link(i, j, k, 5);
       const r = H01(i, j, k, 160);
+      if (D.type === 'catacombs') return up || down ? 'crypt' : 'catacomb';
       if (up || down) return r < 0.5 ? 'open' : 'pillars';
       if (D.type === 'terraces') return isVoid(i, j + 1, k) ? 'terrace' : r < 0.5 ? 'tunnels' : r < 0.8 ? 'warren' : 'open';
       if (D.type === 'colonnade') return r < 0.6 ? 'pillars' : 'open';
@@ -209,11 +214,11 @@
       return r < 0.46 ? 'tunnels' : r < 0.72 ? 'warren' : r < 0.82 ? 'open' : 'pillars';
     }
     const clearVariant = v => v === 'open' || v === 'pillars';
-    const DOORH = { tunnels: 3, warren: 3, open: 4, pillars: 4, terrace: 3 };
+    const DOORH = { tunnels: 3, warren: 3, open: 4, pillars: 4, terrace: 3, catacomb: 2, crypt: 3 };
     // a doorway can be widened into a colonnade between two open rooms
     function wide(i, j, k, d) {
       const p = pairKey(i, j, k, d), q = [p[0] + DIRS[p[3]][0], p[1] + DIRS[p[3]][1], p[2] + DIRS[p[3]][2]];
-      return d < 4 && roomAt(p[0], p[1], p[2]) && roomAt(q[0], q[1], q[2]) && clearVariant(variantOf(p[0], p[1], p[2])) && clearVariant(variantOf(q[0], q[1], q[2])) && H01(p[0], p[1], p[2], 170 + p[3]) < 0.4;
+      return d < 4 && roomAt(p[0], p[1], p[2]) && roomAt(q[0], q[1], q[2]) && clearVariant(variantOf(p[0], p[1], p[2])) && clearVariant(variantOf(q[0], q[1], q[2])) && H01(p[0], p[1], p[2], 170 + p[3]) < 0.65;
     }
     const regionOf = (i, j, k) => { const D = districtOf(i, j, k), L = BIOME_PAL[D.type]; return L[H(D.bi, D.bj, D.bk, 180) % L.length]; };
     const lightOf = (i, j, k) => 1;
@@ -342,6 +347,44 @@
           if (dropHole(j)) box(7, 8, 0, 0, 7, 8, 0);
           if (dropHole(j + 1)) box(7, 8, 4, CEILY, 7, 8, 0);
         }
+      } else if (variant === 'catacomb' || variant === 'crypt') {
+        // passages one voxel wide and two high: each doorway's runs in from the wall, jogs sideways at a random depth
+        // and meets the middle. A crypt (a cell with a stair) has a narrow stairwell down its middle instead of a
+        // junction: x 4..12 (the stair lanes and the free columns 4, 8 and 12 either side of them, so it can always be
+        // crossed), the full depth, and three high
+        const crypt = variant === 'crypt', hgt = crypt ? 3 : 2;
+        const cx = crypt ? null : 8;
+        if (crypt) box(4, 12, 1, 4, 1, CW - 2, 0);
+        else if (rng() < 0.18) { box(6, 10, 1, 3, 6, 10, 0); box(8, 8, 1, 3, 8, 8, M.PILLAR); } // a small ossuary round a pier
+        else box(7, 9, 1, 2, 7, 9, 0);
+        const run = []; // passage voxels, for the niches
+        const cut = (x0, x1, z0, z1) => { for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) for (let z = Math.min(z0, z1); z <= Math.max(z0, z1); z++) { box(x, x, 1, hgt, z, z, 0); run.push([x, z]); } };
+        for (let d = 0; d < 4; d++) {
+          if (!links[d]) continue;
+          const c = laneC(d), m = 2 + Math.floor(rng() * 4);
+          if (crypt) { // straight to the stairwell's nearest free column (4 or 12) or, from the sides, along row 1 or 15
+            if (d === 0) cut(CW - 1, 12, c, c); else if (d === 1) cut(0, 4, c, c);
+            else if (d === 2) { cut(c, c, CW - 1, CW - 2); cut(c, c < 8 ? 4 : 12, CW - 2, CW - 2); } else { cut(c, c, 0, 1); cut(c, c < 8 ? 4 : 12, 1, 1); }
+            continue;
+          }
+          if (d === 0) { cut(CW - 1, CW - 1 - m, c, c); cut(CW - 1 - m, CW - 1 - m, c, cx); cut(CW - 1 - m, cx, cx, cx); }
+          else if (d === 1) { cut(0, m, c, c); cut(m, m, c, cx); cut(m, cx, cx, cx); }
+          else if (d === 2) { cut(c, c, CW - 1, CW - 1 - m); cut(c, cx, CW - 1 - m, CW - 1 - m); cut(cx, cx, CW - 1 - m, cx); }
+          else { cut(c, c, 0, m); cut(c, cx, m, m); cut(cx, cx, m, cx); }
+        }
+        if (!crypt) for (let n = 0; n < 2; n++) { // dead ends
+          const dir = Math.floor(rng() * 4), len = 3 + Math.floor(rng() * 4);
+          if (dir === 0) cut(9, 9 + len, 8, 8); else if (dir === 1) cut(7 - len, 7, 8, 8); else if (dir === 2) cut(8, 8, 9, 9 + len); else cut(8, 8, 7 - len, 7);
+        }
+        // burial niches: one-voxel recesses in the passage walls, at the floor or at head height; a few hold a light
+        for (const [x, z] of run) for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = x + dx, nz = z + dz; if (nx < 1 || nx > CW - 2 || nz < 1 || nz > CW - 2 || g[at(nx, 1, nz)] === 0 || g[at(nx, 2, nz)] === 0) continue;
+          const r = rng(); if (r < 0.16) put(nx, 1 + (rng() < 0.5 ? 1 : 0), nz, r < 0.012 ? M.LIGHT : 0);
+        }
+        if (crypt) {
+          if (linkedUp(i, j - 1, k)) { const st = stairOf(i, j - 1, k), [x0, x1] = LANE(st.lane); box(x0, x1, 0, 0, st.z0 + 4, st.z0 + 6, 0); }
+          if (stairUp(i, j, k)) { const st = stairOf(i, j, k), [x0, x1] = LANE(st.lane); box(x0, x1, 5, 6, st.z0 - 1, st.z0 + 6, 0); box(x0, x1, CEILY, CEILY, st.z0 + 3, st.z0 + 6, 0); flight(st); }
+        }
       } else if (variant === 'warren') {
         for (let a = 0; a < 4; a++) for (let b = 0; b < 4; b++) box(1 + 4 * a, 3 + 4 * a, 1, 3, 1 + 4 * b, 3 + 4 * b, 0); // the small cells
         const seen = new Uint8Array(16), st = [0]; seen[0] = 1;
@@ -375,7 +418,7 @@
 
       // doorways in the walls
       for (let d = 0; d < 4; d++) {
-        if (variant === 'tunnels') continue; // their corridors are already cut through
+        if (variant === 'tunnels' || variant === 'catacomb' || variant === 'crypt') continue; // their corridors are already cut through
         const nI = i + DIRS[d][0], nK = k + DIRS[d][2], nbVoid = isVoid(nI, j, nK), dh = DOORH[variant];
         const wall = (lat0, lat1, y0, y1) => { // carve a gap in wall d over the lateral range
           if (d === 0) box(CW - 1, CW - 1, y0, y1, lat0, lat1, 0); else if (d === 1) box(0, 0, y0, y1, lat0, lat1, 0);

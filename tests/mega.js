@@ -17,7 +17,7 @@ console.log('Determinism and variety');
   // the cache must not change what a cell is
   const w = createWorld(5), first = Array.from(w.cell(2, 1, -1)); for (let n = 0; n < 1200; n++) w.cell(n % 40 - 20, 0, (n * 7) % 40 - 20); check(first.every((v, q) => v === w.cell(2, 1, -1)[q]), 'a cell regenerated after eviction is identical'); }
 
-const BIOMES = ['interior', 'colonnade', 'terraces', 'chasm', 'expanse'];
+const BIOMES = ['interior', 'colonnade', 'terraces', 'chasm', 'expanse', 'catacombs'];
 const cases = [1, 2, 3, 4, 5].map(seed => ({ seed })).concat(...BIOMES.map(biome => [1, 2].map(seed => ({ seed, biome }))));
 let mixVo = 0, mixN = 0, mixTerr = 0; const mixBiomes = new Set();
 for (const { seed, biome } of cases) {
@@ -25,8 +25,8 @@ for (const { seed, biome } of cases) {
   let vo = 0, n = 0; const variants = {};
   for (let i = -R; i <= R; i++) for (let j = -RY; j <= RY; j++) for (let k = -R; k <= R; k++) { n++; if (w.isVoid(i, j, k)) vo++; else { const v = w.variantOf(i, j, k); variants[v] = (variants[v] || 0) + 1; } }
   const share = `${(vo / n * 100).toFixed(0)}%`;
-  if (!biome) { mixVo += vo; mixN += n; for (let i = -30; i <= 30; i += 3) for (let j = -12; j <= 12; j += 2) for (let k = -30; k <= 30; k += 3) mixBiomes.add(w.districtOf(i, j, k).type); }
-  else if (biome === 'interior') check(vo === 0, `the interior has no open air (${share})`);
+  if (!biome) { mixVo += vo; mixN += n; for (let i = -60; i <= 60; i += 4) for (let j = -27; j <= 27; j += 3) for (let k = -60; k <= 60; k += 4) mixBiomes.add(w.districtOf(i, j, k).type); }
+  else if (biome === 'interior' || biome === 'catacombs') check(vo === 0, `the interior has no open air (${share})`);
   else if (biome === 'colonnade') check(vo / n > 0.6, `the colonnade is mostly air (${share})`);
   else if (biome === 'chasm') check(vo / n > 0.6 && vo / n < 0.95, `the chasm is mostly open, with faces standing in it (${share})`);
   else if (biome !== 'expanse') check(vo / n > 0.2 && vo / n < 0.8, `voids are a fair share of the ${biome} (${share})`);
@@ -44,14 +44,14 @@ for (const { seed, biome } of cases) {
     if (l && (w.isAir(i, j, k) || w.isAir(i + dx, j + dy, k + dz))) badAir++;
     if (l && d < 4 && w.isVoid(i, j, k) !== w.isVoid(i + dx, j, k + dz)) bridges++;
   }
-  check(asym === 0, 'a link looks the same from both sides'); check(badVert === 0, 'no stair runs through a well or a drop'); check(badAir === 0, 'nothing links into open air'); if (biome === 'colonnade' || biome === 'chasm') check(voidStairs > 4, `the open voids have stair towers (${voidStairs / 2 | 0} flights)`); check(vertical > 10 && (biome === 'interior' || bridges > 10), `there are stairs (${vertical / 2 | 0}) and doors onto voids (${bridges / 2 | 0})`);
+  check(asym === 0, 'a link looks the same from both sides'); check(badVert === 0, 'no stair runs through a well or a drop'); check(badAir === 0, 'nothing links into open air'); if (biome === 'colonnade' || biome === 'chasm') check(voidStairs > 4, `the open voids have stair towers (${voidStairs / 2 | 0} flights)`); check(vertical > 10 && (biome === 'interior' || biome === 'catacombs' || bridges > 10), `there are stairs (${vertical / 2 | 0}) and doors onto voids (${bridges / 2 | 0})`);
 
   // every cell reaches the start through links
   const seen = new Set(['0,0,0']), q = [[0, 0, 0]];
   for (let h = 0; h < q.length; h++) { const [i, j, k] = q[h]; for (let d = 0; d < 6; d++) { const ni = i + DIRS[d][0], nj = j + DIRS[d][1], nk = k + DIRS[d][2]; if (Math.abs(ni) > R || Math.abs(nj) > RY || Math.abs(nk) > R) continue; const key = ni + ',' + nj + ',' + nk; if (!seen.has(key) && w.link(i, j, k, d)) { seen.add(key); q.push([ni, nj, nk]); } } }
   for (let i = -R; i <= R; i++) for (let j = -RY; j <= RY; j++) for (let k = -R; k <= R; k++) if (w.isAir(i, j, k)) air++;
   check(seen.size === n - air, `every cell that is not open air connects to the start (${seen.size}/${n - air})`);
-  if (biome === 'expanse') { check(air / n > 0.35, `the expanse is mostly open air (${(air / n * 100).toFixed(0)}%)`); let ob = 0; for (let i = -R; i <= R; i++) for (let j = -RY; j <= RY; j++) for (let k = -R; k <= R; k++) if (w.obeliskAt(i, j, k)) ob++; check(ob > 8, `obelisks hang in it (${ob} cells)`); }
+  if (biome === 'expanse') { check(air / n > 0.35, `the expanse is mostly open air (${(air / n * 100).toFixed(0)}%)`); let ob = 0; for (let i = -20; i <= 20; i++) for (let j = -12; j <= 12; j++) for (let k = -20; k <= 20; k++) if (w.obeliskAt(i, j, k) && w.isExpanse(i, j, k)) ob++; check(ob > 100, `huge obelisks hang in it (${ob} cells)`); }
 
   // walk it: standing places are a floor under two clear voxels; move to a neighbour on the same level or one up or down
   const WR = 3, WY = 2, lim = [WR * CW + CW, WY * CH + CH];
@@ -83,7 +83,7 @@ for (const { seed, biome } of cases) {
 
 check(mixVo / mixN > 0.25 && mixVo / mixN < 0.7, `mixed: voids are a fair share of space (${(mixVo / mixN * 100).toFixed(0)}%)`);
 check(mixTerr > 5, `mixed: there are open terraces (${mixTerr})`);
-check(mixBiomes.size === 5, `mixed: every kind of district occurs (${[...mixBiomes]})`);
+check(mixBiomes.size === 6, `mixed: every kind of district occurs (${[...mixBiomes]})`);
 
 console.log('Stair towers in the voids');
 for (const biome of ['colonnade', 'chasm', null]) for (const seed of [1, 2, 3]) {

@@ -151,15 +151,18 @@ The **3D** button on the Delve screen (bottom right) walks the same world in fir
 
 The home page (`index.html`) is a separate 3D game, a Blame!-like infinite structure walked in first person (WASD, mouse, Space, Shift; on a phone a thumb-stick, a look pad and a JUMP button). The world is a pure function of the seed and a 17×8×17 cell, so it streams in every direction including up and down.
 
-**Districts.** Space is divided into districts about ten cells (170 m) across and six levels (48 m) tall, with wobbling plumb sides, and each has an identity you recognise as you walk in:
+**Districts.** Space is divided into districts sixteen cells (272 m) across and nine levels (72 m) tall, with wobbling plumb sides, and each has an identity you recognise as you walk in:
 
 - **The Interior**: the dense inside of the structure, with no open air. Conduits (two-wide, three-high corridors), cells (a warren of small rooms), open halls and pillar halls, wells and narrow drops.
 - **The Colonnade**: one enormous void under a roof of halls, held up by pillars seven metres thick that run through every level, crossed by walkways that meet in rings around the pillars. A few towers stand in it.
 - **The Terraces**: stepped stone massifs that narrow as they rise. Open shelves (no ceiling) fall away level by level, monoliths stand on them, and corridors are cut into the rock behind, leading back into conduits and cells.
-- **The Chasm**: sheer faces. Canyons five cells wide run across the district through every level (in half the districts a second one crosses it), with colossal voids, ribs, pipes, cornices and walkways across; the canyon walls stay whole.
-- **The Expanse**: empty space. Most of it is open air that belongs to no path at all; walkway decks cross it every third level (24 m apart), stair towers rise through it, and huge obelisks hang in it, two or three cells across (34–51 m) and nine or twelve levels tall (72–96 m), with nothing under them. You can walk into them.
+- **The Chasm**: sheer faces. Canyons about nine cells (150 m) wide run across the district through every level (in half the districts a second one crosses it), with colossal voids, ribs, pipes, cornices and walkways across; the canyon walls stay whole.
+- **The Catacombs**: claustrophobic rock. Passages one metre wide and two high (you cannot jump without hitting your head) run in from each doorway, jog sideways and meet at a junction; dead ends branch off, the walls are cut with burial niches at the floor and at head height, a few with a candle's glow, and now and then the junction is a small ossuary round a pier. Levels are joined by narrow stairwells. No voids, wells or drops.
+- **The Expanse**: empty space. Most of it is open air that belongs to no path at all; walkway decks cross it every third level (24 m apart), stair towers rise through it, and huge obelisks hang in it, three or four cells across (51–68 m) and twelve to eighteen levels tall (96–144 m), with nothing under them. You can walk into them.
 
-The HUD names the district and the kind of space you are in. The pills under the top buttons (Mixed, Interior, Colonnade, Terraces, Chasm, Expanse) force every district to one kind, to test each on its own; the choice goes into the address (`#seed=…&biome=terraces`).
+The HUD names the district and the kind of space you are in. The pills under the top buttons (Mixed, Interior, Colonnade, Terraces, Chasm, Expanse, Catacombs) force every district to one kind, to test each on its own; the choice goes into the address (`#seed=…&biome=terraces`).
+
+**Scale.** The large forms (districts, canyons, colossal voids four to six cells across and nine to fourteen levels tall, obelisks, terraced massifs, the colonnade's 64 m void, halls merged into multi-cell halls) are big; the things you walk on keep human sizes (one-metre steps, two-to-four-metre doorways), so everything stays walkable.
 
 **Stairs.** Every staircase, in a hall or out in a void, is the same open flight: seven single slabs climbing one metre a step, rising through a hole in the floor above. Flights alternate sides level by level, so a stack of them zig-zags.
 
