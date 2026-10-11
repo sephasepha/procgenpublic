@@ -29,7 +29,7 @@
     const g = world.cell(i, j, k); let any = false;
     for (let n = 0; n < g.length; n++) if (g[n]) { any = true; break; }
     const c = { i, j, k, n: 0, vbo: null, ibo: null, info: world.info(i, j, k) };
-    if (j === world.GJ) meshTerrain(c);
+    if (j === world.PJ) meshTerrain(c);
     if (!any) return c;
     const ox = i * CW, oy = j * CH, oz = k * CW, V = [], X = [];
     const at = (x, y, z) => (x >= 0 && x < CW && y >= 0 && y < CH && z >= 0 && z < CW) ? g[(y * CW + z) * CW + x] : world.voxel(ox + x, oy + y, oz + z);
@@ -73,8 +73,8 @@
   }
   const TVS = `attribute vec3 aP; attribute vec3 aC; uniform mat4 uVP; uniform vec3 uRel; varying vec3 vRel; varying vec3 vCol;
     void main() { vRel = aP + uRel; vCol = aC * (0.5 + 0.9 / (1.0 + 0.12 * length(vRel))); gl_Position = uVP * vec4(vRel, 1.0); }`;
-  const TFS = `precision mediump float; varying vec3 vRel; varying vec3 vCol; uniform vec3 uFog; uniform float uFogD;
-    void main() { float d = length(vec3(vRel.x, vRel.y * 0.45, vRel.z)) * uFogD; gl_FragColor = vec4(mix(vCol, uFog, 1.0 - exp(-d * d)), 1.0); }`;
+  const TFS = `precision mediump float; varying vec3 vRel; varying vec3 vCol; uniform vec3 uFog; uniform float uFogD; uniform vec4 uClip;
+    void main() { if (dot(uClip.xyz, vRel) + uClip.w > 0.0) discard; float d = length(vec3(vRel.x, vRel.y * 0.45, vRel.z)) * uFogD; gl_FragColor = vec4(mix(vCol, uFog, 1.0 - exp(-d * d)), 1.0); }`;
   let tprog, tloc;
 
   // ---------- shaders ----------
@@ -88,8 +88,9 @@
       vL = a.xyz; vFace = face; vRel = a.xyz + uRel;
       gl_Position = uVP * vec4(vRel, 1.0);
     }`;
-  const FS = `precision mediump float; varying vec3 vL; varying vec3 vRel; varying float vFace; varying vec3 vCol; uniform vec3 uFog; uniform float uFogD;
+  const FS = `precision mediump float; varying vec3 vL; varying vec3 vRel; varying float vFace; varying vec3 vCol; uniform vec3 uFog; uniform float uFogD; uniform vec4 uClip;
     void main() {
+      if (dot(uClip.xyz, vRel) + uClip.w > 0.0) discard; // through a portal: nothing on the near side of its twin
       vec2 uv = vFace < 1.5 ? vL.zy : vFace < 3.5 ? vL.xz : vL.xy;
       vec2 fr = fract(uv); float e = min(min(fr.x, 1.0 - fr.x), min(fr.y, 1.0 - fr.y));
       float grid = 0.91 + 0.09 * smoothstep(0.0, 0.06, e);
@@ -98,15 +99,17 @@
     }`;
   function shader(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
   function initGL() {
-    gl = cv.getContext('webgl', { antialias: !coarse, powerPreference: 'high-performance' }) || cv.getContext('experimental-webgl');
+    gl = cv.getContext('webgl', { antialias: !coarse, stencil: true, powerPreference: 'high-performance' }) || cv.getContext('experimental-webgl');
     if (!gl) return false;
     prog = gl.createProgram(); gl.attachShader(prog, shader(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog);
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
     loc = { a: gl.getAttribLocation(prog, 'a') };
     tprog = gl.createProgram(); gl.attachShader(tprog, shader(gl.VERTEX_SHADER, TVS)); gl.attachShader(tprog, shader(gl.FRAGMENT_SHADER, TFS)); gl.linkProgram(tprog);
     if (!gl.getProgramParameter(tprog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(tprog));
-    tloc = { aP: gl.getAttribLocation(tprog, 'aP'), aC: gl.getAttribLocation(tprog, 'aC') }; ['uVP', 'uRel', 'uFog', 'uFogD'].forEach(n => { tloc[n] = gl.getUniformLocation(tprog, n); });
-    ['uVP', 'uRel', 'uPal', 'uLight', 'uAmb', 'uFog', 'uFogD'].forEach(n => { loc[n] = gl.getUniformLocation(prog, n); });
+    tloc = { aP: gl.getAttribLocation(tprog, 'aP'), aC: gl.getAttribLocation(tprog, 'aC') }; ['uVP', 'uRel', 'uFog', 'uFogD', 'uClip'].forEach(n => { tloc[n] = gl.getUniformLocation(tprog, n); });
+    ['uVP', 'uRel', 'uPal', 'uLight', 'uAmb', 'uFog', 'uFogD', 'uClip'].forEach(n => { loc[n] = gl.getUniformLocation(prog, n); });
+    qprog = gl.createProgram(); gl.attachShader(qprog, shader(gl.VERTEX_SHADER, QVS)); gl.attachShader(qprog, shader(gl.FRAGMENT_SHADER, QFS)); gl.linkProgram(qprog);
+    qloc = { aP: gl.getAttribLocation(qprog, 'aP'), uVP: gl.getUniformLocation(qprog, 'uVP'), uCol: gl.getUniformLocation(qprog, 'uCol') }; qbuf = gl.createBuffer();
     gl.enable(gl.DEPTH_TEST); gl.enable(gl.CULL_FACE); gl.clearColor(FOG[0], FOG[1], FOG[2], 1);
     return true;
   }
@@ -146,9 +149,9 @@
   function chunks(budgetMs) {
     const p = st.p, ci = fdiv(Math.floor(p.x), CW), cj = fdiv(Math.floor(p.y + 1), CH), ck = fdiv(Math.floor(p.z), CW), t0 = performance.now();
     const want = [];
-    const top = cj >= world.GJ; // on the plain the lid hides the structure: draw only the level under it
+    const top = cj >= world.PJ; // on the plain the crust hides the structure: draw only the levels just under it (seen through the doorways)
     for (let dj = -RDOWN; dj <= RUP; dj++) for (let dk = -RH; dk <= RH; dk++) for (let di = -RH; di <= RH; di++) {
-      const r = reach(di, dj, dk); if (r > 1) continue; if (top && (cj + dj < world.GJ - 1 || cj + dj > world.GJ + 1)) continue; want.push([ci + di, cj + dj, ck + dk, Math.hypot(di, dk) + Math.abs(dj) * 0.5]);
+      const r = reach(di, dj, dk); if (r > 1) continue; if (top && (cj + dj < world.GJ - 2 || cj + dj > world.PJ + 1)) continue; want.push([ci + di, cj + dj, ck + dk, Math.hypot(di, dk) + Math.abs(dj) * 0.5]);
     }
     want.sort((a, b) => a[3] - b[3]);
     let built = 0;
@@ -183,7 +186,7 @@
     if (ts - st.hudT > 150) { st.hudT = ts; hud(); }
     if (ts - st.stats.at > 500) { // the timing line, twice a second
       const S = st.stats, secs = (ts - S.at) / 1000;
-      q('.mg-stats').textContent = `${S.frame.toFixed(1)} ms · ${Math.round(1000 / Math.max(1, S.frame))} fps · draw ${S.draw.toFixed(1)} ms · chunks ${S.chunk.toFixed(1)} ms (max ${S.chunkMax.toFixed(0)}, ${(S.built / secs).toFixed(0)}/s) · ${st.drawn}/${st.cells.size} cells` + (S.guideMs ? ` · route ${S.guideMs.toFixed(0)} ms over ${S.guideFrames} frames` : '');
+      q('.mg-stats').textContent = `${S.frame.toFixed(1)} ms · ${Math.round(1000 / Math.max(1, S.frame))} fps · draw ${S.draw.toFixed(1)} ms · chunks ${S.chunk.toFixed(1)} ms (max ${S.chunkMax.toFixed(0)}, ${(S.built / secs).toFixed(0)}/s) · ${st.drawn}/${st.cells.size} cells` + (st.portalsSeen ? ` · ${st.portalsSeen} portal${st.portalsSeen > 1 ? 's' : ''} (${st.portalDrawn} cells)` : '') + (S.guideMs ? ` · route ${S.guideMs.toFixed(0)} ms over ${S.guideFrames} frames` : '');
       S.at = ts; S.built = 0; S.chunkMax = 0;
     }
     st.frames++;
@@ -192,15 +195,14 @@
     const scale = Math.min(window.devicePixelRatio || 1, 2) * (coarse ? 0.7 : 1), w = Math.max(2, Math.floor(cv.clientWidth * scale)), h = Math.max(2, Math.floor(cv.clientHeight * scale));
     if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
   }
-  function draw() {
-    const p = st.p, eye = [p.x, p.y + EYE, p.z];
-    gl.viewport(0, 0, cv.width, cv.height); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  // the fog where an eye is: above ground dense and a little green, thickening as you climb out of a stairwell
+  function fogAt(y) { const up = Math.min(1, Math.max(0, (y - (world.SURF - 6)) / 8)); return { fog: FOG.map((f, n) => f + ([0.66, 0.68, 0.64][n] - f) * up), fogD: FOGD + (0.042 - FOGD) * up }; }
+  const NOCLIP = [0, 0, 0, -1];
+  // the cells and the plain as seen from eye (the view-projection m is relative to the eye, so it serves any eye with
+  // the same look); clip is a plane in eye-relative space: fragments with dot(xyz, rel) + w > 0 are dropped
+  function scene(eye, m, pl, clip, F) {
     gl.useProgram(prog);
-    const m = viewProj(p.yaw, p.pitch, cv.width / cv.height), pl = planes(m);
-    // above ground the fog is dense and a little green; it thickens as you climb out of a stairwell
-    const up = Math.min(1, Math.max(0, (p.y - (world.SURF - 6)) / 8)), fog = FOG.map((f, n) => f + ([0.66, 0.68, 0.64][n] - f) * up), fogD = FOGD + (0.042 - FOGD) * up;
-    gl.clearColor(fog[0], fog[1], fog[2], 1); gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.uniformMatrix4fv(loc.uVP, false, m); gl.uniform3fv(loc.uFog, fog); gl.uniform1f(loc.uFogD, fogD);
+    gl.uniformMatrix4fv(loc.uVP, false, m); gl.uniform3fv(loc.uFog, F.fog); gl.uniform1f(loc.uFogD, F.fogD); gl.uniform4fv(loc.uClip, clip);
     gl.enableVertexAttribArray(loc.a);
     let drawn = 0;
     st.cells.forEach(c => {
@@ -213,9 +215,9 @@
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, c.ibo); gl.drawElements(gl.TRIANGLES, c.n, gl.UNSIGNED_SHORT, 0);
       drawn++;
     });
-    // the plain
     gl.disableVertexAttribArray(loc.a);
-    gl.useProgram(tprog); gl.uniformMatrix4fv(tloc.uVP, false, m); gl.uniform3fv(tloc.uFog, fog); gl.uniform1f(tloc.uFogD, fogD);
+    // the plain
+    gl.useProgram(tprog); gl.uniformMatrix4fv(tloc.uVP, false, m); gl.uniform3fv(tloc.uFog, F.fog); gl.uniform1f(tloc.uFogD, F.fogD); gl.uniform4fv(tloc.uClip, clip);
     gl.enableVertexAttribArray(tloc.aP); gl.enableVertexAttribArray(tloc.aC);
     st.cells.forEach(c => {
       if (!c.tn) return;
@@ -224,7 +226,71 @@
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, c.tibo); gl.drawElements(gl.TRIANGLES, c.tn, gl.UNSIGNED_SHORT, 0);
     });
     gl.disableVertexAttribArray(tloc.aP); gl.disableVertexAttribArray(tloc.aC);
-    drawLine(m, eye, fog, fogD);
+    return drawn;
+  }
+  // a flat quad (eye-relative corners) in one colour, for marking portal openings
+  const QVS = `attribute vec3 aP; uniform mat4 uVP; void main() { gl_Position = uVP * vec4(aP, 1.0); }`;
+  const QFS = `precision mediump float; uniform vec4 uCol; void main() { gl_FragColor = uCol; }`;
+  let qprog, qloc, qbuf;
+  function quad(m, pts, col) {
+    gl.useProgram(qprog); gl.uniformMatrix4fv(qloc.uVP, false, m); gl.uniform4fv(qloc.uCol, col);
+    gl.bindBuffer(gl.ARRAY_BUFFER, qbuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(pts), gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(qloc.aP); gl.vertexAttribPointer(qloc.aP, 3, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, pts.length / 3); gl.disableVertexAttribArray(qloc.aP);
+  }
+  // Portals, after Prey's: for each doorway near you, on its open side, its opening is marked in the stencil buffer
+  // (where it is not hidden), the depth there is reset to the far plane and painted with the fog of the other side, and
+  // the world is drawn again from the eye moved to the twin doorway, only inside the mark, with everything on the near
+  // side of the twin's plane cut away. The two doorways have the same shape and facing, so the move is a translation.
+  function portals(eye, m, pl) {
+    const ci = Math.floor(Math.floor(eye[0]) / CW), ck = Math.floor(Math.floor(eye[2]) / CW), out = [];
+    for (let i = ci - 3; i <= ci + 3; i++) for (let k = ck - 3; k <= ck + 3; k++) {
+      if (!world.portalAt(i, k)) continue;
+      const f = world.portalFrame(i, k);
+      // on the plain, seen from in front (+z); in the crust, seen from the passage (-z)
+      if (eye[1] > f.yA - 1 && eye[1] < f.yA + 12 && eye[2] > f.zP) out.push({ f, y0: f.yA, dy: -f.dy, side: 1 });
+      else if (eye[1] > f.yB - 12 && eye[1] < f.yB + 6 && eye[2] < f.zP) out.push({ f, y0: f.yB, dy: f.dy, side: -1 }); // from the passage and the stair below it
+    }
+    for (const P of out) {
+      const f = P.f, z = f.zP - eye[2], y0 = P.y0 - eye[1], y1 = P.y0 + f.h - eye[1], x0 = f.x0 - eye[0], x1 = f.x1 - eye[0];
+      const tri = [x0, y0, z, x1, y0, z, x1, y1, z, x0, y0, z, x1, y1, z, x0, y1, z];
+      // almost in the plane, inside the opening: the near plane would cut the quad, so the whole view is the portal
+      const fz = -Math.cos(st.p.yaw) * Math.cos(st.p.pitch); // how much you face +z
+      const inside = Math.abs(z) < 0.45 && x0 < 0 && x1 > 0 && y0 < 0 && y1 > 0 && (P.side > 0 ? fz < -0.2 : fz > 0.2); // and facing it
+      const eyeV = [eye[0], eye[1] + P.dy, eye[2]], F = fogAt(eyeV[1] - EYE);
+      gl.enable(gl.STENCIL_TEST); gl.clearStencil(0); gl.clear(gl.STENCIL_BUFFER_BIT);
+      gl.stencilFunc(gl.ALWAYS, 1, 0xff); gl.stencilOp(gl.KEEP, gl.KEEP, gl.REPLACE);
+      gl.colorMask(false, false, false, false); gl.depthMask(false);
+      if (inside) { gl.clearStencil(1); gl.clear(gl.STENCIL_BUFFER_BIT); gl.clearStencil(0); }
+      else { gl.disable(gl.CULL_FACE); quad(m, tri, [0, 0, 0, 0]); gl.enable(gl.CULL_FACE); }
+      // the far plane and the other side's fog inside the mark
+      gl.stencilFunc(gl.EQUAL, 1, 0xff); gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
+      gl.colorMask(true, true, true, true); gl.depthMask(true); gl.depthFunc(gl.ALWAYS); gl.depthRange(1, 1); gl.disable(gl.CULL_FACE);
+      const far = [-1e3, -1e3, 0, 1e3, -1e3, 0, 1e3, 1e3, 0, -1e3, -1e3, 0, 1e3, 1e3, 0, -1e3, 1e3, 0]; // a big quad straight ahead of the camera, in clip space below
+      quadClip(far, [F.fog[0], F.fog[1], F.fog[2], 1]);
+      gl.depthRange(0, 1); gl.depthFunc(gl.LESS); gl.enable(gl.CULL_FACE);
+      // the far side: keep only what lies beyond the twin's plane (z < zP from the plain's doorway; z > zP from the crust's)
+      const clip = P.side > 0 ? [0, 0, 1, eyeV[2] - f.zP] : [0, 0, -1, f.zP - eyeV[2]];
+      st.portalDrawn += scene(eyeV, m, pl, clip, F);
+      gl.disable(gl.STENCIL_TEST);
+    }
+    return out.length;
+  }
+  // a quad given directly in clip space (x, y in -1..1 cover the screen), for filling the stencil mark
+  function quadClip(pts, col) {
+    const I = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]), P = [];
+    for (let n = 0; n < pts.length; n += 3) P.push(Math.max(-1, Math.min(1, pts[n])), Math.max(-1, Math.min(1, pts[n + 1])), 0.999);
+    quad(I, P, col);
+  }
+  function draw() {
+    const p = st.p, eye = [p.x, p.y + EYE, p.z];
+    const m = viewProj(p.yaw, p.pitch, cv.width / cv.height), pl = planes(m), F = fogAt(p.y);
+    gl.viewport(0, 0, cv.width, cv.height);
+    gl.clearColor(F.fog[0], F.fog[1], F.fog[2], 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
+    st.portalDrawn = 0;
+    const drawn = scene(eye, m, pl, NOCLIP, F);
+    st.portalsSeen = portals(eye, m, pl);
+    drawLine(m, eye, F.fog, F.fogD);
     st.drawn = drawn;
   }
 
@@ -233,7 +299,7 @@
   function toast(msg) { const t = q('.mg-toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 3200); }
   function hud() {
     const p = st.p, i = fdiv(Math.floor(p.x), CW), j = fdiv(Math.floor(p.y), CH), k = fdiv(Math.floor(p.z), CW), inf = world.info(i, j, k);
-    const place = inf.biome === 'surface' ? 'Open ground' : inf.air ? 'Open air' : inf.void ? (inf.biome === 'expanse' ? 'A deck' : 'The shaft') : inf.biome === 'expanse' ? 'Inside an obelisk' : inf.well ? 'A well' : inf.drop ? 'A drop' : ({ open: 'A hall', pillars: 'Pillar hall', tunnels: 'Conduit', warren: 'Cells', terrace: 'A terrace', catacomb: 'Passages', crypt: 'A stairwell' })[inf.variant];
+    const place = inf.j === world.GJ ? 'The way down' : inf.biome === 'surface' ? 'Open ground' : inf.air ? 'Open air' : inf.void ? (inf.biome === 'expanse' ? 'A deck' : 'The shaft') : inf.biome === 'expanse' ? 'Inside an obelisk' : inf.well ? 'A well' : inf.drop ? 'A drop' : ({ open: 'A hall', pillars: 'Pillar hall', tunnels: 'Conduit', warren: 'Cells', terrace: 'A terrace', catacomb: 'Passages', crypt: 'A stairwell' })[inf.variant];
     q('.mg-where').innerHTML = `<b>${W.BIOME_NAMES[inf.biome]}</b><span>${place} · ${W.PALETTES[inf.region].name} · level ${j}</span>`;
     q('.mg-pos').textContent = `cell ${i}, ${j}, ${k} · seed ${world.seed}`;
   }
@@ -387,8 +453,8 @@
       if (!pk) { toast('No doorway to the surface was found near here.'); return; }
     }
     st.back = { x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch };
-    const m = MegaGuide.mouth(world, pk[0], pk[1]), z = m[2] + 4;
-    teleport(m[0], world.terrainH(m[0], z), z, 0, 0);
+    const f = world.portalFrame(pk[0], pk[1]), x = (f.x0 + f.x1) / 2, z = f.zP + 4;
+    teleport(x, world.terrainH(x, z), z, 0, 0);
     toast(st.entered ? 'Up at the doorway you came down. T takes you back.' : 'Up at the nearest doorway. T takes you back.');
   }
 

@@ -7,21 +7,22 @@
   const fdiv = (a, b) => Math.floor(a / b);
   const DIRS = [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0], [0, -1, 0]];
 
-  // the doorway's mouth: the middle of the landing a portal's stair climbs out on to
-  function mouth(world, i, k) { const [x0, x1] = world.LANE(1 + (((world.GJ - 1) % 2) + 2) % 2); return [i * world.CW + (x0 + x1 + 1) / 2, world.SURF + 2, k * world.CW + world.PZ + 10]; }
+  // where a route ends: underground, on the landing under the crust's doorway; on the plain, in the doorway
+  function mouth(world, i, k) { const f = world.portalFrame(i, k); return [(f.x0 + f.x1) / 2, f.yB, f.zP - 1]; }
+  function front(world, i, k) { const f = world.portalFrame(i, k); return [(f.x0 + f.x1) / 2, f.yA, f.zP]; }
 
   function onPlain(world, x, z, y) {
     const { CW } = world, ci = fdiv(Math.floor(x), CW), ck = fdiv(Math.floor(z), CW);
     let best = null;
     for (let r = 0; r <= 14 && !best; r++) for (let i = ci - r; i <= ci + r; i++) for (let k = ck - r; k <= ck + r; k++) {
       if (Math.max(Math.abs(i - ci), Math.abs(k - ck)) !== r || !world.portalAt(i, k)) continue;
-      const m = mouth(world, i, k), d = Math.hypot(m[0] - x, m[2] - z); if (!best || d < best.d) best = { m, d };
+      const m = front(world, i, k), d = Math.hypot(m[0] - x, m[2] - z); if (!best || d < best.d) best = { m, d };
     }
     if (!best) return null;
     // over the ground, then up to the doorway: approach the mouth from the open side so the line goes through it
-    const [mx, , mz] = best.m, front = [mx, mz + 3], pts = [];
+    const [mx, , mz] = best.m, fr = [mx, mz + 3], pts = [];
     const seg = (ax, az, bx, bz) => { const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 0.5)); for (let s = 0; s < n; s++) { const t = s / n, px = ax + (bx - ax) * t, pz = az + (bz - az) * t, g = world.groundAt(px, pz); pts.push([px, g === null ? y : g, pz]); } };
-    seg(x, z, front[0], front[1]); seg(front[0], front[1], mx, mz); pts.push([mx, world.SURF + 2, mz]);
+    seg(x, z, fr[0], fr[1]); seg(fr[0], fr[1], mx, mz); pts.push([mx, world.SURF + 2, mz - 0.3]);
     return pts;
   }
 
@@ -89,7 +90,8 @@
       }
       if (end === null) return null;
       const pts = []; for (let k = end; k !== null && k !== undefined; k = par.get(k)) { const kz = k % 8192, rest = (k - kz) / 8192, kj = rest % 8192, ki = (rest - kj) / 8192; pts.push([ki - 4096 + 0.5, kj - 4096, kz - 4096 + 0.5]); }
-      return pts.reverse();
+      pts.reverse(); pts.push([target[0], target[1], target[2] + 1.4]); // on through the doorway
+      return pts;
     }
     let pts = yield* voxels(route);
     if (!pts) { // widen the corridor by a cell all round

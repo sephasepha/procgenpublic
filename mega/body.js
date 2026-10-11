@@ -21,7 +21,7 @@
   }
   // fw, sd: -1..1 forward and sideways; speed scales with the stick when it is analogue
   function step(b, dt, fw, sd, run, scale) {
-    const p = b.p; b.t += dt;
+    const p = b.p, ox = p.x, oy = p.y, oz = p.z; b.t += dt;
     const len = Math.hypot(fw, sd);
     if (len > 0.001) {
       const sp = (run ? RUN : WALK) * dt * (scale === undefined ? 1 : scale) / Math.max(1, len);
@@ -37,6 +37,8 @@
     else { p.y = Math.floor(ny + TALL) - TALL - 1e-3; p.vy = 0; } // bumped the head
     if (p.vy <= 0 && hits(b, p.x, p.y - 0.03, p.z)) { b.grounded = true; b.groundT = b.t; }
     // the open plain above the structure is a smooth heightfield, not voxels: stand on it, and walk up its slopes
+    // portals: crossing a doorway's plane moves you to its twin (the world says by how much)
+    if (b.world.portalCross) { const dy = b.world.portalCross(ox, oy, oz, p.x, p.y, p.z); if (dy) { p.y += dy; b.portalled = (b.portalled || 0) + 1; b.lastPortal = dy; } }
     const G = b.world.groundAt;
     if (G) { const g = G(p.x, p.z);
       if (g !== null && p.y < g && p.y > g - 1.5) { p.y = g; if (p.vy < 0) p.vy = 0; b.grounded = true; b.groundT = b.t; }

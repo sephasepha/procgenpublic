@@ -36,9 +36,12 @@
     { name: 'Ossuary', c: ['#3e3a33', '#4a443b', '#2f2b26', '#5a5246', '#6a6152', '#24211d', '#ffcf8a'] },
     { name: 'Earth', c: ['#3d3a30', '#4b473b', '#34312a', '#5c574b', '#6a6456', '#2b2923', '#dff2ff'] },
   ];
-  // The surface: the structure has a lid. Above level GJ - 1 lies the ground floor, a gently rolling plain of grass
-  // and dirt (a smooth heightfield, not voxels) in dense fog, empty but for doorways that open on stairs down.
-  const GJ = 4, SURF = GJ * CH;
+  // The surface: the structure has a lid. Level GJ is a crust of solid rock; above it, on level PJ, lies the ground
+  // floor, a gently rolling plain of grass and dirt (a smooth heightfield, not voxels) in dense fog, empty but for
+  // doorways. A doorway on the plain is one of a pair of portals: its twin stands in the crust directly below, the
+  // same shape exactly 8 m lower, at the head of a stair down into the structure. Looking through one you see what is
+  // beyond the other; walking through moves you the 8 m between them, so the descent is seamless.
+  const GJ = 4, PJ = GJ + 1, SURF = PJ * CH;
   // Districts: big regions of space (about ten cells across and six levels tall) that each have an identity you
   // recognise as you walk in. They share one connection scheme, so you can always cross from one into the next.
   //   interior   the dense inside of the structure: conduits, cells and halls, no open air
@@ -242,25 +245,48 @@
     // where you stand on the plain, or null over a portal's stairwell
     function groundAt(x, z) {
       const i = fdiv(Math.floor(x), CW), k = fdiv(Math.floor(z), CW);
-      if (portalAt(i, k)) { const [x0, x1] = portalLane(i, k), lx = x - i * CW, lz = z - k * CW; if (lx >= x0 && lx < x1 + 1 && lz >= 1 && lz < PZ + 8) return null; }
       return terrainH(x, z);
     }
     // a surface cell: a slab of rock under the plain (the structure's lid), and a portal where there is one: a trench
     // with walls, the top of the stair climbing out of the cell below, a landing at ground level, and the doorway
-    function surfaceCell(i, j, k, g, box) {
-      if (j !== GJ) return g;
-      box(0, CW - 1, 0, 0, 0, CW - 1, M.FLOOR);
-      if (!portalAt(i, k)) return g;
-      const [x0, x1] = portalLane(i, k);
-      const Z = PZ;                                                 // the stair below starts at Z
-      box(x0, x1, 0, 0, 1, Z + 8, 0);                               // the stairwell
-      box(x0, x1, 0, 0, Z + 7, Z + 7, M.BRIDGE); box(x0, x1, 1, 1, Z + 8, Z + 8, M.BRIDGE); // the last two steps
-      box(x0, x1, 1, 1, Z + 9, Z + 10, M.BRIDGE);                   // the landing at the mouth
-      box(x0 - 1, x0 - 1, 1, 1, 0, Z + 10, M.WALL); box(x1 + 1, x1 + 1, 1, 1, 0, Z + 10, M.WALL); box(x0, x1, 1, 1, 0, 0, M.WALL);
-      // the doorway: two piers and a lintel, two deep, with a cold light along its inner edge
+    // the doorway: two piers and a lintel, two deep, with a cold light along its inner edge (the same on both sides)
+    function doorway(box, x0, x1, Z) {
       box(x0 - 2, x0 - 1, 1, 6, Z + 9, Z + 10, M.PILLAR); box(x1 + 1, x1 + 2, 1, 6, Z + 9, Z + 10, M.PILLAR); box(x0 - 2, x1 + 2, 6, 7, Z + 9, Z + 10, M.PILLAR);
       box(x0 - 1, x0 - 1, 2, 5, Z + 9, Z + 9, M.LIGHT); box(x1 + 1, x1 + 1, 2, 5, Z + 9, Z + 9, M.LIGHT); box(x0, x1, 6, 6, Z + 9, Z + 9, M.LIGHT);
+    }
+    // the crust (level GJ) is solid rock; under each doorway it holds the twin doorway and a passage from it down the
+    // last steps of the stair that climbs out of the cell below. The plain (level PJ) holds only the doorways.
+    function surfaceCell(i, j, k, g, box) {
+      const Z = PZ, [x0, x1] = portalLane(i, k);
+      if (j === GJ) {
+        box(0, CW - 1, 0, CH - 1, 0, CW - 1, M.CEIL);
+        if (!portalAt(i, k)) return g;
+        box(x0, x1, 1, 5, 1, Z + 10, 0);                              // the passage, under a low ceiling
+        box(x0, x1, 0, 0, 1, Z + 8, 0);                               // the stairwell
+        box(x0, x1, 0, 0, Z + 7, Z + 7, M.BRIDGE); box(x0, x1, 1, 1, Z + 8, Z + 8, M.BRIDGE); // the last two steps
+        box(x0, x1, 1, 1, Z + 9, Z + 10, M.BRIDGE);                   // the landing under the doorway
+        box(x0 - 1, x0 - 1, 1, 5, 1, Z + 8, M.WALL); box(x1 + 1, x1 + 1, 1, 5, 1, Z + 8, M.WALL);
+        doorway(box, x0, x1, Z);
+        box(x0 + 1, x0 + 1, 6, 6, Z + 2, Z + 2, M.LIGHT);   // a lamp over the stair
+        return g;
+      }
+      if (j === PJ && portalAt(i, k)) doorway(box, x0, x1, Z);
       return g;
+    }
+    // A portal pair: the opening of the doorway (x0..x1, y from yA or yB up 4 m) and its plane zP (in the middle of the
+    // doorway's depth). Crossing the plane going -z through the plain's doorway takes you to the crust's (-8 m); going
+    // +z through the crust's takes you back up.
+    function portalFrame(i, k) {
+      const [x0, x1] = portalLane(i, k);
+      return { i, k, x0: i * CW + x0, x1: i * CW + x1 + 1, zP: k * CW + PZ + 10, yA: SURF + 2, yB: GJ * CH + 2, h: 4, dy: CH };
+    }
+    function portalCross(ox, oy, oz, nx, ny, nz) {
+      const i = fdiv(Math.floor(nx), CW), k = fdiv(Math.floor(nz), CW);
+      if (!portalAt(i, k)) return 0;
+      const f = portalFrame(i, k); if (nx < f.x0 || nx > f.x1) return 0;
+      if (oz >= f.zP && nz < f.zP && ny >= f.yA - 1 && ny < f.yA + f.h) return -CH;
+      if (oz < f.zP && nz >= f.zP && ny >= f.yB - 1 && ny < f.yB + f.h) return CH;
+      return 0;
     }
     function surfaceSpawn() { const [x0, x1] = portalLane(0, 0), x = (x0 + x1 + 1) / 2, z = CW + 7.5; return { x, y: terrainH(x, z), z, yaw: 0 }; }
     const stairUp = (i, j, k) => roomAt(i, j, k) && link(i, j, k, 4);
@@ -522,7 +548,7 @@
       let yaw = 0; for (let d = 0; d < 4; d++) if (link(0, 0, 0, d)) { yaw = [Math.PI / 2, 3 * Math.PI / 2, Math.PI, 0][d]; break; }
       return { x: 8.5, y: 1, z: 8.5, yaw };
     }
-    return { seed: S, GJ, SURF, PZ, supportAt, portalAt, terrainH, groundAt, surfaceSpawn, biome: force, voidStair, towerCol, isAir, obeliskAt, isExpanse, districtOf, BIOMES, BIOME_NAMES, CW, CH, M, DIRS, PALETTES, info, link, isVoid, wellCol, dropCol, shaftCol, wellHole, dropHole, stairUp, stairOf, laneOf, variantOf, wide, parentDir, genCell, cell, voxel, spawn, regionOf, lightOf, LANE };
+    return { seed: S, GJ, PJ, SURF, PZ, portalFrame, portalCross, supportAt, portalAt, terrainH, groundAt, surfaceSpawn, biome: force, voidStair, towerCol, isAir, obeliskAt, isExpanse, districtOf, BIOMES, BIOME_NAMES, CW, CH, M, DIRS, PALETTES, info, link, isVoid, wellCol, dropCol, shaftCol, wellHole, dropHole, stairUp, stairOf, laneOf, variantOf, wide, parentDir, genCell, cell, voxel, spawn, regionOf, lightOf, LANE };
   }
 
   const api = { createWorld, GJ, CW, CH, MATERIALS: M, PALETTES, BIOMES, BIOME_NAMES };

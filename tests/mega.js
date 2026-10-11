@@ -152,7 +152,7 @@ for (const seed of [1, 2, 3]) {
   let portals = 0, down = 0; const bad = [];
   for (let i = -12; i <= 12; i++) for (let k = -12; k <= 12; k++) {
     if (!w.portalAt(i, k)) continue; portals++;
-    const x0 = i * CW + w.LANE(1 + ((GJ - 1) % 2))[0], start = [x0 + 1, S + 2, k * CW + w.PZ + 10];
+    const x0 = i * CW + w.LANE(1 + ((GJ - 1) % 2))[0], start = [x0 + 1, GJ * CH + 2, k * CW + w.PZ + 9]; // the landing under the crust's doorway
     const q = [start], seen = new Set([start.join()]); let ok = false;
     const stand = (x, y, z) => solid(x, y - 1, z) && !solid(x, y, z) && !solid(x, y + 1, z);
     for (let h = 0; h < q.length && !ok; h++) { const [x, y, z] = q[h];
@@ -168,7 +168,15 @@ for (const seed of [1, 2, 3]) {
   // and the real body walks from the start on the plain through the doorway and down
   const sp = w.surfaceSpawn(), b = Body.createBody(w, sp.x, sp.y, sp.z, sp.yaw);
   for (let n = 0; n < 60 * 10; n++) Body.step(b, 1 / 60, 1, 0, false, 1);
-  check(b.p.y <= S - 5, `seed ${seed}: walking forward from the start goes through the doorway and down the stair (y ${b.p.y.toFixed(1)}, lid at ${S})`);
+  check(b.p.y <= S - 5 && b.portalled === 1, `seed ${seed}: walking forward from the start goes through the doorway (a portal, ${b.portalled || 0} crossing) and down the stair (y ${b.p.y.toFixed(1)}, plain at ${S})`);
+  // and back: from the bottom of the passage walking +z, up the steps, through the twin doorway, out on to the plain
+  const f = w.portalFrame(0, 0), c = Body.createBody(w, (f.x0 + f.x1) / 2, f.yB, f.zP - 3, Math.PI);
+  for (let n = 0; n < 60 * 3; n++) Body.step(c, 1 / 60, 1, 0, false, 1);
+  check(c.portalled === 1 && c.p.y >= S + 1 && c.p.z > f.zP + 2, `seed ${seed}: walking back up through the twin doorway comes out on the plain (y ${c.p.y.toFixed(1)}, z ${c.p.z.toFixed(1)})`);
+  // the plain's doorway seen from behind is only a frame: walking through it that way goes nowhere
+  const d = Body.createBody(w, (f.x0 + f.x1) / 2, w.terrainH((f.x0 + f.x1) / 2, f.zP - 4), f.zP - 4, Math.PI);
+  for (let n = 0; n < 60 * 2; n++) Body.step(d, 1 / 60, 1, 0, false, 1);
+  check(!d.portalled && d.p.y >= S + 1, `seed ${seed}: walking through a doorway from behind stays on the plain`);
 }
 
 console.log('The way out (F)');
@@ -178,9 +186,9 @@ console.log('The way out (F)');
   const w = createWorld(265668), solid = (x, y, z) => w.voxel(x, y, z) !== 0; let sp = null;
   for (let x = 1; x < 16 && !sp; x++) for (let z = 1; z < 16 && !sp; z++) { const X = -4 * CW + x, Y = -16 * CH + 1, Z = 10 * CW + z; if (solid(X, Y - 1, Z) && !solid(X, Y, Z) && !solid(X, Y + 1, Z)) sp = [X + 0.5, Y, Z + 0.5]; }
   const job = G.routeJob(w, ...sp); let r, worst = 0, steps = 0; do { const t0 = Date.now(); r = job.step(4); worst = Math.max(worst, Date.now() - t0); steps++; } while (r === undefined);
-  check(r && r[r.length - 1][1] === w.SURF + 2, `from level -16 the route reaches a doorway (${r ? r.length : 0} steps)`);
+  check(r && r[r.length - 1][1] === w.GJ * CH + 2, `from level -16 the route reaches a doorway (${r ? r.length : 0} steps)`);
   check(worst <= 30 && steps > 1, `spread over ${steps} steps, the longest ${worst} ms`);
-  for (const seed of [1, 2, 3]) { const w2 = createWorld(seed), sp2 = w2.spawn(), r2 = G.findRoute(w2, sp2.x, sp2.y, sp2.z); check(r2 && r2[r2.length - 1][1] === w2.SURF + 2, `seed ${seed}: from the start the route reaches a doorway`); }
+  for (const seed of [1, 2, 3]) { const w2 = createWorld(seed), sp2 = w2.spawn(), r2 = G.findRoute(w2, sp2.x, sp2.y, sp2.z); check(r2 && r2[r2.length - 1][1] === w2.GJ * CH + 2, `seed ${seed}: from the start the route reaches a doorway`); }
 }
 
 console.log('Walking it with the real body: stairs up and down, bridges over voids');
