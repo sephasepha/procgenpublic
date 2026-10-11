@@ -173,7 +173,6 @@
       let n = 0; while (st.acc >= STEP_DT && n++ < 12) { st.acc -= STEP_DT; physics(STEP_DT); }
       if (st.acc > STEP_DT * 12) st.acc = 0;
       if (st.grounded && st.t - st.safeT > 0.5) { st.safe = { x: st.p.x, y: st.p.y, z: st.p.z }; st.safeT = st.t; }
-      if (st.p.y < st.safe.y - 90) { st.p.x = st.safe.x; st.p.y = st.safe.y + 0.1; st.p.z = st.safe.z; st.p.vy = 0; toast('The fall ends. You are set back where you last stood.'); }
     }
     const td = performance.now(); draw(); st.stats.draw = st.stats.draw * 0.92 + (performance.now() - td) * 0.08;
     if (ts - st.hudT > 150) { st.hudT = ts; hud(); }
