@@ -1,7 +1,7 @@
 // The walker's body for the megastructure: a box that moves over voxels, falls, jumps, and walks up steps of one voxel.
 // It knows nothing about the screen, so the tests can drive it too.
 (function (root) {
-  const HALF = 0.3, TALL = 1.7, WALK = 4.4, RUN = 7.2, GRAV = 27, JUMP = 8.6;
+  const HALF = 0.3, TALL = 1.7, WALK = 4.4, RUN = 18, GRAV = 27, JUMP = 8.6;
 
   function createBody(world, x, y, z, yaw) {
     return { world, p: { x, y, z, vy: 0, yaw: yaw || 0, pitch: 0 }, t: 0, grounded: false, groundT: -9, jumpAt: 0, jumps: 0 };
