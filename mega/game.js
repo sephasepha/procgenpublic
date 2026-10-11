@@ -10,6 +10,10 @@
   const RH = PHONE ? 5 : 6, RUP = PHONE ? 5 : 7, RDOWN = PHONE ? 8 : 10;
   // fog: thicker than before, but vertical distance counts for less (FOGV), so drops and shafts read deep
   const FOG = [0.62, 0.64, 0.66], FOGD = PHONE ? 0.0125 : 0.012, FOGV = 0.45;
+  // the depths: going down, the stone darkens and reddens and the fog closes in and turns to a dim blood red.
+  // DEEP0 is where it starts (in metres below the top of the structure), DEEPL how many metres to the full effect.
+  const DEEP_FOG = [0.17, 0.045, 0.035], DEEP_FOGD = 3.2, DEEP0 = 3 * CH, DEEPL = 34 * CH;
+  const deepT = y => { const t = Math.min(1, Math.max(0, (DEEP0 - y) / DEEPL)); return t * (2 - t); }; // eases in fast, then settles
   const reach = (di, dj, dk) => { const h = Math.hypot(di, dk) / (RH + 0.6), v = dj > 0 ? dj / (RUP + 0.5) : -dj / (RDOWN + 0.5); return h * h + v * v; };
   const TAU = Math.PI * 2;
   const hexRGB = h => { const n = parseInt(h.slice(1), 16); return [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]; };
@@ -78,13 +82,17 @@
   let tprog, tloc;
 
   // ---------- shaders ----------
-  const VS = `attribute vec4 a; uniform mat4 uVP; uniform vec3 uRel; uniform vec3 uPal[8]; uniform float uLight; uniform float uAmb;
+  const VS = `attribute vec4 a; uniform mat4 uVP; uniform vec3 uRel; uniform vec3 uPal[8]; uniform float uLight; uniform float uAmb; uniform float uEyeY; uniform vec3 uDeep;
     varying vec3 vL; varying vec3 vRel; varying float vFace; varying vec3 vCol;
     void main() {
       float mat = floor(a.w / 8.0 + 0.001); float face = a.w - mat * 8.0;
       float shade = face < 1.5 ? 0.80 : face < 2.5 ? 1.0 : face < 3.5 ? 0.50 : 0.66;
       vec3 base = uPal[int(mat + 0.5)];
       vCol = mat > 6.5 ? base * 1.12 : base * shade * uLight * (uAmb + 1.1 / (1.0 + 0.12 * length(a.xyz + uRel)));
+      // depth grade by where the stone is (not where you are): deeper is darker and redder; lights keep their glow
+      float t = clamp((uDeep.x - (a.y + uRel.y + uEyeY)) / uDeep.y, 0.0, 1.0); t = t * (2.0 - t);
+      vec3 tint = mix(vec3(1.0), vec3(1.0, 0.42, 0.32), t);
+      vCol *= mat > 6.5 ? mix(vec3(1.0), vec3(1.15, 0.6, 0.45), t) : tint * (1.0 - 0.62 * t);
       vL = a.xyz; vFace = face; vRel = a.xyz + uRel;
       gl_Position = uVP * vec4(vRel, 1.0);
     }`;
@@ -107,7 +115,7 @@
     tprog = gl.createProgram(); gl.attachShader(tprog, shader(gl.VERTEX_SHADER, TVS)); gl.attachShader(tprog, shader(gl.FRAGMENT_SHADER, TFS)); gl.linkProgram(tprog);
     if (!gl.getProgramParameter(tprog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(tprog));
     tloc = { aP: gl.getAttribLocation(tprog, 'aP'), aC: gl.getAttribLocation(tprog, 'aC') }; ['uVP', 'uRel', 'uFog', 'uFogD', 'uClip'].forEach(n => { tloc[n] = gl.getUniformLocation(tprog, n); });
-    ['uVP', 'uRel', 'uPal', 'uLight', 'uAmb', 'uFog', 'uFogD', 'uClip'].forEach(n => { loc[n] = gl.getUniformLocation(prog, n); });
+    ['uVP', 'uRel', 'uPal', 'uLight', 'uAmb', 'uFog', 'uFogD', 'uClip', 'uEyeY', 'uDeep'].forEach(n => { loc[n] = gl.getUniformLocation(prog, n); });
     qprog = gl.createProgram(); gl.attachShader(qprog, shader(gl.VERTEX_SHADER, QVS)); gl.attachShader(qprog, shader(gl.FRAGMENT_SHADER, QFS)); gl.linkProgram(qprog);
     qloc = { aP: gl.getAttribLocation(qprog, 'aP'), uVP: gl.getUniformLocation(qprog, 'uVP'), uCol: gl.getUniformLocation(qprog, 'uCol') }; qbuf = gl.createBuffer();
     pfprog = gl.createProgram(); gl.attachShader(pfprog, shader(gl.VERTEX_SHADER, PFVS)); gl.attachShader(pfprog, shader(gl.FRAGMENT_SHADER, PFFS)); gl.linkProgram(pfprog);
@@ -209,13 +217,19 @@
     if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
   }
   // the fog where an eye is: above ground dense and a little green, thickening as you climb out of a stairwell
-  function fogAt(y) { const up = Math.min(1, Math.max(0, (y - (world.SURF - 6)) / 8)); return { fog: FOG.map((f, n) => f + ([0.66, 0.68, 0.64][n] - f) * up), fogD: FOGD + (0.042 - FOGD) * up }; }
+  // and below, darker, redder and thicker the deeper you are
+  function fogAt(y) {
+    const up = Math.min(1, Math.max(0, (y - (world.SURF - 6)) / 8)), t = deepT(y);
+    const base = FOG.map((f, n) => f + (DEEP_FOG[n] - f) * t), baseD = FOGD * (1 + (DEEP_FOGD - 1) * t);
+    return { fog: base.map((f, n) => f + ([0.66, 0.68, 0.64][n] - f) * up), fogD: baseD + (0.042 - baseD) * up, deep: t };
+  }
   const NOCLIP = [0, 0, 0, -1];
   // the cells and the plain as seen from eye (the view-projection m is relative to the eye, so it serves any eye with
   // the same look); clip is a plane in eye-relative space: fragments with dot(xyz, rel) + w > 0 are dropped
   function scene(eye, m, pl, clip, F) {
     gl.useProgram(prog);
     gl.uniformMatrix4fv(loc.uVP, false, m); gl.uniform3fv(loc.uFog, F.fog); gl.uniform1f(loc.uFogD, F.fogD); gl.uniform4fv(loc.uClip, clip);
+    gl.uniform1f(loc.uEyeY, eye[1]); gl.uniform3f(loc.uDeep, DEEP0, DEEPL, 0);
     gl.enableVertexAttribArray(loc.a);
     let drawn = 0;
     st.cells.forEach(c => {
