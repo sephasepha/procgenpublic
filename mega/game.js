@@ -238,10 +238,27 @@
     window.addEventListener('keyup', e => { if (!st) return; delete st.keys[e.code]; });
     window.addEventListener('blur', () => { if (st) st.keys = {}; });
     const lockEl = q('.mg-stage');
-    const lock = () => { if (!coarse && document.pointerLockElement !== cv) cv.requestPointerLock && cv.requestPointerLock(); };
+    // raw mouse input where the browser has it (it avoids the acceleration that makes some jumps); else plain lock
+    const lock = () => {
+      if (coarse || document.pointerLockElement === cv || !cv.requestPointerLock) return;
+      try { const r = cv.requestPointerLock({ unadjustedMovement: true }); if (r && r.catch) r.catch(() => { try { cv.requestPointerLock(); } catch (e) {} }); }
+      catch (e) { try { cv.requestPointerLock(); } catch (e2) {} }
+    };
     q('.mg-help').addEventListener('click', lock); cv.addEventListener('click', lock);
-    document.addEventListener('pointerlockchange', () => { const on = document.pointerLockElement === cv; el.classList.toggle('looking', on); });
-    document.addEventListener('mousemove', e => { if (!st || document.pointerLockElement !== cv) return; st.p.yaw = (st.p.yaw + e.movementX * 0.0022) % TAU; st.p.pitch = Math.max(-1.52, Math.min(1.52, st.p.pitch - e.movementY * 0.0022)); });
+    // Mouse look. Browsers now and then report one absurd movement (Chrome does it most just after the lock starts,
+    // and on some mice at random): the first events after locking are ignored, and so is any single event far bigger
+    // than the movement just before it, so the view never whips round in one frame.
+    const SENS = 0.0014;
+    let lockedAt = 0, avg = 0;
+    document.addEventListener('pointerlockchange', () => { const on = document.pointerLockElement === cv; el.classList.toggle('looking', on); lockedAt = performance.now(); avg = 0; });
+    document.addEventListener('mousemove', e => {
+      if (!st || document.pointerLockElement !== cv) return;
+      const dx = e.movementX || 0, dy = e.movementY || 0, m = Math.hypot(dx, dy);
+      if (performance.now() - lockedAt < 120) return;
+      if (m > 300 || (m > 80 && m > 6 * avg + 40)) return; // a spike, not a hand
+      avg = avg * 0.8 + m * 0.2;
+      st.p.yaw = (st.p.yaw + dx * SENS) % TAU; st.p.pitch = Math.max(-1.52, Math.min(1.52, st.p.pitch - dy * SENS));
+    });
     // phones: a floating thumb-stick on the left half, a look pad on the right half, a jump button
     if (coarse) {
       el.classList.add('touch');
