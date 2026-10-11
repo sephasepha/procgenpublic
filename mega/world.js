@@ -104,6 +104,17 @@
     const obeliskCol = (i, k) => { const bi = fdiv(i, 10), bk = fdiv(k, 10), w = 3 + (H(bi, 0, bk, 430) & 1), d = 3 + (H(bi, 0, bk, 431) & 1);
       const ox = bi * 10 + H(bi, 0, bk, 432) % (9 - w), oz = bk * 10 + H(bi, 0, bk, 433) % (9 - d); return i >= ox && i < ox + w && k >= oz && k < oz + d; };
     const isExpanse = (i, j, k) => districtOf(i, j, k).type === 'expanse';
+    // supports: now and then a column two or three cells thick hangs from the roof of an expanse (only where the roof is
+    // structure, not more open air) five to eight levels down, as if holding it up
+    function supportAt(i, j, k) {
+      const D = districtOf(i, j, k); if (D.type !== 'expanse') return false;
+      const bi = fdiv(i, 12), bk = fdiv(k, 12); if (H01(bi, D.bj, bk, 440) > 0.35) return false;
+      const w = H01(bi, D.bj, bk, 441) < 0.3 ? 3 : 2, ox = bi * 12 + 1 + H(bi, D.bj, bk, 442) % (10 - w), oz = bk * 12 + 1 + H(bi, D.bj, bk, 443) % (10 - w);
+      if (i < ox || i >= ox + w || k < oz || k >= oz + w) return false;
+      const top = D.bj * DY + DY - 1, h = 5 + H(bi, D.bj, bk, 444) % 4;
+      if (j > top || j <= top - h) return false;
+      return districtOf(ox, top + 1, oz).type !== 'expanse';
+    }
     const deckLevel = j => ((j % 3) + 3) % 3 === 0;
     // open air: an expanse cell that is no part of the network at all, so the expanse is truly empty. Only away from
     // the decks, the obelisks, the stair towers and the edges of the district (every one of its neighbours is expanse)
@@ -112,7 +123,7 @@
       if (j >= GJ) return true; // above the lid: no part of the network
       if (deckLevel(j) || (i === 0 && k === 0)) return false;
       const key = i + ',' + j + ',' + k, m = airMemo.get(key); if (m !== undefined) return m;
-      let a = isExpanse(i, j, k) && !obeliskAt(i, j, k) && !towerCol(i, k);
+      let a = isExpanse(i, j, k) && !obeliskAt(i, j, k) && !supportAt(i, j, k) && !towerCol(i, k);
       for (let d = 0; d < 6 && a; d++) if (!isExpanse(i + DIRS[d][0], j + DIRS[d][1], k + DIRS[d][2])) a = false;
       if (airMemo.size > 60000) airMemo.clear();
       airMemo.set(key, a); return a;
@@ -120,7 +131,7 @@
     function voidIn(D, i, j, k) {
       if (D.type === 'surface') return true;
       if (D.type === 'interior' || D.type === 'catacombs') return false;
-      if (D.type === 'expanse') return !obeliskAt(i, j, k);
+      if (D.type === 'expanse') return !obeliskAt(i, j, k) && !supportAt(i, j, k);
       if (D.type === 'colonnade') return D.lj !== DY - 1 && H01(i, 0, k, 405) > 0.04; // all air under a roof, a few towers
       if (D.type === 'terraces') { // a stepped massif, narrowing as it rises, its centre off to one side
         const cx = 5 + H(D.bi, D.bj, D.bk, 406) % 6, cz = 5 + H(D.bi, D.bj, D.bk, 407) % 6;
@@ -511,7 +522,7 @@
       let yaw = 0; for (let d = 0; d < 4; d++) if (link(0, 0, 0, d)) { yaw = [Math.PI / 2, 3 * Math.PI / 2, Math.PI, 0][d]; break; }
       return { x: 8.5, y: 1, z: 8.5, yaw };
     }
-    return { seed: S, GJ, SURF, PZ, portalAt, terrainH, groundAt, surfaceSpawn, biome: force, voidStair, towerCol, isAir, obeliskAt, isExpanse, districtOf, BIOMES, BIOME_NAMES, CW, CH, M, DIRS, PALETTES, info, link, isVoid, wellCol, dropCol, shaftCol, wellHole, dropHole, stairUp, stairOf, laneOf, variantOf, wide, parentDir, genCell, cell, voxel, spawn, regionOf, lightOf, LANE };
+    return { seed: S, GJ, SURF, PZ, supportAt, portalAt, terrainH, groundAt, surfaceSpawn, biome: force, voidStair, towerCol, isAir, obeliskAt, isExpanse, districtOf, BIOMES, BIOME_NAMES, CW, CH, M, DIRS, PALETTES, info, link, isVoid, wellCol, dropCol, shaftCol, wellHole, dropHole, stairUp, stairOf, laneOf, variantOf, wide, parentDir, genCell, cell, voxel, spawn, regionOf, lightOf, LANE };
   }
 
   const api = { createWorld, GJ, CW, CH, MATERIALS: M, PALETTES, BIOMES, BIOME_NAMES };
