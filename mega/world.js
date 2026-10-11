@@ -218,29 +218,47 @@
        z0: isSite(i, j + 1, k) ? PZ : 2 + H(i, j, k, 151) % 7 }; } // for the cell below the stair: 2..8, so there is always a metre of floor before the first step and after the last (a portal's starts at the back, so it can climb on to the surface)
 
     // ---------- the surface ----------
-    // portals: now and then a cell of the plain has one; there is always one over the start
+    // Portals on two grids. On the plain, one doorway to every block of PS x PS cells (about 300 m apart), at a random
+    // spot inside it, and the block at the origin has its doorway right in front of the start. In the structure, one
+    // twin to every block of TS x TS cells (about 10 km apart). The plain's blocks and the structure's are paired one to
+    // one by a shuffle that can be undone (two Feistel rounds over the block numbers), so any cell can tell at once
+    // whether it holds a twin and whose.
+    const PS = 18, TS = 588;
+    const nodeOfPortal = (u, v) => u === 0 && v === 0 ? [0, 0] : [u * PS + 5 + H(u, 0, v, 520) % (PS - 10), v * PS + 5 + H(u, 0, v, 521) % (PS - 10)];
     const portalMemo = new Map();
     function portalAt(i, k) {
-      if (i === 0 && k === 0) return true;
       const key = i + ',' + k, m = portalMemo.get(key); if (m !== undefined) return m;
-      let v = i === 0 && k === 0 || H01(i, 0, k, 500) < 0.035;
-      if (v) { // its twin must stand in the structure, with the cell under it, away from wells, drops and open air
-        const [a, b, c] = siteOf(i, k);
-        v = !isAir(a, b, c) && !isAir(a, b - 1, c) && !shaftCol(a, c, b) && !shaftCol(a, c, b - 1);
-      }
+      const u = fdiv(i, PS), v = fdiv(k, PS), [pi, pk] = nodeOfPortal(u, v), r = pi === i && pk === k;
       if (portalMemo.size > 60000) portalMemo.clear();
-      portalMemo.set(key, v); return v;
+      portalMemo.set(key, r); return r;
     }
-    // where a doorway's twin is: a shuffle of the plane that can be undone (two Feistel rounds), so any cell can tell
-    // whether it holds a twin and whose. Up to 500 cells either way; an even level from 40 down to 2 (even, so the
-    // stair under it rises in lane 2 and the stairs either side of it alternate as everywhere else)
-    const F = (n, salt) => Math.floor(H01(n, 0, 0, salt) * 1001) - 500;
-    function siteOf(i, k) { const a = i + F(k, 510), c = k + F(a, 511); return [a, 2 - 2 * Math.floor(H01(i, 0, k, 512) * 20), c]; }
+    const F = (n, salt) => Math.floor(H01(n, 0, 0, salt) * 7) - 3; // a shuffle of up to three blocks either way
+    const blockOfTwin = (u, v) => { const a = u + F(v, 510); return [a, v + F(a, 511)]; };
+    const blockOfDoor = (a, b) => { const v = b - F(a, 511); return [a - F(v, 510), v]; };
+    // where in its block a twin stands: a random spot and an even level from 40 down to 2 (even, so the stair under it
+    // rises in lane 2 and the stairs either side of it alternate as everywhere else), the first of a few tries that
+    // has structure for it (not open air, not a well or a drop, and the same for the cell under it)
+    const twinMemo = new Map();
+    function twinIn(a, b) {
+      const key = a + ',' + b, m = twinMemo.get(key); if (m) return m;
+      let t = null;
+      for (let n = 0; n < 12 && !t; n++) {
+        const i = a * TS + 144 + H(a, n, b, 530) % 300, k = b * TS + 144 + H(a, n, b, 531) % 300, j = 2 - 2 * (H(a, n, b, 532) % 21);
+        if (!isAir(i, j, k) && !isAir(i, j - 1, k) && !shaftCol(i, k, j) && !shaftCol(i, k, j - 1)) t = [i, j, k];
+      }
+      if (!t) t = [a * TS + TS / 2, 2 - 2 * 20, b * TS + TS / 2];
+      if (twinMemo.size > 20000) twinMemo.clear();
+      twinMemo.set(key, t); return t;
+    }
+    function siteOf(i, k) { const [a, b] = blockOfTwin(fdiv(i, PS), fdiv(k, PS)); return twinIn(a, b); }
     function siteA(a, j, c) { // the plain's doorway whose twin is at (a, j, c), or null
       if (j >= GJ - 1 || ((j % 2) + 2) % 2) return null;
-      const k = c - F(a, 511), i = a - F(k, 510);
-      return siteOf(i, k)[1] === j && portalAt(i, k) ? [i, k] : null;
+      const A = fdiv(a, TS), B = fdiv(c, TS), t = twinIn(A, B);
+      if (t[0] !== a || t[1] !== j || t[2] !== c) return null;
+      const [u, v] = blockOfDoor(A, B); return nodeOfPortal(u, v);
     }
+    // the twins nearest a cell (those of the blocks round it), for finding the way out
+    function twinsNear(i, k) { const A = fdiv(i, TS), B = fdiv(k, TS), out = []; for (let da = -1; da <= 1; da++) for (let db = -1; db <= 1; db++) out.push(twinIn(A + da, B + db)); return out; }
     const isSite = (a, j, c) => j < GJ - 1 && siteA(a, j, c) !== null;
     const PZ = 2; // where a portal's stair starts in the cell below the twin
     const portalLane = () => LANE(2);
@@ -563,7 +581,7 @@
       let yaw = 0; for (let d = 0; d < 4; d++) if (link(0, 0, 0, d)) { yaw = [Math.PI / 2, 3 * Math.PI / 2, Math.PI, 0][d]; break; }
       return { x: 8.5, y: 1, z: 8.5, yaw };
     }
-    return { seed: S, GJ, PJ, SURF, PZ, portalPair, pairOfSite, siteOf, siteA, isSite, frameIn, portalCross, supportAt, portalAt, terrainH, groundAt, surfaceSpawn, biome: force, voidStair, towerCol, isAir, obeliskAt, isExpanse, districtOf, BIOMES, BIOME_NAMES, CW, CH, M, DIRS, PALETTES, info, link, isVoid, wellCol, dropCol, shaftCol, wellHole, dropHole, stairUp, stairOf, laneOf, variantOf, wide, parentDir, genCell, cell, voxel, spawn, regionOf, lightOf, LANE };
+    return { seed: S, GJ, PJ, SURF, PZ, PS, TS, twinsNear, portalPair, pairOfSite, siteOf, siteA, isSite, frameIn, portalCross, supportAt, portalAt, terrainH, groundAt, surfaceSpawn, biome: force, voidStair, towerCol, isAir, obeliskAt, isExpanse, districtOf, BIOMES, BIOME_NAMES, CW, CH, M, DIRS, PALETTES, info, link, isVoid, wellCol, dropCol, shaftCol, wellHole, dropHole, stairUp, stairOf, laneOf, variantOf, wide, parentDir, genCell, cell, voxel, spawn, regionOf, lightOf, LANE };
   }
 
   const api = { createWorld, GJ, CW, CH, MATERIALS: M, PALETTES, BIOMES, BIOME_NAMES };

@@ -439,6 +439,8 @@
     }
     if (line) { gl.deleteBuffer(line.vbo); gl.deleteBuffer(line.ibo); }
     // smooth the staircase of voxel centres a little, then lay a flat ribbon 0.2 m wide just above the floor
+    const total = r.reduce((L, p, n) => n ? L + Math.hypot(p[0] - r[n - 1][0], p[1] - r[n - 1][1], p[2] - r[n - 1][2]) : 0, 0);
+    if (r.length > 3000) r = r.slice(0, 3000); // the first few kilometres are plenty to follow (and keep the line within 16-bit indices)
     const o = r[0], pts = r.map((p, n) => { if (n === 0 || n === r.length - 1) return p; const a = r[n - 1], b = r[n + 1]; return [(a[0] + 2 * p[0] + b[0]) / 4, p[1], (a[2] + 2 * p[2] + b[2]) / 4]; });
     const V = [], X = []; let along = 0, nv = 0;
     for (let n = 0; n < pts.length - 1; n++) {
@@ -450,7 +452,7 @@
     line = { o, n: X.length, t0: st.t, vbo: gl.createBuffer(), ibo: gl.createBuffer() };
     gl.bindBuffer(gl.ARRAY_BUFFER, line.vbo); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(V), gl.STATIC_DRAW);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, line.ibo); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(X), gl.STATIC_DRAW);
-    toast(`The way to a portal: about ${Math.round(along)} m.`);
+    toast(`The way to a portal: about ${total > 2000 ? (total / 1000).toFixed(1) + ' km' : Math.round(total) + ' m'}.`);
   }
   function drawLine(m, eye, fog, fogD) {
     if (!line) return;

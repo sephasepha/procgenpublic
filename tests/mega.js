@@ -151,8 +151,9 @@ for (const seed of [1, 2, 3]) {
   // portals: one in front of the start, a few elsewhere; each one's twin is far off in the depths, a cell that knows
   // whose twin it is, and from the landing under the twin the steps lead down into the cell below
   let portals = 0, down = 0, far = 0, inv = 0; const bad = [];
-  for (let i = -12; i <= 12; i++) for (let k = -12; k <= 12; k++) {
-    if (!w.portalAt(i, k)) continue; portals++;
+  const doors = [];
+  for (let i = -40; i <= 40; i++) for (let k = -40; k <= 40; k++) {
+    if (!w.portalAt(i, k)) continue; portals++; doors.push([i, k]);
     const P = w.portalPair(i, k), B = P.B, A2 = w.siteA(B.i, B.j, B.k); if (A2 && A2[0] === i && A2[1] === k) inv++;
     if (Math.hypot(P.d[0], P.d[2]) > 5 * CW || P.d[1] < -4 * CH) far++;
     // from the twin's landing, within its column, down to the floor of the cell under it
@@ -168,6 +169,10 @@ for (const seed of [1, 2, 3]) {
       } }
     if (ok) down++; else if (bad.length < 3) bad.push(i + ',' + k);
   }
+  // spacing: doorways on the plain some 300 m apart, their twins some 10 km apart
+  const nearest = (pts, f) => pts.map(a => Math.min(...pts.filter(b => b !== a).map(b => f(a, b)))).reduce((s, v) => s + v, 0) / pts.length;
+  const dPlain = nearest(doors, (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) * CW), twins = []; for (let a = -3; a <= 3; a++) for (let b = -3; b <= 3; b++) twins.push(w.twinsNear(a * w.TS, b * w.TS)[4]); const dTwin = nearest(twins, (a, b) => Math.hypot(a[0] - b[0], a[2] - b[2]) * CW);
+  check(dPlain > 200 && dPlain < 400 && dTwin > 7000 && dTwin < 13000, `seed ${seed}: doorways are ${dPlain.toFixed(0)} m apart on the plain, their twins ${(dTwin / 1000).toFixed(1)} km apart in the structure`);
   check(w.portalAt(0, 0) && portals > 5 && inv === portals, `seed ${seed}: each of ${portals} doorways has a twin that knows it (${inv})`);
   check(far >= portals * 0.8, `seed ${seed}: the twins are far away, not just under the doorways (${far}/${portals})`);
   check(down === portals, `seed ${seed}: ${down}/${portals} twins lead down into the structure ${bad.join(' ')}`);
@@ -204,7 +209,7 @@ console.log('The way out (F)');
   // far out in the structure (thousands of metres from the start, where a doorway can put you): the route still works
   { const sF = (() => { const i = 1500, j = -10, k = -1600; for (let x = 1; x < 16; x++) for (let z = 1; z < 16; z++) { const X = i * CW + x, Y = j * CH + 1, Z = k * CW + z; if (solid(X, Y - 1, Z) && !solid(X, Y, Z) && !solid(X, Y + 1, Z)) return [X + 0.5, Y, Z + 0.5]; } })();
     const rF = sF && G.findRoute(w, ...sF); let L = 0; if (rF) for (let n = 1; n < rF.length; n++) L += Math.hypot(rF[n][0] - rF[n - 1][0], rF[n][1] - rF[n - 1][1], rF[n][2] - rF[n - 1][2]);
-    check(rF && atSite(w, [rF[rF.length - 1][0], rF[rF.length - 1][1], rF[rF.length - 1][2] - 0.5]) && L < 2000, `25 km out, the route reaches a twin doorway ${L.toFixed(0)} m away`); }
+    check(rF && atSite(w, [rF[rF.length - 1][0], rF[rF.length - 1][1], rF[rF.length - 1][2] - 0.5]) && L < 15000, `25 km out, the route reaches a twin doorway ${(L / 1000).toFixed(1)} km away`); }
   for (const seed of [1, 2, 3]) { const w2 = createWorld(seed), sp2 = w2.spawn(), r2 = G.findRoute(w2, sp2.x, sp2.y, sp2.z); check(atSite(w2, r2 && r2[r2.length - 1]), `seed ${seed}: from the start the route reaches a twin doorway`); }
 }
 

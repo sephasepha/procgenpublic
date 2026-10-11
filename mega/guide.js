@@ -14,7 +14,7 @@
   function onPlain(world, x, z, y) {
     const { CW } = world, ci = fdiv(Math.floor(x), CW), ck = fdiv(Math.floor(z), CW);
     let best = null;
-    for (let r = 0; r <= 14 && !best; r++) for (let i = ci - r; i <= ci + r; i++) for (let k = ck - r; k <= ck + r; k++) {
+    for (let r = 0; r <= 2 * world.PS && !best; r++) for (let i = ci - r; i <= ci + r; i++) for (let k = ck - r; k <= ck + r; k++) {
       if (Math.max(Math.abs(i - ci), Math.abs(k - ck)) !== r || !world.portalAt(i, k)) continue;
       const m = front(world, i, k), d = Math.hypot(m[0] - x, m[2] - z); if (!best || d < best.d) best = { m, d };
     }
@@ -45,17 +45,21 @@
   //  2. voxels: A* over standing places inside the route's cells (widened by a cell all round if that is not enough).
   function* underground(world, x, y, z, maxCells) {
     const { CW, CH, GJ } = world, start = [fdiv(Math.floor(x), CW), fdiv(Math.floor(y + 0.01), CH), fdiv(Math.floor(z), CW)];
+    // the twins are kilometres apart and the grid says where: aim at the nearest, by A* over the cells weighted towards
+    // it (a route somewhat longer than the shortest, found without searching kilometres of structure evenly)
+    let aim = null; for (const t of world.twinsNear(start[0], start[2])) { const d = Math.abs(t[0] - start[0]) + Math.abs(t[2] - start[2]) + Math.abs(t[1] - start[1]); if (!aim || d < aim.d) aim = { t, d }; }
+    const T = aim.t, W = 1.6, hc = (i, j, k) => W * (Math.abs(i - T[0]) + Math.abs(j - T[1]) + Math.abs(k - T[2]));
     const g = new Map(), prev = new Map(), open = Heap(), sk = CK(...start);
-    g.set(sk, 0); prev.set(sk, null); open.push(0, start);
+    g.set(sk, 0); prev.set(sk, null); open.push(hc(...start), start);
     let goal = null, n = 0;
     while (open.size && n < maxCells) {
       const c = open.pop(), ck = CK(...c), gc = g.get(ck); n++;
-      if (world.isSite(c[0], c[1], c[2])) { goal = c; break; }
+      if (c[0] === T[0] && c[1] === T[1] && c[2] === T[2]) { goal = c; break; }
       for (let d = 0; d < 6; d++) {
         const ni = c[0] + DIRS[d][0], nj = c[1] + DIRS[d][1], nk = c[2] + DIRS[d][2]; if (nj >= GJ) continue;
         const key = CK(ni, nj, nk); if (g.has(key) && g.get(key) <= gc + 1) continue;
         if (!world.link(c[0], c[1], c[2], d)) continue;
-        g.set(key, gc + 1); prev.set(key, ck); open.push(gc + 1, [ni, nj, nk]);
+        g.set(key, gc + 1); prev.set(key, ck); open.push(gc + 1 + hc(ni, nj, nk), [ni, nj, nk]);
       }
       if ((n & 63) === 0) yield;
     }
@@ -110,7 +114,7 @@
   // (a list of feet positions) or null. The game steps it a little each frame, so pressing F never stalls a frame.
   function routeJob(world, x, y, z, opts) {
     if (y >= world.SURF + 0.5 && world.groundAt(x, z) !== null) { const r = onPlain(world, x, z, y); return { step: () => r, done: true, result: r }; }
-    const it = underground(world, x, y, z, (opts && opts.maxCells) || 50000), job = { done: false, result: undefined, step(ms) {
+    const it = underground(world, x, y, z, (opts && opts.maxCells) || 400000), job = { done: false, result: undefined, step(ms) {
       if (job.done) return job.result;
       const t0 = Date.now();
       for (;;) { const r = it.next(); if (r.done) { job.done = true; job.result = r.value || null; return job.result; } if (Date.now() - t0 >= ms) return undefined; }
