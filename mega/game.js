@@ -148,20 +148,22 @@
   // ---------- chunks ----------
   function chunks(budgetMs) {
     const p = st.p, ci = fdiv(Math.floor(p.x), CW), cj = fdiv(Math.floor(p.y + 1), CH), ck = fdiv(Math.floor(p.z), CW), t0 = performance.now();
-    const want = [];
-    const top = cj >= world.PJ; // on the plain the crust hides the structure: draw only the levels just under it (seen through the doorways)
-    for (let dj = -RDOWN; dj <= RUP; dj++) for (let dk = -RH; dk <= RH; dk++) for (let di = -RH; di <= RH; di++) {
-      const r = reach(di, dj, dk); if (r > 1) continue; if (top && (cj + dj < world.GJ || cj + dj > world.PJ + 1)) continue; want.push([ci + di, cj + dj, ck + dk, Math.hypot(di, dk) + Math.abs(dj) * 0.5]);
-    }
-    // through a doorway you see its other end, perhaps hundreds of cells away: build the cells round it too
-    const keep = new Set();
-    if (st.ready) for (const P of nearPortals([p.x, p.y + EYE, p.z])) {
-      const fi = P.far.i, fj = P.far.j, fk = P.far.k;
-      for (let dj = -2; dj <= 1; dj++) for (let dk = -2; dk <= 2; dk++) for (let di = -2; di <= 2; di++) {
-        const key = (fi + di) + ',' + (fj + dj) + ',' + (fk + dk); keep.add(key);
-        want.push([fi + di, fj + dj, fk + dk, 0.5 + Math.hypot(di, dk) + Math.abs(dj)]);
+    const want = [], keep = new Set();
+    // everything you could see from a viewpoint: the drawn ellipsoid round it (on the plain the crust hides the
+    // structure, so only the plain's levels)
+    const around = (ci, cj, ck, extra, kept) => {
+      const top = cj >= world.PJ;
+      for (let dj = -RDOWN; dj <= RUP; dj++) for (let dk = -RH; dk <= RH; dk++) for (let di = -RH; di <= RH; di++) {
+        const r = reach(di, dj, dk); if (r > 1) continue; if (top && (cj + dj < world.GJ || cj + dj > world.PJ + 1)) continue;
+        want.push([ci + di, cj + dj, ck + dk, extra + Math.hypot(di, dk) + Math.abs(dj) * 0.5]);
+        if (kept) keep.add((ci + di) + ',' + (cj + dj) + ',' + (ck + dk));
       }
-    }
+    };
+    around(ci, cj, ck, 0, false);
+    // and from the far end of the nearest doorway: the eye moved through it, so that the view through the doorway is
+    // complete, and stepping through finds everything built (after the cells round you, which come first)
+    const N = st.ready && nearestPortal([p.x, p.y + EYE, p.z]);
+    if (N) { const v = [p.x + N.d[0], p.y + 1 + N.d[1], p.z + N.d[2]]; around(fdiv(Math.floor(v[0]), CW), fdiv(Math.floor(v[1]), CH), fdiv(Math.floor(v[2]), CW), 1.5, true); }
     want.sort((a, b) => a[3] - b[3]);
     let built = 0;
     for (const [i, j, k] of want) {
@@ -261,6 +263,16 @@
     }
     return out;
   }
+  // the nearest doorway end within a few cells, on either side of it (for loading what is beyond it)
+  function nearestPortal(eye) {
+    const ci = Math.floor(Math.floor(eye[0]) / CW), cj = Math.floor(Math.floor(eye[1]) / CH), ck = Math.floor(Math.floor(eye[2]) / CW);
+    let best = null; const consider = (f, d) => { const dist = Math.hypot((f.x0 + f.x1) / 2 - eye[0], f.y0 - eye[1], f.zP - eye[2]); if (dist < 4 * CW && (!best || dist < best.dist)) best = { d, dist }; };
+    for (let i = ci - 3; i <= ci + 3; i++) for (let k = ck - 3; k <= ck + 3; k++) {
+      if (cj >= world.PJ - 1 && world.portalAt(i, k)) { const P = world.portalPair(i, k); consider(P.A, P.d); }
+      if (cj < world.GJ) for (let j = cj - 2; j <= cj + 1; j++) if (world.isSite(i, j, k)) { const P = world.pairOfSite(i, j, k); consider(P.B, P.d.map(v => -v)); }
+    }
+    return best;
+  }
   function portals(eye, m, pl) {
     const out = nearPortals(eye);
     for (const P of out) {
@@ -275,7 +287,7 @@
         Q([a0, b0, z], [a0, b0, zb], [a0, b1, zb], [a0, b1, z]), Q([a1, b0, z], [a1, b0, zb], [a1, b1, zb], [a1, b1, z]),
         Q([a0, b0, z], [a1, b0, z], [a1, b0, zb], [a0, b0, zb]), Q([a0, b1, z], [a1, b1, z], [a1, b1, zb], [a0, b1, zb]));
       const inside = false;
-      const eyeV = [eye[0] + P.d[0], eye[1] + P.d[1], eye[2] + P.d[2]], F0 = fogAt(eyeV[1] - EYE), F = { fog: F0.fog, fogD: Math.max(F0.fogD, 0.03) }; // a little thicker, so the edge of what is loaded there never shows
+      const eyeV = [eye[0] + P.d[0], eye[1] + P.d[1], eye[2] + P.d[2]], F = fogAt(eyeV[1] - EYE); // exactly the fog you will have there
       gl.enable(gl.STENCIL_TEST); gl.clearStencil(0); gl.clear(gl.STENCIL_BUFFER_BIT);
       gl.stencilFunc(gl.ALWAYS, 1, 0xff); gl.stencilOp(gl.KEEP, gl.KEEP, gl.REPLACE);
       gl.colorMask(false, false, false, false); gl.depthMask(false);
