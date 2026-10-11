@@ -31,12 +31,14 @@
   function propsIn(world, i, k) {
     const { CW, SURF, PJ } = world, seed = world.seed | 0, ox = i * CW, oz = k * CW, out = [];
     const portal = world.portalAt(i, k) ? world.frameIn(i, PJ, k) : null;
-    const tries = 14;
-    for (let n = 0; n < tries; n++) {
-      const x = ox + 0.6 + hash(seed, i, k, n * 4 + 1) * (CW - 1.2), z = oz + 0.6 + hash(seed, i, k, n * 4 + 2) * (CW - 1.2);
-      // patches: dense in some places, almost nothing in others
-      const p = patch(seed, x, z), keep = Math.max(0, (p - 0.32) / 0.68) ** 1.6;
-      if (hash(seed, i, k, n * 4 + 3) > keep * 0.8) continue;
+    // one candidate spot in each quarter of the cell, jittered but kept away from the quarter's edges, so props are
+    // always several metres apart; the patches decide which spots hold anything
+    const Q = CW / 2, M = 2.2;
+    for (let n = 0; n < 4; n++) {
+      const x = ox + (n & 1) * Q + M + hash(seed, i, k, n * 4 + 1) * (Q - 2 * M), z = oz + (n >> 1) * Q + M + hash(seed, i, k, n * 4 + 2) * (Q - 2 * M);
+      // patches: a scatter in some places, nothing for a long way in others
+      const p = patch(seed, x, z), keep = Math.max(0, (p - 0.38) / 0.62) ** 1.4;
+      if (hash(seed, i, k, n * 4 + 3) > keep * 0.75) continue;
       if (portal && x > portal.x0 - 4 && x < portal.x1 + 4 && z > oz - 1 && z < portal.zP + 6) continue; // the doorway and its approaches
       const g = world.groundAt(x, z); if (g === null) continue;
       if (world.voxel(Math.floor(x), SURF + 1, Math.floor(z))) continue; // stone breaking the surface
@@ -67,7 +69,7 @@
         const lit = glow ? 1.25 : 0.42 + 0.58 * Math.max(0, (nrm[0] * L[0] + nrm[1] * L[1] + nrm[2] * L[2]) / nl / ll);
         const base = P.length / 6;
         for (const p of v) P.push(p[0], p[1], p[2], col[0] * lit, col[1] * lit, col[2] * lit);
-        X.push(base, base + 2, base + 1, base, base + 3, base + 2);
+        X.push(base, base + 1, base + 2, base, base + 2, base + 3); // counter-clockwise seen from outside
       }
     }
     for (const pr of props) {
@@ -82,11 +84,15 @@
   }
 
   // the nearest prop within reach of feet at (x, y, z), among those not yet gathered
-  function nearest(world, x, y, z, gathered, reach) {
+  // (with a facing yaw, the one most nearly in front of you wins over one a little nearer behind you)
+  function nearest(world, x, y, z, gathered, reach, yaw) {
     const { CW } = world, ci = fdiv(Math.floor(x), CW), ck = fdiv(Math.floor(z), CW); let best = null;
+    const fx = yaw === undefined ? 0 : Math.sin(yaw), fz = yaw === undefined ? 0 : -Math.cos(yaw); // the way the camera looks
     for (let i = ci - 1; i <= ci + 1; i++) for (let k = ck - 1; k <= ck + 1; k++) for (const p of propsIn(world, i, k)) {
       if (gathered.has(p.id) || Math.abs(p.y - y) > 2.2) continue;
-      const d = Math.hypot(p.x - x, p.z - z); if (d <= (reach || 2.2) && (!best || d < best.d)) best = { p, d };
+      const d = Math.hypot(p.x - x, p.z - z); if (d > (reach || 2.2)) continue;
+      const ahead = d > 1e-6 ? ((p.x - x) * fx + (p.z - z) * fz) / d : 1, score = d * (1.6 - 0.6 * ahead);
+      if (!best || score < best.score) best = { p, score };
     }
     return best && best.p;
   }

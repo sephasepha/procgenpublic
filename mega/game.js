@@ -343,11 +343,18 @@
       // the far side: keep only what lies beyond the twin's plane (z < zP from the plain's doorway; z > zP from the crust's)
       const zF = P.far.zP, clip = P.side > 0 ? [0, 0, 1, eyeV[2] - zF] : [0, 0, -1, zF - eyeV[2]];
       st.portalDrawn += scene(eyeV, m, pl, clip, F);
+      drawAsh(m, eyeV, F, clip); // the far side's own ash
       // then this side's fog over the opening, per pixel at the portal plane, blended over whatever the far side showed
       gl.stencilFunc(gl.EQUAL, 1, 0xff); gl.disable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE); gl.depthMask(false);
       gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
       portalFog(m, Q([a0, b0, z], [a1, b0, z], [a1, b1, z], [a0, b1, z]), nearF);
       gl.disable(gl.BLEND); gl.depthMask(true); gl.enable(gl.DEPTH_TEST); gl.enable(gl.CULL_FACE);
+      // and the opening takes the depth of the portal's plane, so this side's ash (drawn last) shows in front of the
+      // doorway but never through it
+      // (the whole mark box, not just its face: standing in the doorway, its sides are what fill the view)
+      gl.colorMask(false, false, false, false); gl.depthFunc(gl.LESS); gl.disable(gl.CULL_FACE);
+      quad(m, tri, [0, 0, 0, 0]);
+      gl.colorMask(true, true, true, true); gl.enable(gl.CULL_FACE);
       gl.disable(gl.STENCIL_TEST);
     }
     return out.length;
@@ -363,28 +370,31 @@
   // them into the box around the eye, so the field never runs out. How many are drawn follows the depth.
   const ASH_N = PHONE ? 2400 : 5000, BOX = 22;
   const AVS = `attribute vec4 aS; uniform mat4 uVP; uniform vec3 uEye; uniform float uTime; uniform float uSize; uniform float uBox;
-    varying float vA; varying float vD;
+    varying float vA; varying float vD; varying vec3 vRel;
     void main() {
       float ph = aS.w * 6.2831, fall = 0.35 + 0.55 * fract(aS.w * 7.13);
       vec3 p = aS.xyz * uBox + vec3(0.45 * sin(uTime * 0.37 + ph) + 0.25 * uTime, -fall * uTime, 0.4 * cos(uTime * 0.29 + ph * 1.7) + 0.12 * uTime);
       p += vec3(0.18 * sin(uTime * 1.9 + ph * 3.0), 0.0, 0.18 * cos(uTime * 1.6 + ph * 2.0)); // flutter
       vec3 rel = mod(p - uEye, uBox) - 0.5 * uBox;
-      float d = length(rel); vD = d;
+      float d = length(rel); vD = d; vRel = rel;
       vA = smoothstep(0.5 * uBox, 0.32 * uBox, d) * smoothstep(0.25, 0.9, d); // fade at the box's edge and right at the eye
       gl_Position = uVP * vec4(rel, 1.0);
       gl_PointSize = clamp(uSize * (0.6 + 0.8 * fract(aS.w * 13.7)) / max(d, 0.3), 1.6, 14.0);
     }`;
-  const AFS = `precision mediump float; varying float vA; varying float vD; uniform vec3 uCol; uniform vec3 uFog; uniform float uFogD; uniform float uAlpha;
+  const AFS = `precision mediump float; varying float vA; varying float vD; varying vec3 vRel; uniform vec3 uCol; uniform vec3 uFog; uniform float uFogD; uniform float uAlpha; uniform vec4 uClip;
     void main() {
+      if (dot(uClip.xyz, vRel) + uClip.w > 0.0) discard; // through a portal: none on the near side of its twin
       vec2 q = gl_PointCoord - 0.5; float r = dot(q, q); if (r > 0.25) discard;
       float d = vD * uFogD; float fog = 1.0 - exp(-d * d);
       gl_FragColor = vec4(mix(uCol, uFog, fog * 0.7), vA * uAlpha * (1.0 - r * 2.6));
     }`;
   let aprog, aloc, abuf;
-  function drawAsh(m, eye, F) {
+  // eye: whose ash this is (yours, or the far side of a portal, seen through it); the field is fixed in the world, so
+  // the far side's ash seen through a doorway is exactly the ash you are in once you step through
+  function drawAsh(m, eye, F, clip) {
     if (!aprog) {
       aprog = gl.createProgram(); gl.attachShader(aprog, shader(gl.VERTEX_SHADER, AVS)); gl.attachShader(aprog, shader(gl.FRAGMENT_SHADER, AFS)); gl.linkProgram(aprog);
-      aloc = { aS: gl.getAttribLocation(aprog, 'aS') }; ['uVP', 'uEye', 'uTime', 'uSize', 'uBox', 'uCol', 'uFog', 'uFogD', 'uAlpha'].forEach(n => { aloc[n] = gl.getUniformLocation(aprog, n); });
+      aloc = { aS: gl.getAttribLocation(aprog, 'aS') }; ['uVP', 'uEye', 'uTime', 'uSize', 'uBox', 'uCol', 'uFog', 'uFogD', 'uAlpha', 'uClip'].forEach(n => { aloc[n] = gl.getUniformLocation(aprog, n); });
       const S = new Float32Array(ASH_N * 4); let h = 12345;
       const rnd = () => { h = Math.imul(h ^ (h >>> 15), 2246822519) + 0x9E3779B9 | 0; return ((h >>> 0) % 1e6) / 1e6; };
       for (let n = 0; n < ASH_N; n++) { S[n * 4] = rnd(); S[n * 4 + 1] = rnd(); S[n * 4 + 2] = rnd(); S[n * 4 + 3] = rnd(); }
@@ -398,12 +408,12 @@
     const ash = onPlain ? [0.30, 0.30, 0.31] : [0.80, 0.78, 0.74], ember = [1.0, 0.36, 0.14], col = ash.map((a, k) => a + (ember[k] - a) * Math.min(1, t * 1.3));
     gl.useProgram(aprog); gl.uniformMatrix4fv(aloc.uVP, false, m); gl.uniform3f(aloc.uEye, eye[0], eye[1], eye[2]); gl.uniform1f(aloc.uTime, st.t);
     gl.uniform1f(aloc.uSize, (cv.height / 480) * 15); gl.uniform1f(aloc.uBox, BOX); gl.uniform3fv(aloc.uCol, col); gl.uniform3fv(aloc.uFog, F.fog); gl.uniform1f(aloc.uFogD, F.fogD);
-    gl.uniform1f(aloc.uAlpha, onPlain ? 0.75 : 0.7 + 0.3 * t);
+    gl.uniform1f(aloc.uAlpha, onPlain ? 0.75 : 0.7 + 0.3 * t); gl.uniform4fv(aloc.uClip, clip || NOCLIP);
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
     gl.bindBuffer(gl.ARRAY_BUFFER, abuf); gl.enableVertexAttribArray(aloc.aS); gl.vertexAttribPointer(aloc.aS, 4, gl.FLOAT, false, 0, 0);
     gl.drawArrays(gl.POINTS, 0, n); gl.disableVertexAttribArray(aloc.aS);
     gl.disable(gl.BLEND); gl.depthMask(true);
-    st.ash = n;
+    if (!clip) st.ash = n;
   }
   function draw() {
     const p = st.p, eye = [p.x, p.y + EYE, p.z];
@@ -422,13 +432,13 @@
   let toastT = 0;
   function toast(msg) { const t = q('.mg-toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 3200); }
   // ---------- gathering: E (or TAKE) picks up the nearest prop in reach; what is gathered is kept per seed ----------
-  const gKey = () => 'mega-gathered-' + world.seed;
+  const gKey = () => 'mega-gathered2-' + world.seed; // (2: props were respaced, so the ids changed)
   function loadGathered() {
     st.gathered = new Set(); st.satchel = {};
     try { const g = JSON.parse(localStorage.getItem(gKey()) || 'null'); if (g) { g.ids.forEach(id => st.gathered.add(id)); st.satchel = g.satchel || {}; } } catch (e) { /* private mode */ }
   }
   function saveGathered() { try { localStorage.setItem(gKey(), JSON.stringify({ ids: [...st.gathered], satchel: st.satchel })); } catch (e) { /* full or blocked */ } }
-  function inReach() { const p = st.p; return p.y > world.SURF ? MegaProps.nearest(world, p.x, p.y, p.z, st.gathered, 2.4) : null; }
+  function inReach() { const p = st.p; return p.y > world.SURF ? MegaProps.nearest(world, p.x, p.y, p.z, st.gathered, 2.4, p.yaw) : null; }
   function gather() {
     const pr = inReach(); if (!pr) return;
     st.gathered.add(pr.id); st.satchel[pr.kind] = (st.satchel[pr.kind] || 0) + 1; saveGathered();

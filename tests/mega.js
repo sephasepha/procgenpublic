@@ -231,7 +231,7 @@ console.log('Gatherable props on the plain');
   for (const seed of [265668, 1, 2]) {
     const w = createWorld(seed), all = []; let empty = 0, cells = 0, dense = 0, again = true, onGround = true, clear = true, meshOk = true;
     for (let i = -20; i < 20; i++) for (let k = -20; k < 20; k++) {
-      const ps = P.propsIn(w, i, k); cells++; if (!ps.length) empty++; if (ps.length >= 6) dense++; all.push(...ps);
+      const ps = P.propsIn(w, i, k); cells++; if (!ps.length) empty++; if (ps.length >= 3) dense++; all.push(...ps);
       if (JSON.stringify(P.propsIn(w, i, k)) !== JSON.stringify(ps)) again = false;
       const f = w.portalAt(i, k) ? w.frameIn(i, w.PJ, k) : null;
       for (const p of ps) {
@@ -246,15 +246,32 @@ console.log('Gatherable props on the plain');
     check(new Set(all.map(p => p.id)).size === all.length, `seed ${seed}: every prop has its own id`);
     check(onGround, `seed ${seed}: props sit on the ground of their own cell`);
     check(clear, `seed ${seed}: none in a doorway or on stone breaking the surface`);
-    check(all.length / cells > 1 && all.length / cells < 5 && empty / cells > 0.2 && dense > 0, `seed ${seed}: they come in patches (${(all.length / cells).toFixed(1)} a cell, ${Math.round(100 * empty / cells)}% bare, ${dense} dense cells)`);
+    check(all.length / cells > 0.3 && all.length / cells < 1.2 && empty / cells > 0.45 && dense > 0, `seed ${seed}: they are sparse, in patches (${(all.length / cells).toFixed(1)} a cell, ${Math.round(100 * empty / cells)}% bare, ${dense} dense cells)`);
     check(Object.keys(P.KINDS).every(k => kinds[k]) && kinds.relic < kinds.flint / 4, `seed ${seed}: every kind turns up, and relics are rare (${JSON.stringify(kinds)})`);
     check(meshOk, `seed ${seed}: their meshes are well formed`);
+    let mind = Infinity; for (let a = 0; a < all.length; a++) for (let b = a + 1; b < all.length; b++) { const d = Math.hypot(all[a].x - all[b].x, all[a].z - all[b].z); if (d < mind) mind = d; }
+    check(mind >= 4, `seed ${seed}: no two props closer than 4 m (closest ${mind.toFixed(1)} m)`);
+    // the faces wind counter-clockwise seen from outside (else the GPU culls the outsides and you see in)
+    { const m = P.meshOf(all.slice(0, 40), 0, 0, 0); let out = 0, tot = 0;
+      // every box is 6 faces of 4 vertices: each triangle's normal (by its winding) must point away from its box's centre
+      for (let b = 0; b < m.P.length / 6; b += 24) {
+        const c = [0, 1, 2].map(n => { let a = 0; for (let v = b; v < b + 24; v++) a += m.P[v * 6 + n]; return a / 24; });
+        for (let t = (b / 4) * 6; t < (b / 4) * 6 + 36; t += 3) {
+          const v = [0, 1, 2].map(n => [m.P[m.X[t + n] * 6], m.P[m.X[t + n] * 6 + 1], m.P[m.X[t + n] * 6 + 2]]);
+          const e1 = v[1].map((q, n) => q - v[0][n]), e2 = v[2].map((q, n) => q - v[0][n]), nr = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+          const f = v.reduce((a, q) => a.map((x, n) => x + q[n] / 3), [0, 0, 0]);
+          tot++; if (nr[0] * (f[0] - c[0]) + nr[1] * (f[1] - c[1]) + nr[2] * (f[2] - c[2]) > 0) out++;
+        }
+      }
+      check(tot > 0 && out === tot, `seed ${seed}: every prop face winds outwards (${out} of ${tot})`); }
   }
   // reaching for one: the nearest in reach, and never one already gathered
   const w = createWorld(265668); let pr = null; for (let i = 0; i < 20 && !pr; i++) pr = P.propsIn(w, i, 3)[0];
   const got = P.nearest(w, pr.x + 1, pr.y, pr.z, new Set(), 2.2), again = P.nearest(w, pr.x + 1, pr.y, pr.z, new Set([pr.id]), 2.2);
   check(got && got.id === pr.id && (!again || again.id !== pr.id), 'the nearest prop in reach is found, and a gathered one is not found again');
   check(!P.nearest(w, pr.x + 9, pr.y, pr.z + 9, new Set(), 2.2) || P.nearest(w, pr.x + 9, pr.y, pr.z + 9, new Set(), 2.2).id !== pr.id, 'and one out of reach is not');
+  // facing it: standing 1.5 m south (+z) of it and looking north (yaw 0 looks along -z), it is chosen
+  check((P.nearest(w, pr.x, pr.y, pr.z + 1.5, new Set(), 2.2, 0) || {}).id === pr.id, 'the prop you face is the one you take');
 }
 
 console.log('Walking it with the real body: stairs up and down, bridges over voids');
