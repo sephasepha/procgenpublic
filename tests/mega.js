@@ -148,29 +148,36 @@ for (const seed of [1, 2, 3]) {
   let lo = 1e9, hi = -1e9, steep = 0;
   for (let x = -300; x <= 300; x += 1.5) for (let z = -300; z <= 300; z += 7) { const h = w.terrainH(x, z); lo = Math.min(lo, h); hi = Math.max(hi, h); if (Math.abs(w.terrainH(x + 1, z) - h) > 0.6) steep++; }
   check(lo >= S + 1.05 && hi <= S + 5 && steep === 0, `seed ${seed}: the plain is gentle (${(lo - S).toFixed(1)} to ${(hi - S).toFixed(1)} m over the lid, ${steep} steep spots)`);
-  // portals: one over the start, a few elsewhere, and every one leads down by steps into the structure below
-  let portals = 0, down = 0; const bad = [];
+  // portals: one in front of the start, a few elsewhere; each one's twin is far off in the depths, a cell that knows
+  // whose twin it is, and from the landing under the twin the steps lead down into the cell below
+  let portals = 0, down = 0, far = 0, inv = 0; const bad = [];
   for (let i = -12; i <= 12; i++) for (let k = -12; k <= 12; k++) {
     if (!w.portalAt(i, k)) continue; portals++;
-    const x0 = i * CW + w.LANE(1 + ((GJ - 1) % 2))[0], start = [x0 + 1, GJ * CH + 2, k * CW + w.PZ + 9]; // the landing under the crust's doorway
+    const P = w.portalPair(i, k), B = P.B, A2 = w.siteA(B.i, B.j, B.k); if (A2 && A2[0] === i && A2[1] === k) inv++;
+    if (Math.hypot(P.d[0], P.d[2]) > 5 * CW || P.d[1] < -4 * CH) far++;
+    // from the twin's landing, within its column, down to the floor of the cell under it
+    const start = [B.x0 + 1, B.y0, B.zP - 1], ci = B.i, ck = B.k, low = (B.j - 1) * CH;
     const q = [start], seen = new Set([start.join()]); let ok = false;
     const stand = (x, y, z) => solid(x, y - 1, z) && !solid(x, y, z) && !solid(x, y + 1, z);
     for (let h = 0; h < q.length && !ok; h++) { const [x, y, z] = q[h];
       for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (const dy of [0, 1, -1]) {
-        const nx = x + dx, ny = y + dy, nz = z + dz; if (nx < i * CW || nx >= (i + 1) * CW || nz < k * CW || nz >= (k + 1) * CW || ny < (GJ - 1) * CH) continue;
+        const nx = x + dx, ny = y + dy, nz = z + dz; if (nx < ci * CW || nx >= (ci + 1) * CW || nz < ck * CW || nz >= (ck + 1) * CW || ny < low) continue;
         const key = nx + ',' + ny + ',' + nz; if (seen.has(key) || !stand(nx, ny, nz)) continue;
         if (dy === 1 && solid(x, y + 2, z)) continue; if (dy === -1 && solid(nx, y + 1, nz)) continue;
-        seen.add(key); q.push([nx, ny, nz]); if (ny === (GJ - 1) * CH + 1) ok = true;
+        seen.add(key); q.push([nx, ny, nz]); if (ny === low + 1) ok = true;
       } }
     if (ok) down++; else if (bad.length < 3) bad.push(i + ',' + k);
   }
-  check(w.portalAt(0, 0) && portals > 5 && down === portals, `seed ${seed}: ${down}/${portals} portals lead down into the structure ${bad.join(' ')}`);
+  check(w.portalAt(0, 0) && portals > 5 && inv === portals, `seed ${seed}: each of ${portals} doorways has a twin that knows it (${inv})`);
+  check(far >= portals * 0.8, `seed ${seed}: the twins are far away, not just under the doorways (${far}/${portals})`);
+  check(down === portals, `seed ${seed}: ${down}/${portals} twins lead down into the structure ${bad.join(' ')}`);
   // and the real body walks from the start on the plain through the doorway and down
   const sp = w.surfaceSpawn(), b = Body.createBody(w, sp.x, sp.y, sp.z, sp.yaw);
   for (let n = 0; n < 60 * 10; n++) Body.step(b, 1 / 60, 1, 0, false, 1);
   check(b.p.y <= S - 5 && b.portalled === 1, `seed ${seed}: walking forward from the start goes through the doorway (a portal, ${b.portalled || 0} crossing) and down the stair (y ${b.p.y.toFixed(1)}, plain at ${S})`);
   // and back: from the bottom of the passage walking +z, up the steps, through the twin doorway, out on to the plain
-  const f = w.portalFrame(0, 0), c = Body.createBody(w, (f.x0 + f.x1) / 2, f.yB, f.zP - 3, Math.PI);
+  const PP = w.portalPair(0, 0), f = { x0: PP.A.x0, x1: PP.A.x1, zP: PP.A.zP }, c = Body.createBody(w, (PP.B.x0 + PP.B.x1) / 2, PP.B.y0, PP.B.zP - 1.5, Math.PI);
+  check(Math.hypot(b.p.x - (PP.B.x0 + PP.B.x1) / 2, b.p.z - PP.B.zP) < 2 * CW, `seed ${seed}: and it came out at the twin, ${Math.round(Math.hypot(PP.d[0], PP.d[2]))} m away and ${-PP.d[1]} m down`);
   for (let n = 0; n < 60 * 3; n++) Body.step(c, 1 / 60, 1, 0, false, 1);
   check(c.portalled === 1 && c.p.y >= S + 1 && c.p.z > f.zP + 2, `seed ${seed}: walking back up through the twin doorway comes out on the plain (y ${c.p.y.toFixed(1)}, z ${c.p.z.toFixed(1)})`);
   // the plain's doorway seen from behind is only a frame: walking through it that way goes nowhere
@@ -186,9 +193,10 @@ console.log('The way out (F)');
   const w = createWorld(265668), solid = (x, y, z) => w.voxel(x, y, z) !== 0; let sp = null;
   for (let x = 1; x < 16 && !sp; x++) for (let z = 1; z < 16 && !sp; z++) { const X = -4 * CW + x, Y = -16 * CH + 1, Z = 10 * CW + z; if (solid(X, Y - 1, Z) && !solid(X, Y, Z) && !solid(X, Y + 1, Z)) sp = [X + 0.5, Y, Z + 0.5]; }
   const job = G.routeJob(w, ...sp); let r, worst = 0, steps = 0; do { const t0 = Date.now(); r = job.step(4); worst = Math.max(worst, Date.now() - t0); steps++; } while (r === undefined);
-  check(r && r[r.length - 1][1] === w.GJ * CH + 2, `from level -16 the route reaches a doorway (${r ? r.length : 0} steps)`);
+  const atSite = (W, e) => e && W.isSite(Math.floor(e[0] / CW), Math.floor(e[1] / CH), Math.floor(e[2] / CW));
+  check(atSite(w, r && r[r.length - 1]), `from level -16 the route reaches a twin doorway (${r ? r.length : 0} steps)`);
   check(worst <= 30 && steps > 1, `spread over ${steps} steps, the longest ${worst} ms`);
-  for (const seed of [1, 2, 3]) { const w2 = createWorld(seed), sp2 = w2.spawn(), r2 = G.findRoute(w2, sp2.x, sp2.y, sp2.z); check(r2 && r2[r2.length - 1][1] === w2.GJ * CH + 2, `seed ${seed}: from the start the route reaches a doorway`); }
+  for (const seed of [1, 2, 3]) { const w2 = createWorld(seed), sp2 = w2.spawn(), r2 = G.findRoute(w2, sp2.x, sp2.y, sp2.z); check(atSite(w2, r2 && r2[r2.length - 1]), `seed ${seed}: from the start the route reaches a twin doorway`); }
 }
 
 console.log('Walking it with the real body: stairs up and down, bridges over voids');

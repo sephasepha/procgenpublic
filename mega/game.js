@@ -151,7 +151,16 @@
     const want = [];
     const top = cj >= world.PJ; // on the plain the crust hides the structure: draw only the levels just under it (seen through the doorways)
     for (let dj = -RDOWN; dj <= RUP; dj++) for (let dk = -RH; dk <= RH; dk++) for (let di = -RH; di <= RH; di++) {
-      const r = reach(di, dj, dk); if (r > 1) continue; if (top && (cj + dj < world.GJ - 2 || cj + dj > world.PJ + 1)) continue; want.push([ci + di, cj + dj, ck + dk, Math.hypot(di, dk) + Math.abs(dj) * 0.5]);
+      const r = reach(di, dj, dk); if (r > 1) continue; if (top && (cj + dj < world.GJ || cj + dj > world.PJ + 1)) continue; want.push([ci + di, cj + dj, ck + dk, Math.hypot(di, dk) + Math.abs(dj) * 0.5]);
+    }
+    // through a doorway you see its other end, perhaps hundreds of cells away: build the cells round it too
+    const keep = new Set();
+    if (st.ready) for (const P of nearPortals([p.x, p.y + EYE, p.z])) {
+      const fi = P.far.i, fj = P.far.j, fk = P.far.k;
+      for (let dj = -2; dj <= 1; dj++) for (let dk = -2; dk <= 2; dk++) for (let di = -2; di <= 2; di++) {
+        const key = (fi + di) + ',' + (fj + dj) + ',' + (fk + dk); keep.add(key);
+        want.push([fi + di, fj + dj, fk + dk, 0.5 + Math.hypot(di, dk) + Math.abs(dj)]);
+      }
     }
     want.sort((a, b) => a[3] - b[3]);
     let built = 0;
@@ -160,7 +169,7 @@
       st.cells.set(key, meshCell(i, j, k)); built++;
       if (performance.now() - t0 > budgetMs && st.ready) break;
     }
-    st.cells.forEach((c, key) => { if (reach(c.i - ci, c.j - cj, c.k - ck) > 1.35) { dropCell(c); st.cells.delete(key); } });
+    st.cells.forEach((c, key) => { if (reach(c.i - ci, c.j - cj, c.k - ck) > 1.35 && !keep.has(key)) { dropCell(c); st.cells.delete(key); } });
     if (!st.ready) { const near = want.filter(w => w[3] <= 1.5).every(w => st.cells.has(w[0] + ',' + w[1] + ',' + w[2])); if (near) { st.ready = true; q('.mg-load').hidden = true; } }
     return built;
   }
@@ -178,7 +187,7 @@
       if (st.acc > STEP_DT * 12) st.acc = 0;
       // which portal you came down: you were on the plain and now you are under the lid, in a portal's column
       { const up = st.p.y >= world.SURF + 0.5;
-        if (st.wasUp && !up && st.p.y < world.SURF - 1) { const i = Math.floor(Math.floor(st.p.x) / CW), k = Math.floor(Math.floor(st.p.z) / CW); if (world.portalAt(i, k)) st.entered = [i, k]; }
+        const lc = st.body.lastCross; if (lc && lc !== st.seenCross) { st.seenCross = lc; if (lc.down) st.entered = lc.a; }
         if (up || st.p.y < world.SURF - 1) st.wasUp = up; }
       if (st.grounded && st.t - st.safeT > 0.5) { st.safe = { x: st.p.x, y: st.p.y, z: st.p.z }; st.safeT = st.t; }
     }
@@ -242,22 +251,31 @@
   // (where it is not hidden), the depth there is reset to the far plane and painted with the fog of the other side, and
   // the world is drawn again from the eye moved to the twin doorway, only inside the mark, with everything on the near
   // side of the twin's plane cut away. The two doorways have the same shape and facing, so the move is a translation.
-  function portals(eye, m, pl) {
-    const ci = Math.floor(Math.floor(eye[0]) / CW), ck = Math.floor(Math.floor(eye[2]) / CW), out = [];
+  // the portal doorways near an eye that it sees from their open side: on the plain from in front (+z), a twin from
+  // its stair (-z). Each with the move to its other end, d.
+  function nearPortals(eye) {
+    const ci = Math.floor(Math.floor(eye[0]) / CW), cj = Math.floor(Math.floor(eye[1]) / CH), ck = Math.floor(Math.floor(eye[2]) / CW), out = [];
     for (let i = ci - 3; i <= ci + 3; i++) for (let k = ck - 3; k <= ck + 3; k++) {
-      if (!world.portalAt(i, k)) continue;
-      const f = world.portalFrame(i, k);
-      // on the plain, seen from in front (+z); in the crust, seen from the passage (-z)
-      if (eye[1] > f.yA - 1 && eye[1] < f.yA + 12 && eye[2] > f.zP) out.push({ f, y0: f.yA, dy: -f.dy, side: 1 });
-      else if (eye[1] > f.yB - 12 && eye[1] < f.yB + 6 && eye[2] < f.zP) out.push({ f, y0: f.yB, dy: f.dy, side: -1 }); // from the passage and the stair below it
+      if (cj >= world.PJ - 1 && world.portalAt(i, k)) { const P = world.portalPair(i, k), f = P.A; if (eye[1] > f.y0 - 1 && eye[1] < f.y0 + 12 && eye[2] > f.zP) out.push({ f, far: P.B, d: P.d, side: 1 }); }
+      if (cj < world.GJ) for (let j = cj - 2; j <= cj + 1; j++) if (world.isSite(i, j, k)) { const P = world.pairOfSite(i, j, k), f = P.B; if (eye[1] > f.y0 - 12 && eye[1] < f.y0 + 6 && eye[2] < f.zP) out.push({ f, far: P.A, d: P.d.map(v => -v), side: -1 }); }
     }
+    return out;
+  }
+  function portals(eye, m, pl) {
+    const out = nearPortals(eye);
     for (const P of out) {
-      const f = P.f, z = f.zP - eye[2], y0 = P.y0 - eye[1], y1 = P.y0 + f.h - eye[1], x0 = f.x0 - eye[0], x1 = f.x1 - eye[0];
-      const tri = [x0, y0, z, x1, y0, z, x1, y1, z, x0, y0, z, x1, y1, z, x0, y1, z];
-      // almost in the plane, inside the opening: the near plane would cut the quad, so the whole view is the portal
-      const fz = -Math.cos(st.p.yaw) * Math.cos(st.p.pitch); // how much you face +z
-      const inside = Math.abs(z) < 0.45 && x0 < 0 && x1 > 0 && y0 < 0 && y1 > 0 && (P.side > 0 ? fz < -0.2 : fz > 0.2); // and facing it
-      const eyeV = [eye[0], eye[1] + P.dy, eye[2]], F = fogAt(eyeV[1] - EYE);
+      const f = P.f, z = f.zP - eye[2], y0 = f.y0 - eye[1], y1 = f.y0 + f.h - eye[1], x0 = f.x0 - eye[0], x1 = f.x1 - eye[0];
+      // The opening is marked as a shallow box, half a metre deep, going back from the plane into the doorway's own depth
+      // (where only the opening can see it). A flat quad would be sliced by the near plane as you step through it,
+      // above all walking in sideways, and for a frame part of the view would show this side; every ray through the
+      // opening meets the box, however close the eye is. Its sides sit a hair inside the opening, clear of the piers.
+      const e = 0.003, a0 = x0 + e, a1 = x1 - e, b0 = y0 + e, b1 = y1 - e, zb = z - 0.5 * P.side;
+      const Q = (p0, p1, p2, p3) => [...p0, ...p1, ...p2, ...p0, ...p2, ...p3];
+      const tri = [].concat(Q([a0, b0, z], [a1, b0, z], [a1, b1, z], [a0, b1, z]), Q([a0, b0, zb], [a1, b0, zb], [a1, b1, zb], [a0, b1, zb]),
+        Q([a0, b0, z], [a0, b0, zb], [a0, b1, zb], [a0, b1, z]), Q([a1, b0, z], [a1, b0, zb], [a1, b1, zb], [a1, b1, z]),
+        Q([a0, b0, z], [a1, b0, z], [a1, b0, zb], [a0, b0, zb]), Q([a0, b1, z], [a1, b1, z], [a1, b1, zb], [a0, b1, zb]));
+      const inside = false;
+      const eyeV = [eye[0] + P.d[0], eye[1] + P.d[1], eye[2] + P.d[2]], F0 = fogAt(eyeV[1] - EYE), F = { fog: F0.fog, fogD: Math.max(F0.fogD, 0.03) }; // a little thicker, so the edge of what is loaded there never shows
       gl.enable(gl.STENCIL_TEST); gl.clearStencil(0); gl.clear(gl.STENCIL_BUFFER_BIT);
       gl.stencilFunc(gl.ALWAYS, 1, 0xff); gl.stencilOp(gl.KEEP, gl.KEEP, gl.REPLACE);
       gl.colorMask(false, false, false, false); gl.depthMask(false);
@@ -270,7 +288,7 @@
       quadClip(far, [F.fog[0], F.fog[1], F.fog[2], 1]);
       gl.depthRange(0, 1); gl.depthFunc(gl.LESS); gl.enable(gl.CULL_FACE);
       // the far side: keep only what lies beyond the twin's plane (z < zP from the plain's doorway; z > zP from the crust's)
-      const clip = P.side > 0 ? [0, 0, 1, eyeV[2] - f.zP] : [0, 0, -1, f.zP - eyeV[2]];
+      const zF = P.far.zP, clip = P.side > 0 ? [0, 0, 1, eyeV[2] - zF] : [0, 0, -1, zF - eyeV[2]];
       st.portalDrawn += scene(eyeV, m, pl, clip, F);
       gl.disable(gl.STENCIL_TEST);
     }
@@ -299,7 +317,7 @@
   function toast(msg) { const t = q('.mg-toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 3200); }
   function hud() {
     const p = st.p, i = fdiv(Math.floor(p.x), CW), j = fdiv(Math.floor(p.y), CH), k = fdiv(Math.floor(p.z), CW), inf = world.info(i, j, k);
-    const place = inf.j === world.GJ ? 'The way down' : inf.biome === 'surface' ? 'Open ground' : inf.air ? 'Open air' : inf.void ? (inf.biome === 'expanse' ? 'A deck' : 'The shaft') : inf.biome === 'expanse' ? 'Inside an obelisk' : inf.well ? 'A well' : inf.drop ? 'A drop' : ({ open: 'A hall', pillars: 'Pillar hall', tunnels: 'Conduit', warren: 'Cells', terrace: 'A terrace', catacomb: 'Passages', crypt: 'A stairwell' })[inf.variant];
+    const place = inf.site ? 'A doorway to the surface' : inf.j === world.GJ ? 'Rock' : inf.biome === 'surface' ? 'Open ground' : inf.air ? 'Open air' : inf.void ? (inf.biome === 'expanse' ? 'A deck' : 'The shaft') : inf.biome === 'expanse' ? 'Inside an obelisk' : inf.well ? 'A well' : inf.drop ? 'A drop' : ({ open: 'A hall', pillars: 'Pillar hall', tunnels: 'Conduit', warren: 'Cells', terrace: 'A terrace', catacomb: 'Passages', crypt: 'A stairwell' })[inf.variant];
     q('.mg-where').innerHTML = `<b>${W.BIOME_NAMES[inf.biome]}</b><span>${place} · ${W.PALETTES[inf.region].name} · level ${j}</span>`;
     q('.mg-pos').textContent = `cell ${i}, ${j}, ${k} · seed ${world.seed}`;
   }
@@ -453,7 +471,7 @@
       if (!pk) { toast('No doorway to the surface was found near here.'); return; }
     }
     st.back = { x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch };
-    const f = world.portalFrame(pk[0], pk[1]), x = (f.x0 + f.x1) / 2, z = f.zP + 4;
+    const f = world.frameIn(pk[0], world.PJ, pk[1]), x = (f.x0 + f.x1) / 2, z = f.zP + 4;
     teleport(x, world.terrainH(x, z), z, 0, 0);
     toast(st.entered ? 'Up at the doorway you came down. T takes you back.' : 'Up at the nearest doorway. T takes you back.');
   }

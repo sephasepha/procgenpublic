@@ -38,7 +38,7 @@
     if (p.vy <= 0 && hits(b, p.x, p.y - 0.03, p.z)) { b.grounded = true; b.groundT = b.t; }
     // the open plain above the structure is a smooth heightfield, not voxels: stand on it, and walk up its slopes
     // portals: crossing a doorway's plane moves you to its twin (the world says by how much)
-    if (b.world.portalCross) { const dy = b.world.portalCross(ox, oy, oz, p.x, p.y, p.z); if (dy) { p.y += dy; b.portalled = (b.portalled || 0) + 1; b.lastPortal = dy; } }
+    if (b.world.portalCross) { const c = b.world.portalCross(ox, oy, oz, p.x, p.y, p.z); if (c) { p.x += c.d[0]; p.y += c.d[1]; p.z += c.d[2]; b.portalled = (b.portalled || 0) + 1; b.lastCross = c; } }
     const G = b.world.groundAt;
     if (G) { const g = G(p.x, p.z);
       if (g !== null && p.y < g && p.y > g - 1.5) { p.y = g; if (p.vy < 0) p.vy = 0; b.grounded = true; b.groundT = b.t; }

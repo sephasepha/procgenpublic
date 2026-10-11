@@ -8,8 +8,8 @@
   const DIRS = [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0], [0, -1, 0]];
 
   // where a route ends: underground, on the landing under the crust's doorway; on the plain, in the doorway
-  function mouth(world, i, k) { const f = world.portalFrame(i, k); return [(f.x0 + f.x1) / 2, f.yB, f.zP - 1]; }
-  function front(world, i, k) { const f = world.portalFrame(i, k); return [(f.x0 + f.x1) / 2, f.yA, f.zP]; }
+  function mouth(world, a, j, c) { const f = world.frameIn(a, j, c); return [(f.x0 + f.x1) / 2, f.y0, f.zP - 1]; }
+  function front(world, i, k) { const f = world.frameIn(i, world.PJ, k); return [(f.x0 + f.x1) / 2, f.y0, f.zP]; }
 
   function onPlain(world, x, z, y) {
     const { CW } = world, ci = fdiv(Math.floor(x), CW), ck = fdiv(Math.floor(z), CW);
@@ -36,34 +36,32 @@
   const CK = (i, j, k) => ((i + 4096) * 8192 + (j + 4096)) * 8192 + (k + 4096); // a cell or voxel as one number
 
   // The search, as a generator so the game can run it a few milliseconds a frame (it yields every so often).
-  //  1. cells: A* over the cells and their links towards the portal level, the climb weighted double so it heads up
-  //     rather than spreading out level by level (a route a cell or two longer than the shortest, found a hundred times
-  //     faster from deep down);
+  //  1. cells: breadth first over the cells and their links to the nearest twin doorway (the far ends of the plain's
+  //     doorways, scattered through the depths);
   //  2. voxels: A* over standing places inside the route's cells (widened by a cell all round if that is not enough).
   function* underground(world, x, y, z, maxCells) {
     const { CW, CH, GJ } = world, start = [fdiv(Math.floor(x), CW), fdiv(Math.floor(y + 0.01), CH), fdiv(Math.floor(z), CW)];
-    const top = GJ - 1, W = 2;
     const g = new Map(), prev = new Map(), open = Heap(), sk = CK(...start);
-    g.set(sk, 0); prev.set(sk, null); open.push(W * Math.abs(top - start[1]), start);
+    g.set(sk, 0); prev.set(sk, null); open.push(0, start);
     let goal = null, n = 0;
     while (open.size && n < maxCells) {
       const c = open.pop(), ck = CK(...c), gc = g.get(ck); n++;
-      if (c[1] === top && world.portalAt(c[0], c[2])) { goal = c; break; }
+      if (world.isSite(c[0], c[1], c[2])) { goal = c; break; }
       for (let d = 0; d < 6; d++) {
         const ni = c[0] + DIRS[d][0], nj = c[1] + DIRS[d][1], nk = c[2] + DIRS[d][2]; if (nj >= GJ) continue;
         const key = CK(ni, nj, nk); if (g.has(key) && g.get(key) <= gc + 1) continue;
         if (!world.link(c[0], c[1], c[2], d)) continue;
-        g.set(key, gc + 1); prev.set(key, ck); open.push(gc + 1 + W * Math.abs(top - nj), [ni, nj, nk]);
+        g.set(key, gc + 1); prev.set(key, ck); open.push(gc + 1, [ni, nj, nk]);
       }
       if ((n & 63) === 0) yield;
     }
     if (!goal) return null;
     const route = []; for (let k = CK(...goal); k !== null && k !== undefined; k = prev.get(k)) route.push(k);
-    const target = mouth(world, goal[0], goal[2]);
+    const target = mouth(world, goal[0], goal[1], goal[2]);
     const solid = (a, b, c) => world.voxel(a, b, c) !== 0;
     const stand = (a, b, c) => solid(a, b - 1, c) && !solid(a, b, c) && !solid(a, b + 1, c);
     function* voxels(cells) {
-      const allowed = new Set(cells); allowed.add(CK(goal[0], GJ, goal[2]));
+      const allowed = new Set(cells);
       const inside = (a, b, c) => allowed.has(CK(fdiv(a, CW), fdiv(b, CH), fdiv(c, CW)));
       let s = [Math.floor(x), Math.floor(y + 0.01), Math.floor(z)];
       if (!stand(...s)) { // standing on an edge: the nearest standing place around the feet
