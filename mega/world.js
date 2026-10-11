@@ -231,8 +231,8 @@
       const links = [0, 1, 2, 3].map(d => link(i, j, k, d));
       const laneC = d => 2 + 4 * laneOf(i, j, k, d); // the lateral centre of the lane a doorway or walkway uses
       // every staircase is the same: an open flight of single slabs climbing one voxel a step through a hole in the level
-      // above, with a post at its head, in halls and out in the voids alike
-      const flight = st => { const [x0, x1] = LANE(st.lane); for (let t = 0; t <= 6; t++) box(x0, x1, 1 + t, 1 + t, st.z0 + t, st.z0 + t, M.BRIDGE); box(x0 - 1, x0 - 1, 1, 7, st.z0 + 6, st.z0 + 6, M.PILLAR); };
+      // above, in halls and out in the voids alike
+      const flight = st => { const [x0, x1] = LANE(st.lane); for (let t = 0; t <= 6; t++) box(x0, x1, 1 + t, 1 + t, st.z0 + t, st.z0 + t, M.BRIDGE); };
 
       if (isVoid(i, j, k)) {
         const D = districtOf(i, j, k), up = link(i, j, k, 4), down = link(i, j, k, 5);

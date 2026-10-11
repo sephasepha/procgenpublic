@@ -161,7 +161,7 @@ The home page (`index.html`) is a separate 3D game, a Blame!-like infinite struc
 
 The HUD names the district and the kind of space you are in. The pills under the top buttons (Mixed, Interior, Colonnade, Terraces, Chasm, Expanse) force every district to one kind, to test each on its own; the choice goes into the address (`#seed=…&biome=terraces`).
 
-**Stairs.** Every staircase, in a hall or out in a void, is the same open flight: seven single slabs climbing one metre a step, a post at its head, rising through a hole in the floor above. Flights alternate sides level by level, so a stack of them zig-zags.
+**Stairs.** Every staircase, in a hall or out in a void, is the same open flight: seven single slabs climbing one metre a step, rising through a hole in the floor above. Flights alternate sides level by level, so a stack of them zig-zags.
 
 **Stair towers.** About one column in twelve carries a stair tower through the open voids: a landing at every level that every walkway there joins, and a flight of slabs up to the landing above, alternating sides by level, so the voids can be climbed and descended without going back indoors.
 
