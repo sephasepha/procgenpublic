@@ -230,6 +230,9 @@
       const rng = (() => { let s = H(i, j, k, 200) || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; })();
       const links = [0, 1, 2, 3].map(d => link(i, j, k, d));
       const laneC = d => 2 + 4 * laneOf(i, j, k, d); // the lateral centre of the lane a doorway or walkway uses
+      // every staircase is the same: an open flight of single slabs climbing one voxel a step through a hole in the level
+      // above, with a post at its head, in halls and out in the voids alike
+      const flight = st => { const [x0, x1] = LANE(st.lane); for (let t = 0; t <= 6; t++) box(x0, x1, 1 + t, 1 + t, st.z0 + t, st.z0 + t, M.BRIDGE); box(x0 - 1, x0 - 1, 1, 7, st.z0 + 6, st.z0 + 6, M.PILLAR); };
 
       if (isVoid(i, j, k)) {
         const D = districtOf(i, j, k), up = link(i, j, k, 4), down = link(i, j, k, 5);
@@ -279,7 +282,7 @@
           box(1, CW - 2, 0, 0, 1, CW - 2, M.BRIDGE);
           for (const [x, z] of [[1, 1], [1, CW - 2], [CW - 2, 1], [CW - 2, CW - 2]]) box(x, x, 1, 1, z, z, M.TRIM);
           if (down) { const st = stairOf(i, j - 1, k), [x0, x1] = LANE(st.lane); box(x0, x1, 0, 0, st.z0 + 4, st.z0 + 6, 0); }
-          if (up) { const st = stairOf(i, j, k), [x0, x1] = LANE(st.lane); for (let t = 0; t <= 6; t++) box(x0, x1, 1 + t, 1 + t, st.z0 + t, st.z0 + t, M.BRIDGE); box(x0 - 1, x0 - 1, 1, 7, st.z0 + 6, st.z0 + 6, M.PILLAR); }
+          if (up) flight(stairOf(i, j, k));
         }
         return g;
       }
@@ -365,7 +368,7 @@
         if (stairUp(i, j, k)) {
           const s = stairOf(i, j, k), [x0, x1] = LANE(s.lane);
           box(x0, x1, CEILY, CEILY, s.z0 + 3, s.z0 + 6, 0); // headroom starts a step early
-          for (let t = 0; t <= 6; t++) box(x0, x1, 1, 1 + t, s.z0 + t, s.z0 + t, M.BRIDGE);
+          flight(s);
         }
         if (linkedUp(i, j - 1, k)) { const s = stairOf(i, j - 1, k), [x0, x1] = LANE(s.lane); box(x0, x1, FLOORY, FLOORY, s.z0 + 4, s.z0 + 6, 0); }
       }
