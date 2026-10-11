@@ -12,7 +12,7 @@
   const FOG = [0.62, 0.64, 0.66], FOGD = PHONE ? 0.0125 : 0.012, FOGV = 0.45;
   // the depths: going down, the stone darkens and reddens and the fog closes in and turns to a dim blood red.
   // DEEP0 is where it starts (in metres below the top of the structure), DEEPL how many metres to the full effect.
-  const DEEP_FOG = [0.17, 0.045, 0.035], DEEP_FOGD = 3.2, DEEP0 = 3 * CH, DEEPL = 34 * CH;
+  const DEEP_FOG = [0.085, 0.006, 0.004], DEEP_FOGD = 3.4, DEEP0 = 3 * CH, DEEPL = 34 * CH;
   const deepT = y => { const t = Math.min(1, Math.max(0, (DEEP0 - y) / DEEPL)); return t * (2 - t); }; // eases in fast, then settles
   const reach = (di, dj, dk) => { const h = Math.hypot(di, dk) / (RH + 0.6), v = dj > 0 ? dj / (RUP + 0.5) : -dj / (RDOWN + 0.5); return h * h + v * v; };
   const TAU = Math.PI * 2;
@@ -91,8 +91,8 @@
       vCol = mat > 6.5 ? base * 1.12 : base * shade * uLight * (uAmb + 1.1 / (1.0 + 0.12 * length(a.xyz + uRel)));
       // depth grade by where the stone is (not where you are): deeper is darker and redder; lights keep their glow
       float t = clamp((uDeep.x - (a.y + uRel.y + uEyeY)) / uDeep.y, 0.0, 1.0); t = t * (2.0 - t);
-      vec3 tint = mix(vec3(1.0), vec3(1.0, 0.42, 0.32), t);
-      vCol *= mat > 6.5 ? mix(vec3(1.0), vec3(1.15, 0.6, 0.45), t) : tint * (1.0 - 0.62 * t);
+      vec3 tint = mix(vec3(1.0), vec3(1.0, 0.2, 0.12), t);
+      vCol *= mat > 6.5 ? mix(vec3(1.0), vec3(1.2, 0.35, 0.2), t) : tint * (1.0 - 0.84 * t);
       vL = a.xyz; vFace = face; vRel = a.xyz + uRel;
       gl_Position = uVP * vec4(vRel, 1.0);
     }`;
