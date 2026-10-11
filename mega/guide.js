@@ -19,10 +19,11 @@
       const m = front(world, i, k), d = Math.hypot(m[0] - x, m[2] - z); if (!best || d < best.d) best = { m, d };
     }
     if (!best) return null;
-    // over the ground, then up to the doorway: approach the mouth from the open side so the line goes through it
-    const [mx, , mz] = best.m, fr = [mx, mz + 3], pts = [];
+    // over the ground, then up to the doorway: doorways work from both sides, so come at it from the side you are on
+    // and go through to the other
+    const [mx, , mz] = best.m, side = z >= mz ? 1 : -1, fr = [mx, mz + 3 * side], pts = [];
     const seg = (ax, az, bx, bz) => { const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 0.5)); for (let s = 0; s < n; s++) { const t = s / n, px = ax + (bx - ax) * t, pz = az + (bz - az) * t, g = world.groundAt(px, pz); pts.push([px, g === null ? y : g, pz]); } };
-    seg(x, z, fr[0], fr[1]); seg(fr[0], fr[1], mx, mz); pts.push([mx, world.SURF + 2, mz - 0.3]);
+    seg(x, z, fr[0], fr[1]); seg(fr[0], fr[1], mx, mz); pts.push([mx, world.SURF + 2, mz - 0.3 * side]);
     return pts;
   }
 
@@ -76,14 +77,16 @@
         let f = null; for (let dy = 0; dy >= -2 && !f; dy--) for (const [dx, dz] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) if (!f && stand(s[0] + dx, s[1] + dy, s[2] + dz)) f = [s[0] + dx, s[1] + dy, s[2] + dz];
         if (!f) return null; s = f;
       }
-      const tx = Math.floor(target[0]), ty = target[1], tz = Math.floor(target[2]);
-      const hfn = (a, b, c) => Math.abs(a - tx) + Math.abs(b - ty) * 2 + Math.abs(c - tz);
+      // the twin works from both sides: end in the doorway on whichever side is reached first (the landing the stair
+      // arrives at, in front, or the step behind)
+      const tx = Math.floor(target[0]), ty = target[1], tz = Math.floor(target[2]), tzB = tz + 1;
+      const hfn = (a, b, c) => Math.abs(a - tx) + Math.abs(b - ty) * 2 + Math.min(Math.abs(c - tz), Math.abs(c - tzB));
       const [sx, sy, sz] = s, VK = (a, b, c) => CK(a - sx, b - sy, c - sz);
       const gv = new Map(), par = new Map(), heap = Heap(), s0 = VK(...s); gv.set(s0, 0); par.set(s0, null); heap.push(hfn(...s), s);
       let end = null, m = 0;
       while (heap.size && m < 400000) {
         const cur = heap.pop(), ck = VK(...cur), gc = gv.get(ck); m++;
-        if (cur[1] === ty && Math.abs(cur[0] - tx) <= 1 && cur[2] === tz) { end = ck; break; }
+        if (cur[1] === ty && Math.abs(cur[0] - tx) <= 1 && (cur[2] === tz || cur[2] === tzB)) { end = ck; break; }
         const [a, b, c] = cur;
         for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (const dy of [0, 1, -1]) {
           const na = a + dx, nb = b + dy, nc = c + dz;
@@ -97,7 +100,7 @@
       }
       if (end === null) return null;
       const pts = []; for (let k = end; k !== null && k !== undefined; k = par.get(k)) { const v = UK(k); pts.push([v[0] + sx + 0.5, v[1] + sy, v[2] + sz + 0.5]); }
-      pts.reverse(); pts.push([target[0], target[1], target[2] + 1]); // up to the doorway's plane
+      pts.reverse(); pts.push([target[0], target[1], tz + 1]); // up to the doorway's plane, from either side
       return pts;
     }
     let pts = yield* voxels(route);

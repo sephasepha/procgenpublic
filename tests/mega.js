@@ -211,6 +211,19 @@ console.log('The way out (F)');
     const rF = sF && G.findRoute(w, ...sF); let L = 0; if (rF) for (let n = 1; n < rF.length; n++) L += Math.hypot(rF[n][0] - rF[n - 1][0], rF[n][1] - rF[n - 1][1], rF[n][2] - rF[n - 1][2]);
     check(rF && atSite(w, [rF[rF.length - 1][0], rF[rF.length - 1][1], rF[rF.length - 1][2] - 0.5]) && L < 15000, `25 km out, the route reaches a twin doorway ${(L / 1000).toFixed(1)} km away`); }
   for (const seed of [1, 2, 3]) { const w2 = createWorld(seed), sp2 = w2.spawn(), r2 = G.findRoute(w2, sp2.x, sp2.y, sp2.z); check(atSite(w2, r2 && r2[r2.length - 1]), `seed ${seed}: from the start the route reaches a twin doorway`); }
+  // doorways work from both sides, so the route comes at one from the side you are on and goes through to the other
+  for (const seed of [1, 2, 3]) {
+    const w2 = createWorld(seed); let pk = null;
+    for (let r = 0; r <= 40 && !pk; r++) for (let i = -r; i <= r && !pk; i++) for (let k = -r; k <= r && !pk; k++) if (Math.max(Math.abs(i), Math.abs(k)) === r && w2.portalAt(i, k)) pk = [i, k];
+    const f = w2.frameIn(pk[0], w2.PJ, pk[1]), mx = (f.x0 + f.x1) / 2;
+    const ends = [1, -1].map(side => { const z = f.zP + 20 * side, r2 = G.findRoute(w2, mx + 3, w2.terrainH(mx + 3, z), z), a = r2[r2.length - 2], b = r2[r2.length - 1]; return { side, a, b, near: r2.slice(0, -1).every(p => (p[2] - f.zP) * side >= -0.01) }; });
+    check(ends.every(e => e.near && (e.a[2] - f.zP) * e.side > 0 && (e.b[2] - f.zP) * e.side < 0), `seed ${seed}: on the plain, from in front or behind, the route stays on your side and goes through the doorway`);
+    // underground, standing just behind the twin, the route ends in the doorway from behind instead of walking round
+    const P = w2.portalPair(pk[0], pk[1]), B = P.B, bx = (B.x0 + B.x1) / 2, by = B.y0;
+    const rB = G.findRoute(w2, bx + 0.5, by, B.zP + 2.5);
+    const last = rB && rB[rB.length - 2];
+    check(rB && last[2] > B.zP && rB.length < 12, `seed ${seed}: underground, just behind a twin doorway, the route goes in from behind (${rB ? rB.length : 0} steps)`);
+  }
 }
 
 console.log('Walking it with the real body: stairs up and down, bridges over voids');

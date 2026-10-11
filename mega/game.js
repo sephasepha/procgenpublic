@@ -110,6 +110,8 @@
     ['uVP', 'uRel', 'uPal', 'uLight', 'uAmb', 'uFog', 'uFogD', 'uClip'].forEach(n => { loc[n] = gl.getUniformLocation(prog, n); });
     qprog = gl.createProgram(); gl.attachShader(qprog, shader(gl.VERTEX_SHADER, QVS)); gl.attachShader(qprog, shader(gl.FRAGMENT_SHADER, QFS)); gl.linkProgram(qprog);
     qloc = { aP: gl.getAttribLocation(qprog, 'aP'), uVP: gl.getUniformLocation(qprog, 'uVP'), uCol: gl.getUniformLocation(qprog, 'uCol') }; qbuf = gl.createBuffer();
+    pfprog = gl.createProgram(); gl.attachShader(pfprog, shader(gl.VERTEX_SHADER, PFVS)); gl.attachShader(pfprog, shader(gl.FRAGMENT_SHADER, PFFS)); gl.linkProgram(pfprog);
+    pfloc = { aP: gl.getAttribLocation(pfprog, 'aP') }; ['uVP', 'uFog', 'uFogD'].forEach(n => { pfloc[n] = gl.getUniformLocation(pfprog, n); });
     gl.enable(gl.DEPTH_TEST); gl.enable(gl.CULL_FACE); gl.clearColor(FOG[0], FOG[1], FOG[2], 1);
     return true;
   }
@@ -242,7 +244,18 @@
   // a flat quad (eye-relative corners) in one colour, for marking portal openings
   const QVS = `attribute vec3 aP; uniform mat4 uVP; void main() { gl_Position = uVP * vec4(aP, 1.0); }`;
   const QFS = `precision mediump float; uniform vec4 uCol; void main() { gl_FragColor = uCol; }`;
-  let qprog, qloc, qbuf;
+  // this side's fog laid over a portal opening: light from the far side crosses this side's air up to the doorway,
+  // so the opening fades into the fog exactly as the frame around it does (and to nothing as you reach it)
+  const PFVS = `attribute vec3 aP; uniform mat4 uVP; varying vec3 vRel; void main() { vRel = aP; gl_Position = uVP * vec4(aP, 1.0); }`;
+  const PFFS = `precision mediump float; varying vec3 vRel; uniform vec3 uFog; uniform float uFogD;
+    void main() { float d = length(vec3(vRel.x, vRel.y * 0.45, vRel.z)) * uFogD; gl_FragColor = vec4(uFog, 1.0 - exp(-d * d)); }`;
+  let qprog, qloc, qbuf, pfprog, pfloc;
+  function portalFog(m, pts, F) {
+    gl.useProgram(pfprog); gl.uniformMatrix4fv(pfloc.uVP, false, m); gl.uniform3fv(pfloc.uFog, F.fog); gl.uniform1f(pfloc.uFogD, F.fogD);
+    gl.bindBuffer(gl.ARRAY_BUFFER, qbuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(pts), gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(pfloc.aP); gl.vertexAttribPointer(pfloc.aP, 3, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, pts.length / 3); gl.disableVertexAttribArray(pfloc.aP);
+  }
   function quad(m, pts, col) {
     gl.useProgram(qprog); gl.uniformMatrix4fv(qloc.uVP, false, m); gl.uniform4fv(qloc.uCol, col);
     gl.bindBuffer(gl.ARRAY_BUFFER, qbuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(pts), gl.DYNAMIC_DRAW);
@@ -273,7 +286,7 @@
     }
     return best;
   }
-  function portals(eye, m, pl) {
+  function portals(eye, m, pl, nearF) {
     const out = nearPortals(eye);
     for (const P of out) {
       const f = P.f, z = f.zP - eye[2], y0 = f.y0 - eye[1], y1 = f.y0 + f.h - eye[1], x0 = f.x0 - eye[0], x1 = f.x1 - eye[0];
@@ -302,6 +315,11 @@
       // the far side: keep only what lies beyond the twin's plane (z < zP from the plain's doorway; z > zP from the crust's)
       const zF = P.far.zP, clip = P.side > 0 ? [0, 0, 1, eyeV[2] - zF] : [0, 0, -1, zF - eyeV[2]];
       st.portalDrawn += scene(eyeV, m, pl, clip, F);
+      // then this side's fog over the opening, per pixel at the portal plane, blended over whatever the far side showed
+      gl.stencilFunc(gl.EQUAL, 1, 0xff); gl.disable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE); gl.depthMask(false);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      portalFog(m, Q([a0, b0, z], [a1, b0, z], [a1, b1, z], [a0, b1, z]), nearF);
+      gl.disable(gl.BLEND); gl.depthMask(true); gl.enable(gl.DEPTH_TEST); gl.enable(gl.CULL_FACE);
       gl.disable(gl.STENCIL_TEST);
     }
     return out.length;
@@ -319,7 +337,7 @@
     gl.clearColor(F.fog[0], F.fog[1], F.fog[2], 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
     st.portalDrawn = 0;
     const drawn = scene(eye, m, pl, NOCLIP, F);
-    st.portalsSeen = portals(eye, m, pl);
+    st.portalsSeen = portals(eye, m, pl, F);
     drawLine(m, eye, F.fog, F.fogD);
     st.drawn = drawn;
   }
