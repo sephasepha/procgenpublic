@@ -226,6 +226,37 @@ console.log('The way out (F)');
   }
 }
 
+console.log('Gatherable props on the plain');
+{ const P = require('../mega/props.js');
+  for (const seed of [265668, 1, 2]) {
+    const w = createWorld(seed), all = []; let empty = 0, cells = 0, dense = 0, again = true, onGround = true, clear = true, meshOk = true;
+    for (let i = -20; i < 20; i++) for (let k = -20; k < 20; k++) {
+      const ps = P.propsIn(w, i, k); cells++; if (!ps.length) empty++; if (ps.length >= 6) dense++; all.push(...ps);
+      if (JSON.stringify(P.propsIn(w, i, k)) !== JSON.stringify(ps)) again = false;
+      const f = w.portalAt(i, k) ? w.frameIn(i, w.PJ, k) : null;
+      for (const p of ps) {
+        if (Math.abs(p.y - w.terrainH(p.x, p.z)) > 1e-6 || Math.floor(p.x / CW) !== i || Math.floor(p.z / CW) !== k) onGround = false;
+        if (f && p.x > f.x0 - 3 && p.x < f.x1 + 3 && p.z > f.zP - 12 && p.z < f.zP + 5) clear = false;
+        if (w.voxel(Math.floor(p.x), w.SURF + 1, Math.floor(p.z))) clear = false;
+      }
+      if (ps.length) { const m = P.meshOf(ps, i * CW, w.PJ * CH, k * CW), nv = m.P.length / 6; if (!m.X.length || [...m.X].some(x => x >= nv) || [...m.P].some(v => !Number.isFinite(v))) meshOk = false; }
+    }
+    const kinds = {}; all.forEach(p => kinds[p.kind] = (kinds[p.kind] || 0) + 1);
+    check(again, `seed ${seed}: the same cell always holds the same props`);
+    check(new Set(all.map(p => p.id)).size === all.length, `seed ${seed}: every prop has its own id`);
+    check(onGround, `seed ${seed}: props sit on the ground of their own cell`);
+    check(clear, `seed ${seed}: none in a doorway or on stone breaking the surface`);
+    check(all.length / cells > 1 && all.length / cells < 5 && empty / cells > 0.2 && dense > 0, `seed ${seed}: they come in patches (${(all.length / cells).toFixed(1)} a cell, ${Math.round(100 * empty / cells)}% bare, ${dense} dense cells)`);
+    check(Object.keys(P.KINDS).every(k => kinds[k]) && kinds.relic < kinds.flint / 4, `seed ${seed}: every kind turns up, and relics are rare (${JSON.stringify(kinds)})`);
+    check(meshOk, `seed ${seed}: their meshes are well formed`);
+  }
+  // reaching for one: the nearest in reach, and never one already gathered
+  const w = createWorld(265668); let pr = null; for (let i = 0; i < 20 && !pr; i++) pr = P.propsIn(w, i, 3)[0];
+  const got = P.nearest(w, pr.x + 1, pr.y, pr.z, new Set(), 2.2), again = P.nearest(w, pr.x + 1, pr.y, pr.z, new Set([pr.id]), 2.2);
+  check(got && got.id === pr.id && (!again || again.id !== pr.id), 'the nearest prop in reach is found, and a gathered one is not found again');
+  check(!P.nearest(w, pr.x + 9, pr.y, pr.z + 9, new Set(), 2.2) || P.nearest(w, pr.x + 9, pr.y, pr.z + 9, new Set(), 2.2).id !== pr.id, 'and one out of reach is not');
+}
+
 console.log('Walking it with the real body: stairs up and down, bridges over voids');
 for (const seed of [1, 2, 3]) {
   const w = createWorld(seed), solid = (x, y, z) => w.voxel(x, y, z) !== 0;

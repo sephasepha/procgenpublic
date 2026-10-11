@@ -33,7 +33,7 @@
     const g = world.cell(i, j, k); let any = false;
     for (let n = 0; n < g.length; n++) if (g[n]) { any = true; break; }
     const c = { i, j, k, n: 0, vbo: null, ibo: null, info: world.info(i, j, k) };
-    if (j === world.PJ) meshTerrain(c);
+    if (j === world.PJ) { meshTerrain(c); meshProps(c); }
     if (!any) return c;
     const ox = i * CW, oy = j * CH, oz = k * CW, V = [], X = [];
     const at = (x, y, z) => (x >= 0 && x < CW && y >= 0 && y < CH && z >= 0 && z < CW) ? g[(y * CW + z) * CW + x] : world.voxel(ox + x, oy + y, oz + z);
@@ -53,7 +53,17 @@
     c.n = X.length; c.pal = new Float32Array(PAL[c.info.region]); c.light = c.info.light; { let e = 0; for (const [a, b, d] of [[1,0,0],[-1,0,0],[0,0,1],[0,0,-1],[0,1,0],[0,-1,0]]) if (world.isVoid(c.i + a, c.j + b, c.k + d)) e++; c.amb = 0.16 + 0.12 * e; if (c.info.void) c.amb = 0.4; }
     return c;
   }
-  const dropCell = c => { if (c.vbo) { gl.deleteBuffer(c.vbo); gl.deleteBuffer(c.ibo); } if (c.tvbo) { gl.deleteBuffer(c.tvbo); gl.deleteBuffer(c.tibo); } };
+  const dropCell = c => { if (c.vbo) { gl.deleteBuffer(c.vbo); gl.deleteBuffer(c.ibo); } if (c.tvbo) { gl.deleteBuffer(c.tvbo); gl.deleteBuffer(c.tibo); } if (c.pvbo) { gl.deleteBuffer(c.pvbo); gl.deleteBuffer(c.pibo); c.pvbo = null; } };
+  // the gatherable props on a surface cell (mega/props.js), less any already gathered; drawn with the plain's shader
+  function meshProps(c) {
+    if (c.pvbo) { gl.deleteBuffer(c.pvbo); gl.deleteBuffer(c.pibo); c.pvbo = null; }
+    const list = MegaProps.propsIn(world, c.i, c.k).filter(p => !st.gathered.has(p.id)); c.pn = 0;
+    if (!list.length) return;
+    const m = MegaProps.meshOf(list, c.i * CW, c.j * CH, c.k * CW);
+    c.pvbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, c.pvbo); gl.bufferData(gl.ARRAY_BUFFER, m.P, gl.STATIC_DRAW);
+    c.pibo = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, c.pibo); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, m.X, gl.STATIC_DRAW);
+    c.pn = m.X.length;
+  }
   let PAL = [];
   // the plain: a smooth heightfield over the surface cell, a vertex per voxel corner, shaded by its slope and coloured
   // grass or dirt by a slow noise; the quads over a portal's stairwell are left out
@@ -251,6 +261,10 @@
       gl.uniform3f(tloc.uRel, c.i * CW - eye[0], c.j * CH - eye[1], c.k * CW - eye[2]);
       gl.bindBuffer(gl.ARRAY_BUFFER, c.tvbo); gl.vertexAttribPointer(tloc.aP, 3, gl.FLOAT, false, 24, 0); gl.vertexAttribPointer(tloc.aC, 3, gl.FLOAT, false, 24, 12);
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, c.tibo); gl.drawElements(gl.TRIANGLES, c.tn, gl.UNSIGNED_SHORT, 0);
+      if (c.pn) { // its props
+        gl.bindBuffer(gl.ARRAY_BUFFER, c.pvbo); gl.vertexAttribPointer(tloc.aP, 3, gl.FLOAT, false, 24, 0); gl.vertexAttribPointer(tloc.aC, 3, gl.FLOAT, false, 24, 12);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, c.pibo); gl.drawElements(gl.TRIANGLES, c.pn, gl.UNSIGNED_SHORT, 0);
+      }
     });
     gl.disableVertexAttribArray(tloc.aP); gl.disableVertexAttribArray(tloc.aC);
     return drawn;
@@ -344,6 +358,53 @@
     for (let n = 0; n < pts.length; n += 3) P.push(Math.max(-1, Math.min(1, pts[n])), Math.max(-1, Math.min(1, pts[n + 1])), 0.999);
     quad(I, P, col);
   }
+  // ---------- ash: flakes drifting down round the eye, thicker (and turning to dull embers) the deeper you are ----------
+  // N flakes have fixed spots in a box BOX metres across; the shader drifts them down and sideways with time and wraps
+  // them into the box around the eye, so the field never runs out. How many are drawn follows the depth.
+  const ASH_N = PHONE ? 2400 : 5000, BOX = 22;
+  const AVS = `attribute vec4 aS; uniform mat4 uVP; uniform vec3 uEye; uniform float uTime; uniform float uSize; uniform float uBox;
+    varying float vA; varying float vD;
+    void main() {
+      float ph = aS.w * 6.2831, fall = 0.35 + 0.55 * fract(aS.w * 7.13);
+      vec3 p = aS.xyz * uBox + vec3(0.45 * sin(uTime * 0.37 + ph) + 0.25 * uTime, -fall * uTime, 0.4 * cos(uTime * 0.29 + ph * 1.7) + 0.12 * uTime);
+      p += vec3(0.18 * sin(uTime * 1.9 + ph * 3.0), 0.0, 0.18 * cos(uTime * 1.6 + ph * 2.0)); // flutter
+      vec3 rel = mod(p - uEye, uBox) - 0.5 * uBox;
+      float d = length(rel); vD = d;
+      vA = smoothstep(0.5 * uBox, 0.32 * uBox, d) * smoothstep(0.25, 0.9, d); // fade at the box's edge and right at the eye
+      gl_Position = uVP * vec4(rel, 1.0);
+      gl_PointSize = clamp(uSize * (0.6 + 0.8 * fract(aS.w * 13.7)) / max(d, 0.3), 1.6, 14.0);
+    }`;
+  const AFS = `precision mediump float; varying float vA; varying float vD; uniform vec3 uCol; uniform vec3 uFog; uniform float uFogD; uniform float uAlpha;
+    void main() {
+      vec2 q = gl_PointCoord - 0.5; float r = dot(q, q); if (r > 0.25) discard;
+      float d = vD * uFogD; float fog = 1.0 - exp(-d * d);
+      gl_FragColor = vec4(mix(uCol, uFog, fog * 0.7), vA * uAlpha * (1.0 - r * 2.6));
+    }`;
+  let aprog, aloc, abuf;
+  function drawAsh(m, eye, F) {
+    if (!aprog) {
+      aprog = gl.createProgram(); gl.attachShader(aprog, shader(gl.VERTEX_SHADER, AVS)); gl.attachShader(aprog, shader(gl.FRAGMENT_SHADER, AFS)); gl.linkProgram(aprog);
+      aloc = { aS: gl.getAttribLocation(aprog, 'aS') }; ['uVP', 'uEye', 'uTime', 'uSize', 'uBox', 'uCol', 'uFog', 'uFogD', 'uAlpha'].forEach(n => { aloc[n] = gl.getUniformLocation(aprog, n); });
+      const S = new Float32Array(ASH_N * 4); let h = 12345;
+      const rnd = () => { h = Math.imul(h ^ (h >>> 15), 2246822519) + 0x9E3779B9 | 0; return ((h >>> 0) % 1e6) / 1e6; };
+      for (let n = 0; n < ASH_N; n++) { S[n * 4] = rnd(); S[n * 4 + 1] = rnd(); S[n * 4 + 2] = rnd(); S[n * 4 + 3] = rnd(); }
+      abuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, abuf); gl.bufferData(gl.ARRAY_BUFFER, S, gl.STATIC_DRAW);
+    }
+    // a little ash drifts over the plain and through the upper halls; it thickens and reddens with depth
+    const t = F.deep || 0, onPlain = eye[1] > world.SURF;
+    const amount = onPlain ? 0.16 : 0.1 + 0.9 * t;
+    const n = Math.floor(ASH_N * amount); if (n < 1) return;
+    // on the plain dark ash against the pale fog; below, pale ash in the halls turning to glowing embers in the depths
+    const ash = onPlain ? [0.30, 0.30, 0.31] : [0.80, 0.78, 0.74], ember = [1.0, 0.36, 0.14], col = ash.map((a, k) => a + (ember[k] - a) * Math.min(1, t * 1.3));
+    gl.useProgram(aprog); gl.uniformMatrix4fv(aloc.uVP, false, m); gl.uniform3f(aloc.uEye, eye[0], eye[1], eye[2]); gl.uniform1f(aloc.uTime, st.t);
+    gl.uniform1f(aloc.uSize, (cv.height / 480) * 15); gl.uniform1f(aloc.uBox, BOX); gl.uniform3fv(aloc.uCol, col); gl.uniform3fv(aloc.uFog, F.fog); gl.uniform1f(aloc.uFogD, F.fogD);
+    gl.uniform1f(aloc.uAlpha, onPlain ? 0.75 : 0.7 + 0.3 * t);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
+    gl.bindBuffer(gl.ARRAY_BUFFER, abuf); gl.enableVertexAttribArray(aloc.aS); gl.vertexAttribPointer(aloc.aS, 4, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.POINTS, 0, n); gl.disableVertexAttribArray(aloc.aS);
+    gl.disable(gl.BLEND); gl.depthMask(true);
+    st.ash = n;
+  }
   function draw() {
     const p = st.p, eye = [p.x, p.y + EYE, p.z];
     const m = viewProj(p.yaw, p.pitch, cv.width / cv.height), pl = planes(m), F = fogAt(p.y);
@@ -353,13 +414,35 @@
     const drawn = scene(eye, m, pl, NOCLIP, F);
     st.portalsSeen = portals(eye, m, pl, F);
     drawLine(m, eye, F.fog, F.fogD);
+    drawAsh(m, eye, F);
     st.drawn = drawn;
   }
 
   // ---------- hud ----------
   let toastT = 0;
   function toast(msg) { const t = q('.mg-toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 3200); }
+  // ---------- gathering: E (or TAKE) picks up the nearest prop in reach; what is gathered is kept per seed ----------
+  const gKey = () => 'mega-gathered-' + world.seed;
+  function loadGathered() {
+    st.gathered = new Set(); st.satchel = {};
+    try { const g = JSON.parse(localStorage.getItem(gKey()) || 'null'); if (g) { g.ids.forEach(id => st.gathered.add(id)); st.satchel = g.satchel || {}; } } catch (e) { /* private mode */ }
+  }
+  function saveGathered() { try { localStorage.setItem(gKey(), JSON.stringify({ ids: [...st.gathered], satchel: st.satchel })); } catch (e) { /* full or blocked */ } }
+  function inReach() { const p = st.p; return p.y > world.SURF ? MegaProps.nearest(world, p.x, p.y, p.z, st.gathered, 2.4) : null; }
+  function gather() {
+    const pr = inReach(); if (!pr) return;
+    st.gathered.add(pr.id); st.satchel[pr.kind] = (st.satchel[pr.kind] || 0) + 1; saveGathered();
+    const ci = fdiv(Math.floor(pr.x), CW), ck = fdiv(Math.floor(pr.z), CW), c = st.cells.get(ci + ',' + world.PJ + ',' + ck); if (c) meshProps(c);
+    const K = MegaProps.KINDS[pr.kind], n = st.satchel[pr.kind];
+    toast(`Gathered ${pr.kind === 'relic' ? 'a ' : ''}${K.name} · ${n} ${n === 1 ? K.name : K.plural}`);
+    hud();
+  }
   function hud() {
+    { const pr = inReach(), t = q('.mg-take'), b = q('.mg-takebtn');
+      if (t) { t.hidden = !pr; if (pr) t.innerHTML = `<kbd>E</kbd> take ${MegaProps.KINDS[pr.kind].name}`; }
+      if (b) b.hidden = !pr;
+      const sat = q('.mg-satchel'), have = Object.keys(MegaProps.KINDS).filter(k => st.satchel[k]);
+      if (sat) { sat.hidden = !have.length; sat.textContent = have.map(k => `${st.satchel[k]} ${st.satchel[k] === 1 ? MegaProps.KINDS[k].name : MegaProps.KINDS[k].plural}`).join(' · '); } }
     const p = st.p, i = fdiv(Math.floor(p.x), CW), j = fdiv(Math.floor(p.y), CH), k = fdiv(Math.floor(p.z), CW), inf = world.info(i, j, k);
     const place = inf.site ? 'A doorway to the surface' : inf.j === world.GJ ? 'Rock' : inf.biome === 'surface' ? 'Open ground' : inf.air ? 'Open air' : inf.void ? (inf.biome === 'expanse' ? 'A deck' : 'The shaft') : inf.biome === 'expanse' ? 'Inside an obelisk' : inf.well ? 'A well' : inf.drop ? 'A drop' : ({ open: 'A hall', pillars: 'Pillar hall', tunnels: 'Conduit', warren: 'Cells', terrace: 'A terrace', catacomb: 'Passages', crypt: 'A stairwell' })[inf.variant];
     q('.mg-where').innerHTML = `<b>${W.BIOME_NAMES[inf.biome]}</b><span>${place} · ${W.PALETTES[inf.region].name} · level ${j}</span>`;
@@ -373,6 +456,7 @@
       if (e.code === 'KeyR' && !e.repeat) { respawn(); return; }
       if (e.code === 'KeyF' && !e.repeat) { guide(); return; }
       if (e.code === 'KeyT' && !e.repeat) { surfaceToggle(); return; }
+      if (e.code === 'KeyE' && !e.repeat) { gather(); return; }
       if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) { e.preventDefault(); st.keys[e.code] = true; }
       if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) st.jumpAt = st.t; st.keys.Space = true; }
     });
@@ -418,6 +502,7 @@
       ['pointerup', 'pointercancel'].forEach(t => zone.addEventListener(t, lift));
       const sb = q('.mg-surf'); if (sb) sb.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); surfaceToggle(); });
       const gb = q('.mg-guide'); if (gb) gb.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); guide(); });
+      const tb = q('.mg-takebtn'); if (tb) tb.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); gather(); });
       const jump = q('.mg-jump'); jump.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); st.jumpAt = st.t; st.keys.Space = true; });
       ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => jump.addEventListener(t, () => { if (st) delete st.keys.Space; }));
     }
@@ -537,6 +622,7 @@
     const s = startPoint();
     const body = MegaBody.createBody(world, s.x, s.y, s.z, s.yaw);
     st = { body, p: body.p, keys: {}, stick: { on: false, x: 0, y: 0, mag: 0 }, cells: new Map(), ready: false, t: 0, last: 0, acc: 0, grounded: false, groundT: 0, jumpAt: 0, jumps: 0, safe: { x: s.x, y: s.y, z: s.z }, safeT: 0, frames: 0, hudT: 0, drawn: 0, entered: null, back: null, wasUp: false, stats: { frame: 16, chunk: 0, draw: 0, built: 0, chunkMax: 0, at: 0, guideMs: 0, guideFrames: 0 } };
+    loadGathered();
     q('.mg-load').hidden = false; q('.mg-load').textContent = 'Building the first rooms…';
     cancelAnimationFrame(raf); raf = requestAnimationFrame(frame);
   }
@@ -546,7 +632,7 @@
     setup();
     let seed = seedFromHash(); biome = biomeFromHash(); if (seed === null) { seed = Math.floor(Math.random() * 1e6); history.replaceState(null, '', hashFor(seed, biome)); }
     start(seed);
-    root.Mega = { state: () => st, world: () => world, start, respawn, guide, line: () => line, CW, CH };
+    root.Mega = { state: () => st, world: () => world, start, respawn, guide, gather, inReach, line: () => line, CW, CH };
   }
   root.MegaGame = { init };
 })(window);
