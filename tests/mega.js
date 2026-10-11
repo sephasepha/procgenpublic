@@ -171,6 +171,18 @@ for (const seed of [1, 2, 3]) {
   check(b.p.y <= S - 5, `seed ${seed}: walking forward from the start goes through the doorway and down the stair (y ${b.p.y.toFixed(1)}, lid at ${S})`);
 }
 
+console.log('The way out (F)');
+{ const G = require('../mega/guide.js');
+  // a deep start (seed 265668, cell -4, -16, 10: a reported hitch): the route is found, reaches the surface, and run as a
+  // job of 4 ms steps no step takes long
+  const w = createWorld(265668), solid = (x, y, z) => w.voxel(x, y, z) !== 0; let sp = null;
+  for (let x = 1; x < 16 && !sp; x++) for (let z = 1; z < 16 && !sp; z++) { const X = -4 * CW + x, Y = -16 * CH + 1, Z = 10 * CW + z; if (solid(X, Y - 1, Z) && !solid(X, Y, Z) && !solid(X, Y + 1, Z)) sp = [X + 0.5, Y, Z + 0.5]; }
+  const job = G.routeJob(w, ...sp); let r, worst = 0, steps = 0; do { const t0 = Date.now(); r = job.step(4); worst = Math.max(worst, Date.now() - t0); steps++; } while (r === undefined);
+  check(r && r[r.length - 1][1] === w.SURF + 2, `from level -16 the route reaches a doorway (${r ? r.length : 0} steps)`);
+  check(worst <= 30 && steps > 1, `spread over ${steps} steps, the longest ${worst} ms`);
+  for (const seed of [1, 2, 3]) { const w2 = createWorld(seed), sp2 = w2.spawn(), r2 = G.findRoute(w2, sp2.x, sp2.y, sp2.z); check(r2 && r2[r2.length - 1][1] === w2.SURF + 2, `seed ${seed}: from the start the route reaches a doorway`); }
+}
+
 console.log('Walking it with the real body: stairs up and down, bridges over voids');
 for (const seed of [1, 2, 3]) {
   const w = createWorld(seed), solid = (x, y, z) => w.voxel(x, y, z) !== 0;

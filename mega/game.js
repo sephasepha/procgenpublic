@@ -167,6 +167,7 @@
     raf = requestAnimationFrame(frame);
     const dt = Math.min(0.1, (ts - (st.last || ts)) / 1000); st.last = ts; st.acc = (st.acc || 0) + dt;
     resize();
+    stepGuide();
     const S = st.stats, tc = performance.now(), built = chunks(st.ready ? 5 : 40), cm = performance.now() - tc;
     S.frame = S.frame * 0.92 + dt * 1000 * 0.08; S.chunk = S.chunk * 0.92 + cm * 0.08; S.built += built; if (cm > S.chunkMax) S.chunkMax = cm;
     if (st.ready) {
@@ -178,7 +179,7 @@
     if (ts - st.hudT > 150) { st.hudT = ts; hud(); }
     if (ts - st.stats.at > 500) { // the timing line, twice a second
       const S = st.stats, secs = (ts - S.at) / 1000;
-      q('.mg-stats').textContent = `${S.frame.toFixed(1)} ms · ${Math.round(1000 / Math.max(1, S.frame))} fps · draw ${S.draw.toFixed(1)} ms · chunks ${S.chunk.toFixed(1)} ms (max ${S.chunkMax.toFixed(0)}, ${(S.built / secs).toFixed(0)}/s) · ${st.drawn}/${st.cells.size} cells` + (S.guideMs ? ` · route ${S.guideMs.toFixed(0)} ms` : '');
+      q('.mg-stats').textContent = `${S.frame.toFixed(1)} ms · ${Math.round(1000 / Math.max(1, S.frame))} fps · draw ${S.draw.toFixed(1)} ms · chunks ${S.chunk.toFixed(1)} ms (max ${S.chunkMax.toFixed(0)}, ${(S.built / secs).toFixed(0)}/s) · ${st.drawn}/${st.cells.size} cells` + (S.guideMs ? ` · route ${S.guideMs.toFixed(0)} ms over ${S.guideFrames} frames` : '');
       S.at = ts; S.built = 0; S.chunkMax = 0;
     }
     st.frames++;
@@ -313,10 +314,22 @@
       gl_FragColor = vec4(mix(col, uFog, fog), uAlpha * (0.75 + 0.25 * pulse)); }`;
   let lprog, lloc, line = null;
   const GUIDE_S = 6;
+  // F starts a search job; the frame loop gives it a few milliseconds each frame until it has the route
+  let job = null;
   function guide() {
-    if (!st || !st.ready) return;
-    const t0 = performance.now(), r = MegaGuide.findRoute(world, st.p.x, st.p.y, st.p.z);
-    st.stats.guideMs = performance.now() - t0;
+    if (!st || !st.ready || job) return;
+    job = { j: MegaGuide.routeJob(world, st.p.x, st.p.y, st.p.z), t0: performance.now(), work: 0, frames: 0 };
+    stepGuide();
+    if (job) toast('Finding the way…');
+  }
+  function stepGuide() {
+    if (!job) return;
+    const t = performance.now(), r = job.j.step(4); job.work += performance.now() - t; job.frames++;
+    if (r === undefined) return;
+    st.stats.guideMs = job.work; st.stats.guideFrames = job.frames; job = null;
+    showRoute(r);
+  }
+  function showRoute(r) {
     if (!r || r.length < 2) { toast('No way to a portal was found from here.'); return; }
     if (!lprog) {
       lprog = gl.createProgram(); gl.attachShader(lprog, shader(gl.VERTEX_SHADER, LVS)); gl.attachShader(lprog, shader(gl.FRAGMENT_SHADER, LFS)); gl.linkProgram(lprog);
@@ -359,13 +372,13 @@
   const hashFor = (s, b) => '#seed=' + s + (b ? '&biome=' + b : '');
   let biome = null;
   function start(seed) {
-    if (st) { st.cells.forEach(dropCell); }
+    if (st) { st.cells.forEach(dropCell); } job = null;
     world = W.createWorld(seed, { biome });
     el.querySelectorAll('.mg-biomes button').forEach(b => b.classList.toggle('on', (b.dataset.b || null) === biome));
     PAL = W.PALETTES.map(palFlat);
     const s = startPoint();
     const body = MegaBody.createBody(world, s.x, s.y, s.z, s.yaw);
-    st = { body, p: body.p, keys: {}, stick: { on: false, x: 0, y: 0, mag: 0 }, cells: new Map(), ready: false, t: 0, last: 0, acc: 0, grounded: false, groundT: 0, jumpAt: 0, jumps: 0, safe: { x: s.x, y: s.y, z: s.z }, safeT: 0, frames: 0, hudT: 0, drawn: 0, stats: { frame: 16, chunk: 0, draw: 0, built: 0, chunkMax: 0, at: 0, guideMs: 0 } };
+    st = { body, p: body.p, keys: {}, stick: { on: false, x: 0, y: 0, mag: 0 }, cells: new Map(), ready: false, t: 0, last: 0, acc: 0, grounded: false, groundT: 0, jumpAt: 0, jumps: 0, safe: { x: s.x, y: s.y, z: s.z }, safeT: 0, frames: 0, hudT: 0, drawn: 0, stats: { frame: 16, chunk: 0, draw: 0, built: 0, chunkMax: 0, at: 0, guideMs: 0, guideFrames: 0 } };
     q('.mg-load').hidden = false; q('.mg-load').textContent = 'Building the first rooms…';
     cancelAnimationFrame(raf); raf = requestAnimationFrame(frame);
   }

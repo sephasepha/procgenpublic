@@ -1,7 +1,7 @@
 // The way out: a walkable route from where you stand to the nearest portal, for the guide line (F).
-// Underground it is found in two steps: a breadth-first search over the cells and their links (cheap, and it finds the
-// nearest portal by the structure's own connections), then a search over the voxels you can stand on, kept to the
-// cells along that route (and their neighbours, if the narrow corridor is not enough). On the plain it is simply the
+// Underground it is found in two steps: a search over the cells and their links up to a cell under a portal, then a
+// search over the voxels you can stand on, kept to the cells along that route (and their neighbours, if the narrow
+// corridor is not enough); it can run spread over frames. On the plain it is simply the
 // ground between you and the nearest doorway. A route is a list of feet positions [x, y, z].
 (function (root) {
   const fdiv = (a, b) => Math.floor(a / b);
@@ -25,29 +25,45 @@
     return pts;
   }
 
-  function underground(world, x, y, z, maxCells) {
+  // a binary heap of [priority, value]
+  function Heap() {
+    const h = [];
+    return { get size() { return h.length; },
+      push(f, v) { h.push([f, v]); let i = h.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (h[p][0] <= h[i][0]) break; [h[p], h[i]] = [h[i], h[p]]; i = p; } },
+      pop() { const top = h[0], last = h.pop(); if (h.length) { h[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < h.length && h[l][0] < h[m][0]) m = l; if (r < h.length && h[r][0] < h[m][0]) m = r; if (m === i) break; [h[m], h[i]] = [h[i], h[m]]; i = m; } } return top[1]; } };
+  }
+  const CK = (i, j, k) => ((i + 4096) * 8192 + (j + 4096)) * 8192 + (k + 4096); // a cell or voxel as one number
+
+  // The search, as a generator so the game can run it a few milliseconds a frame (it yields every so often).
+  //  1. cells: A* over the cells and their links towards the portal level, the climb weighted double so it heads up
+  //     rather than spreading out level by level (a route a cell or two longer than the shortest, found a hundred times
+  //     faster from deep down);
+  //  2. voxels: A* over standing places inside the route's cells (widened by a cell all round if that is not enough).
+  function* underground(world, x, y, z, maxCells) {
     const { CW, CH, GJ } = world, start = [fdiv(Math.floor(x), CW), fdiv(Math.floor(y + 0.01), CH), fdiv(Math.floor(z), CW)];
-    // 1. cells: breadth first to the nearest cell under a portal
-    const key = c => c[0] + ',' + c[1] + ',' + c[2], prev = new Map([[key(start), null]]), q = [start];
-    let goal = null;
-    for (let h = 0; h < q.length && h < maxCells; h++) {
-      const c = q[h];
-      if (c[1] === GJ - 1 && world.portalAt(c[0], c[2])) { goal = c; break; }
+    const top = GJ - 1, W = 2;
+    const g = new Map(), prev = new Map(), open = Heap(), sk = CK(...start);
+    g.set(sk, 0); prev.set(sk, null); open.push(W * Math.abs(top - start[1]), start);
+    let goal = null, n = 0;
+    while (open.size && n < maxCells) {
+      const c = open.pop(), ck = CK(...c), gc = g.get(ck); n++;
+      if (c[1] === top && world.portalAt(c[0], c[2])) { goal = c; break; }
       for (let d = 0; d < 6; d++) {
-        const n = [c[0] + DIRS[d][0], c[1] + DIRS[d][1], c[2] + DIRS[d][2]];
-        if (n[1] >= GJ || prev.has(key(n)) || !world.link(c[0], c[1], c[2], d)) continue;
-        prev.set(key(n), c); q.push(n);
+        const ni = c[0] + DIRS[d][0], nj = c[1] + DIRS[d][1], nk = c[2] + DIRS[d][2]; if (nj >= GJ) continue;
+        const key = CK(ni, nj, nk); if (g.has(key) && g.get(key) <= gc + 1) continue;
+        if (!world.link(c[0], c[1], c[2], d)) continue;
+        g.set(key, gc + 1); prev.set(key, ck); open.push(gc + 1 + W * Math.abs(top - nj), [ni, nj, nk]);
       }
+      if ((n & 63) === 0) yield;
     }
     if (!goal) return null;
-    const route = []; for (let c = goal; c; c = prev.get(key(c))) route.push(c);
+    const route = []; for (let k = CK(...goal); k !== null && k !== undefined; k = prev.get(k)) route.push(k);
     const target = mouth(world, goal[0], goal[2]);
-    // 2. voxels: standing places inside the route's cells (the plain's cell over the portal too)
-    const tryCells = cells => {
-      const allowed = new Set(cells.map(key)); allowed.add(key([goal[0], GJ, goal[2]]));
-      const solid = (a, b, c) => world.voxel(a, b, c) !== 0;
-      const stand = (a, b, c) => solid(a, b - 1, c) && !solid(a, b, c) && !solid(a, b + 1, c);
-      const inside = (a, b, c) => allowed.has(fdiv(a, CW) + ',' + fdiv(b, CH) + ',' + fdiv(c, CW));
+    const solid = (a, b, c) => world.voxel(a, b, c) !== 0;
+    const stand = (a, b, c) => solid(a, b - 1, c) && !solid(a, b, c) && !solid(a, b + 1, c);
+    function* voxels(cells) {
+      const allowed = new Set(cells); allowed.add(CK(goal[0], GJ, goal[2]));
+      const inside = (a, b, c) => allowed.has(CK(fdiv(a, CW), fdiv(b, CH), fdiv(c, CW)));
       let s = [Math.floor(x), Math.floor(y + 0.01), Math.floor(z)];
       if (!stand(...s)) { // standing on an edge: the nearest standing place around the feet
         let f = null; for (let dy = 0; dy >= -2 && !f; dy--) for (const [dx, dz] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) if (!f && stand(s[0] + dx, s[1] + dy, s[2] + dz)) f = [s[0] + dx, s[1] + dy, s[2] + dz];
@@ -55,42 +71,50 @@
       }
       const tx = Math.floor(target[0]), ty = target[1], tz = Math.floor(target[2]);
       const hfn = (a, b, c) => Math.abs(a - tx) + Math.abs(b - ty) * 2 + Math.abs(c - tz);
-      // A* with a binary heap
-      const heap = [], push = (f, n) => { heap.push([f, n]); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
-      const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top; };
-      const g = new Map(), par = new Map(), sk = s.join(); g.set(sk, 0); push(hfn(...s), s);
-      let end = null, n = 0;
-      while (heap.length && n++ < 400000) {
-        const [, cur] = pop(), ck = cur.join(), gc = g.get(ck);
-        if (cur[1] === ty && Math.abs(cur[0] - tx) <= 1 && cur[2] === tz) { end = cur; break; }
+      const gv = new Map(), par = new Map(), heap = Heap(), s0 = CK(...s); gv.set(s0, 0); par.set(s0, null); heap.push(hfn(...s), s);
+      let end = null, m = 0;
+      while (heap.size && m < 400000) {
+        const cur = heap.pop(), ck = CK(...cur), gc = gv.get(ck); m++;
+        if (cur[1] === ty && Math.abs(cur[0] - tx) <= 1 && cur[2] === tz) { end = ck; break; }
         const [a, b, c] = cur;
         for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (const dy of [0, 1, -1]) {
           const na = a + dx, nb = b + dy, nc = c + dz;
           if (!inside(na, nb, nc) || !stand(na, nb, nc)) continue;
           if (dy === 1 && solid(a, b + 2, c)) continue; if (dy === -1 && solid(na, b + 1, nc)) continue;
-          const nk = na + ',' + nb + ',' + nc, ng = gc + 1;
-          if (g.has(nk) && g.get(nk) <= ng) continue;
-          g.set(nk, ng); par.set(nk, ck); push(ng + hfn(na, nb, nc), [na, nb, nc]);
+          const nk = CK(na, nb, nc), ng = gc + 1;
+          if (gv.has(nk) && gv.get(nk) <= ng) continue;
+          gv.set(nk, ng); par.set(nk, ck); heap.push(ng + hfn(na, nb, nc), [na, nb, nc]);
         }
+        if ((m & 255) === 0) yield;
       }
-      if (!end) return null;
-      const pts = []; for (let k = end.join(); k; k = par.get(k)) { const v = k.split(',').map(Number); pts.push([v[0] + 0.5, v[1], v[2] + 0.5]); }
+      if (end === null) return null;
+      const pts = []; for (let k = end; k !== null && k !== undefined; k = par.get(k)) { const kz = k % 8192, rest = (k - kz) / 8192, kj = rest % 8192, ki = (rest - kj) / 8192; pts.push([ki - 4096 + 0.5, kj - 4096, kz - 4096 + 0.5]); }
       return pts.reverse();
-    };
-    let pts = tryCells(route);
+    }
+    let pts = yield* voxels(route);
     if (!pts) { // widen the corridor by a cell all round
-      const wide = new Map(); for (const c of route) for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let d = -1; d <= 1; d++) { const n = [c[0] + a, c[1] + b, c[2] + d]; if (n[1] < GJ) wide.set(key(n), n); }
-      pts = tryCells([...wide.values()]);
+      const wide = new Set();
+      for (const k of route) { const kz = k % 8192, rest = (k - kz) / 8192, kj = rest % 8192, ki = (rest - kj) / 8192, c = [ki - 4096, kj - 4096, kz - 4096];
+        for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let d = -1; d <= 1; d++) if (c[1] + b < GJ) wide.add(CK(c[0] + a, c[1] + b, c[2] + d)); }
+      pts = yield* voxels([...wide]);
     }
     return pts;
   }
 
-  // a route to the nearest portal from feet position (x, y, z), or null
-  function findRoute(world, x, y, z, opts) {
-    if (y >= world.SURF + 0.5 && world.groundAt(x, z) !== null) return onPlain(world, x, z, y);
-    return underground(world, x, y, z, (opts && opts.maxCells) || 50000);
+  // A search job: step(ms) works for about that long and returns undefined while it is still working, then the route
+  // (a list of feet positions) or null. The game steps it a little each frame, so pressing F never stalls a frame.
+  function routeJob(world, x, y, z, opts) {
+    if (y >= world.SURF + 0.5 && world.groundAt(x, z) !== null) { const r = onPlain(world, x, z, y); return { step: () => r, done: true, result: r }; }
+    const it = underground(world, x, y, z, (opts && opts.maxCells) || 50000), job = { done: false, result: undefined, step(ms) {
+      if (job.done) return job.result;
+      const t0 = Date.now();
+      for (;;) { const r = it.next(); if (r.done) { job.done = true; job.result = r.value || null; return job.result; } if (Date.now() - t0 >= ms) return undefined; }
+    } };
+    return job;
   }
+  // the whole search at once (for the tests)
+  function findRoute(world, x, y, z, opts) { const j = routeJob(world, x, y, z, opts); let r; do { r = j.step(1e9); } while (r === undefined); return r; }
 
-  const api = { findRoute, mouth };
+  const api = { findRoute, routeJob, mouth };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MegaGuide = api;
 })(typeof window !== 'undefined' ? window : globalThis);
