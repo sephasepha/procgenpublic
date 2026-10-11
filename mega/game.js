@@ -29,6 +29,7 @@
     const g = world.cell(i, j, k); let any = false;
     for (let n = 0; n < g.length; n++) if (g[n]) { any = true; break; }
     const c = { i, j, k, n: 0, vbo: null, ibo: null, info: world.info(i, j, k) };
+    if (j === world.GJ) meshTerrain(c);
     if (!any) return c;
     const ox = i * CW, oy = j * CH, oz = k * CW, V = [], X = [];
     const at = (x, y, z) => (x >= 0 && x < CW && y >= 0 && y < CH && z >= 0 && z < CW) ? g[(y * CW + z) * CW + x] : world.voxel(ox + x, oy + y, oz + z);
@@ -48,8 +49,33 @@
     c.n = X.length; c.pal = new Float32Array(PAL[c.info.region]); c.light = c.info.light; { let e = 0; for (const [a, b, d] of [[1,0,0],[-1,0,0],[0,0,1],[0,0,-1],[0,1,0],[0,-1,0]]) if (world.isVoid(c.i + a, c.j + b, c.k + d)) e++; c.amb = 0.16 + 0.12 * e; if (c.info.void) c.amb = 0.4; }
     return c;
   }
-  const dropCell = c => { if (c.vbo) { gl.deleteBuffer(c.vbo); gl.deleteBuffer(c.ibo); } };
+  const dropCell = c => { if (c.vbo) { gl.deleteBuffer(c.vbo); gl.deleteBuffer(c.ibo); } if (c.tvbo) { gl.deleteBuffer(c.tvbo); gl.deleteBuffer(c.tibo); } };
   let PAL = [];
+  // the plain: a smooth heightfield over the surface cell, a vertex per voxel corner, shaded by its slope and coloured
+  // grass or dirt by a slow noise; the quads over a portal's stairwell are left out
+  function meshTerrain(c) {
+    const ox = c.i * CW, oz = c.k * CW, N = CW + 1, P = new Float32Array(N * N * 6), X = [];
+    const L = [0.35, 0.85, 0.4], ll = Math.hypot(...L);
+    for (let z = 0; z < N; z++) for (let x = 0; x < N; x++) {
+      const gx = ox + x, gz = oz + z, h = world.terrainH(gx, gz), hx = world.terrainH(gx + 1, gz) - world.terrainH(gx - 1, gz), hz = world.terrainH(gx, gz + 1) - world.terrainH(gx, gz - 1);
+      const n = [-hx / 2, 1, -hz / 2], nl = Math.hypot(...n), lit = 0.55 + 0.45 * Math.max(0, (n[0] * L[0] + n[1] * L[1] + n[2] * L[2]) / nl / ll);
+      const g = Math.min(1, Math.max(0, (Math.sin(gx * 0.11) * Math.cos(gz * 0.09) * 0.5 + 0.5) * 0.6 + 0.4 * ((gx * 7 + gz * 13) % 5) / 5));
+      const col = [0.30 + (0.23 - 0.30) * g, 0.29 + (0.30 - 0.29) * g, 0.24 + (0.19 - 0.24) * g];
+      const o = (z * N + x) * 6; P[o] = x; P[o + 1] = h - c.j * CH; P[o + 2] = z; P[o + 3] = col[0] * lit; P[o + 4] = col[1] * lit; P[o + 5] = col[2] * lit;
+    }
+    for (let z = 0; z < CW; z++) for (let x = 0; x < CW; x++) {
+      if (world.groundAt(ox + x + 0.5, oz + z + 0.5) === null || world.voxel(ox + x, world.SURF + 1, oz + z)) continue; // the stairwell, and the stone that comes up to the surface
+      const a = z * N + x; X.push(a, a + N, a + N + 1, a, a + N + 1, a + 1);
+    }
+    c.tvbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, c.tvbo); gl.bufferData(gl.ARRAY_BUFFER, P, gl.STATIC_DRAW);
+    c.tibo = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, c.tibo); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(X), gl.STATIC_DRAW);
+    c.tn = X.length;
+  }
+  const TVS = `attribute vec3 aP; attribute vec3 aC; uniform mat4 uVP; uniform vec3 uRel; varying vec3 vRel; varying vec3 vCol;
+    void main() { vRel = aP + uRel; vCol = aC * (0.5 + 0.9 / (1.0 + 0.12 * length(vRel))); gl_Position = uVP * vec4(vRel, 1.0); }`;
+  const TFS = `precision mediump float; varying vec3 vRel; varying vec3 vCol; uniform vec3 uFog; uniform float uFogD;
+    void main() { float d = length(vec3(vRel.x, vRel.y * 0.45, vRel.z)) * uFogD; gl_FragColor = vec4(mix(vCol, uFog, 1.0 - exp(-d * d)), 1.0); }`;
+  let tprog, tloc;
 
   // ---------- shaders ----------
   const VS = `attribute vec4 a; uniform mat4 uVP; uniform vec3 uRel; uniform vec3 uPal[8]; uniform float uLight; uniform float uAmb;
@@ -77,6 +103,9 @@
     prog = gl.createProgram(); gl.attachShader(prog, shader(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog);
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
     loc = { a: gl.getAttribLocation(prog, 'a') };
+    tprog = gl.createProgram(); gl.attachShader(tprog, shader(gl.VERTEX_SHADER, TVS)); gl.attachShader(tprog, shader(gl.FRAGMENT_SHADER, TFS)); gl.linkProgram(tprog);
+    if (!gl.getProgramParameter(tprog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(tprog));
+    tloc = { aP: gl.getAttribLocation(tprog, 'aP'), aC: gl.getAttribLocation(tprog, 'aC') }; ['uVP', 'uRel', 'uFog', 'uFogD'].forEach(n => { tloc[n] = gl.getUniformLocation(tprog, n); });
     ['uVP', 'uRel', 'uPal', 'uLight', 'uAmb', 'uFog', 'uFogD'].forEach(n => { loc[n] = gl.getUniformLocation(prog, n); });
     gl.enable(gl.DEPTH_TEST); gl.enable(gl.CULL_FACE); gl.clearColor(FOG[0], FOG[1], FOG[2], 1);
     return true;
@@ -117,8 +146,9 @@
   function chunks(budgetMs) {
     const p = st.p, ci = fdiv(Math.floor(p.x), CW), cj = fdiv(Math.floor(p.y + 1), CH), ck = fdiv(Math.floor(p.z), CW), t0 = performance.now();
     const want = [];
+    const top = cj >= world.GJ; // on the plain the lid hides the structure: draw only the level under it
     for (let dj = -RDOWN; dj <= RUP; dj++) for (let dk = -RH; dk <= RH; dk++) for (let di = -RH; di <= RH; di++) {
-      const r = reach(di, dj, dk); if (r > 1) continue; want.push([ci + di, cj + dj, ck + dk, Math.hypot(di, dk) + Math.abs(dj) * 0.5]);
+      const r = reach(di, dj, dk); if (r > 1) continue; if (top && (cj + dj < world.GJ - 1 || cj + dj > world.GJ + 1)) continue; want.push([ci + di, cj + dj, ck + dk, Math.hypot(di, dk) + Math.abs(dj) * 0.5]);
     }
     want.sort((a, b) => a[3] - b[3]);
     let built = 0;
@@ -157,7 +187,10 @@
     gl.viewport(0, 0, cv.width, cv.height); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.useProgram(prog);
     const m = viewProj(p.yaw, p.pitch, cv.width / cv.height), pl = planes(m);
-    gl.uniformMatrix4fv(loc.uVP, false, m); gl.uniform3fv(loc.uFog, FOG); gl.uniform1f(loc.uFogD, FOGD);
+    // above ground the fog is dense and a little green; it thickens as you climb out of a stairwell
+    const up = Math.min(1, Math.max(0, (p.y - (world.SURF - 6)) / 8)), fog = FOG.map((f, n) => f + ([0.66, 0.68, 0.64][n] - f) * up), fogD = FOGD + (0.042 - FOGD) * up;
+    gl.clearColor(fog[0], fog[1], fog[2], 1); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.uniformMatrix4fv(loc.uVP, false, m); gl.uniform3fv(loc.uFog, fog); gl.uniform1f(loc.uFogD, fogD);
     gl.enableVertexAttribArray(loc.a);
     let drawn = 0;
     st.cells.forEach(c => {
@@ -170,6 +203,17 @@
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, c.ibo); gl.drawElements(gl.TRIANGLES, c.n, gl.UNSIGNED_SHORT, 0);
       drawn++;
     });
+    // the plain
+    gl.disableVertexAttribArray(loc.a);
+    gl.useProgram(tprog); gl.uniformMatrix4fv(tloc.uVP, false, m); gl.uniform3fv(tloc.uFog, fog); gl.uniform1f(tloc.uFogD, fogD);
+    gl.enableVertexAttribArray(tloc.aP); gl.enableVertexAttribArray(tloc.aC);
+    st.cells.forEach(c => {
+      if (!c.tn) return;
+      gl.uniform3f(tloc.uRel, c.i * CW - eye[0], c.j * CH - eye[1], c.k * CW - eye[2]);
+      gl.bindBuffer(gl.ARRAY_BUFFER, c.tvbo); gl.vertexAttribPointer(tloc.aP, 3, gl.FLOAT, false, 24, 0); gl.vertexAttribPointer(tloc.aC, 3, gl.FLOAT, false, 24, 12);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, c.tibo); gl.drawElements(gl.TRIANGLES, c.tn, gl.UNSIGNED_SHORT, 0);
+    });
+    gl.disableVertexAttribArray(tloc.aP); gl.disableVertexAttribArray(tloc.aC);
     st.drawn = drawn;
   }
 
@@ -178,7 +222,7 @@
   function toast(msg) { const t = q('.mg-toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 3200); }
   function hud() {
     const p = st.p, i = fdiv(Math.floor(p.x), CW), j = fdiv(Math.floor(p.y), CH), k = fdiv(Math.floor(p.z), CW), inf = world.info(i, j, k);
-    const place = inf.air ? 'Open air' : inf.void ? (inf.biome === 'expanse' ? 'A deck' : 'The shaft') : inf.biome === 'expanse' ? 'Inside an obelisk' : inf.well ? 'A well' : inf.drop ? 'A drop' : ({ open: 'A hall', pillars: 'Pillar hall', tunnels: 'Conduit', warren: 'Cells', terrace: 'A terrace', catacomb: 'Passages', crypt: 'A stairwell' })[inf.variant];
+    const place = inf.biome === 'surface' ? 'Open ground' : inf.air ? 'Open air' : inf.void ? (inf.biome === 'expanse' ? 'A deck' : 'The shaft') : inf.biome === 'expanse' ? 'Inside an obelisk' : inf.well ? 'A well' : inf.drop ? 'A drop' : ({ open: 'A hall', pillars: 'Pillar hall', tunnels: 'Conduit', warren: 'Cells', terrace: 'A terrace', catacomb: 'Passages', crypt: 'A stairwell' })[inf.variant];
     q('.mg-where').innerHTML = `<b>${W.BIOME_NAMES[inf.biome]}</b><span>${place} · ${W.PALETTES[inf.region].name} · level ${j}</span>`;
     q('.mg-pos').textContent = `cell ${i}, ${j}, ${k} · seed ${world.seed}`;
   }
@@ -235,7 +279,8 @@
     if ((askedFull && !force) || document.fullscreenElement || !document.documentElement.requestFullscreen) { if (force && document.fullscreenElement) document.exitFullscreen(); return; }
     askedFull = true; document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {})).catch(() => {});
   }
-  function respawn() { const s = world.spawn(); Object.assign(st.p, { x: s.x, y: s.y, z: s.z, vy: 0, yaw: s.yaw, pitch: 0 }); st.safe = { x: s.x, y: s.y, z: s.z }; toast('Back at the start.'); }
+  const startPoint = () => biome ? world.spawn() : world.surfaceSpawn(); // Mixed begins on the plain; a forced kind begins inside it
+  function respawn() { const s = startPoint(); Object.assign(st.p, { x: s.x, y: s.y, z: s.z, vy: 0, yaw: s.yaw, pitch: 0 }); st.safe = { x: s.x, y: s.y, z: s.z }; toast('Back at the start.'); }
 
   // ---------- start ----------
   const seedFromHash = () => { const m = /seed=(-?\d+)/.exec(location.hash); return m ? +m[1] : null; };
@@ -247,7 +292,7 @@
     world = W.createWorld(seed, { biome });
     el.querySelectorAll('.mg-biomes button').forEach(b => b.classList.toggle('on', (b.dataset.b || null) === biome));
     PAL = W.PALETTES.map(palFlat);
-    const s = world.spawn();
+    const s = startPoint();
     const body = MegaBody.createBody(world, s.x, s.y, s.z, s.yaw);
     st = { body, p: body.p, keys: {}, stick: { on: false, x: 0, y: 0, mag: 0 }, cells: new Map(), ready: false, t: 0, last: 0, acc: 0, grounded: false, groundT: 0, jumpAt: 0, jumps: 0, safe: { x: s.x, y: s.y, z: s.z }, safeT: 0, frames: 0, hudT: 0, drawn: 0 };
     q('.mg-load').hidden = false; q('.mg-load').textContent = 'Building the first rooms…';

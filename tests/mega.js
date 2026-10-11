@@ -25,7 +25,7 @@ for (const { seed, biome } of cases) {
   let vo = 0, n = 0; const variants = {};
   for (let i = -R; i <= R; i++) for (let j = -RY; j <= RY; j++) for (let k = -R; k <= R; k++) { n++; if (w.isVoid(i, j, k)) vo++; else { const v = w.variantOf(i, j, k); variants[v] = (variants[v] || 0) + 1; } }
   const share = `${(vo / n * 100).toFixed(0)}%`;
-  if (!biome) { mixVo += vo; mixN += n; for (let i = -60; i <= 60; i += 4) for (let j = -27; j <= 27; j += 3) for (let k = -60; k <= 60; k += 4) mixBiomes.add(w.districtOf(i, j, k).type); }
+  if (!biome) { mixVo += vo; mixN += n; for (let i = -60; i <= 60; i += 4) for (let j = -27; j <= 27; j += 3) for (let k = -60; k <= 60; k += 4) { const t = w.districtOf(i, j, k).type; if (t !== 'surface') mixBiomes.add(t); } }
   else if (biome === 'interior' || biome === 'catacombs') check(vo === 0, `the interior has no open air (${share})`);
   else if (biome === 'colonnade') check(vo / n > 0.6, `the colonnade is mostly air (${share})`);
   else if (biome === 'chasm') check(vo / n > 0.6 && vo / n < 0.95, `the chasm is mostly open, with faces standing in it (${share})`);
@@ -41,7 +41,7 @@ for (const { seed, biome } of cases) {
     const [dx, dy, dz] = DIRS[d], l = w.link(i, j, k, d);
     if (l !== w.link(i + dx, j + dy, k + dz, OPP[d])) asym++;
     if (l && d >= 4) { vertical++; const lo = d === 4 ? j : j - 1; if (w.shaftCol(i, k, j) || w.shaftCol(i, k, j + dy)) badVert++; if (w.voidStair(i, lo, k)) voidStairs++; }
-    if (l && (w.isAir(i, j, k) || w.isAir(i + dx, j + dy, k + dz))) badAir++;
+    if (l && (w.isAir(i, j, k) || w.isAir(i + dx, j + dy, k + dz)) && !(d === 4 && j === w.GJ - 1 && w.portalAt(i, k))) badAir++; // a portal's stair is the one way up out of the lid
     if (l && d < 4 && w.isVoid(i, j, k) !== w.isVoid(i + dx, j, k + dz)) bridges++;
   }
   check(asym === 0, 'a link looks the same from both sides'); check(badVert === 0, 'no stair runs through a well or a drop'); check(badAir === 0, 'nothing links into open air'); if (biome === 'colonnade' || biome === 'chasm') check(voidStairs > 4, `the open voids have stair towers (${voidStairs / 2 | 0} flights)`); check(vertical > 10 && (biome === 'interior' || biome === 'catacombs' || bridges > 10), `there are stairs (${vertical / 2 | 0}) and doors onto voids (${bridges / 2 | 0})`);
@@ -126,6 +126,36 @@ for (const biome of ['expanse', null]) for (const seed of [1, 2, 3, 4]) {
     if (ok) climbed++; else if (bad.length < 3) bad.push([i, j, k].join());
   }
   check(tried > 0 && climbed === tried, `${biome || 'mixed'} seed ${seed}: ${climbed}/${tried} flights out of or into open space climb (${[...kinds]}) ${bad.join(' ')}`);
+}
+
+console.log('The surface');
+for (const seed of [1, 2, 3]) {
+  const w = createWorld(seed), solid = (x, y, z) => w.voxel(x, y, z) !== 0, S = w.SURF, GJ = w.GJ;
+  // the plain is gentle: within a few metres of its base, and no steep step between neighbouring metres
+  let lo = 1e9, hi = -1e9, steep = 0;
+  for (let x = -300; x <= 300; x += 1.5) for (let z = -300; z <= 300; z += 7) { const h = w.terrainH(x, z); lo = Math.min(lo, h); hi = Math.max(hi, h); if (Math.abs(w.terrainH(x + 1, z) - h) > 0.6) steep++; }
+  check(lo >= S + 1.05 && hi <= S + 5 && steep === 0, `seed ${seed}: the plain is gentle (${(lo - S).toFixed(1)} to ${(hi - S).toFixed(1)} m over the lid, ${steep} steep spots)`);
+  // portals: one over the start, a few elsewhere, and every one leads down by steps into the structure below
+  let portals = 0, down = 0; const bad = [];
+  for (let i = -12; i <= 12; i++) for (let k = -12; k <= 12; k++) {
+    if (!w.portalAt(i, k)) continue; portals++;
+    const x0 = i * CW + w.LANE(1 + ((GJ - 1) % 2))[0], start = [x0 + 1, S + 2, k * CW + 11];
+    const q = [start], seen = new Set([start.join()]); let ok = false;
+    const stand = (x, y, z) => solid(x, y - 1, z) && !solid(x, y, z) && !solid(x, y + 1, z);
+    for (let h = 0; h < q.length && !ok; h++) { const [x, y, z] = q[h];
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (const dy of [0, 1, -1]) {
+        const nx = x + dx, ny = y + dy, nz = z + dz; if (nx < i * CW || nx >= (i + 1) * CW || nz < k * CW || nz >= (k + 1) * CW || ny < (GJ - 1) * CH) continue;
+        const key = nx + ',' + ny + ',' + nz; if (seen.has(key) || !stand(nx, ny, nz)) continue;
+        if (dy === 1 && solid(x, y + 2, z)) continue; if (dy === -1 && solid(nx, y + 1, nz)) continue;
+        seen.add(key); q.push([nx, ny, nz]); if (ny === (GJ - 1) * CH + 1) ok = true;
+      } }
+    if (ok) down++; else if (bad.length < 3) bad.push(i + ',' + k);
+  }
+  check(w.portalAt(0, 0) && portals > 5 && down === portals, `seed ${seed}: ${down}/${portals} portals lead down into the structure ${bad.join(' ')}`);
+  // and the real body walks from the start on the plain through the doorway and down
+  const sp = w.surfaceSpawn(), b = Body.createBody(w, sp.x, sp.y, sp.z, sp.yaw);
+  for (let n = 0; n < 60 * 10; n++) Body.step(b, 1 / 60, 1, 0, false, 1);
+  check(b.p.y <= S - 5, `seed ${seed}: walking forward from the start goes through the doorway and down the stair (y ${b.p.y.toFixed(1)}, lid at ${S})`);
 }
 
 console.log('Walking it with the real body: stairs up and down, bridges over voids');

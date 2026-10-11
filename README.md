@@ -151,6 +151,8 @@ The **3D** button on the Delve screen (bottom right) walks the same world in fir
 
 The home page (`index.html`) is a separate 3D game, a Blame!-like infinite structure walked in first person (WASD, mouse, Space, Shift; on a phone a thumb-stick, a look pad and a JUMP button). The world is a pure function of the seed and a 17×8×17 cell, so it streams in every direction including up and down.
 
+**The surface.** The structure has a lid four levels above the start. Above it lies the ground floor: a gently rolling plain of grass and dirt (a smooth heightfield with slope shading, not voxels; you walk on its height directly) in dense, slightly green fog, empty but for doorways. About one cell in thirty holds one: two stone piers and a lintel with a cold light along the inner edge, opening on a trench and a stair down into whatever lies beneath. There is always one in front of the start, and Mixed begins there on the plain; a forced kind of district begins inside the structure as before. On the plain only the level under the lid is drawn, since the lid hides the rest.
+
 **Districts.** Space is divided into districts sixteen cells (272 m) across and nine levels (72 m) tall, with wobbling plumb sides, and each has an identity you recognise as you walk in:
 
 - **The Interior**: the dense inside of the structure, with no open air. Conduits (two-wide, three-high corridors), cells (a warren of small rooms), open halls and pillar halls, wells and narrow drops.

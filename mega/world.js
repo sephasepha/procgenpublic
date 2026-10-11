@@ -34,7 +34,11 @@
     { name: 'Stone', c: ['#4d4842', '#605a52', '#3c3833', '#716a60', '#837b6f', '#2d2a26', '#fff0dc'] },
     { name: 'Obsidian', c: ['#2c2e33', '#2a2c31', '#1e2023', '#3a3d44', '#565a62', '#18191c', '#e8f0ff'] },
     { name: 'Ossuary', c: ['#3e3a33', '#4a443b', '#2f2b26', '#5a5246', '#6a6152', '#24211d', '#ffcf8a'] },
+    { name: 'Earth', c: ['#3d3a30', '#4b473b', '#34312a', '#5c574b', '#6a6456', '#2b2923', '#dff2ff'] },
   ];
+  // The surface: the structure has a lid. Above level GJ - 1 lies the ground floor, a gently rolling plain of grass
+  // and dirt (a smooth heightfield, not voxels) in dense fog, empty but for doorways that open on stairs down.
+  const GJ = 4, SURF = GJ * CH;
   // Districts: big regions of space (about ten cells across and six levels tall) that each have an identity you
   // recognise as you walk in. They share one connection scheme, so you can always cross from one into the next.
   //   interior   the dense inside of the structure: conduits, cells and halls, no open air
@@ -46,8 +50,8 @@
   //              with burial niches; now and then a small ossuary; narrow stairwells between levels
   //   expanse    empty space: open air with decks of walkways every third level, and huge obelisks floating in it
   const BIOMES = ['interior', 'colonnade', 'terraces', 'chasm', 'expanse', 'catacombs'];
-  const BIOME_NAMES = { interior: 'The Interior', colonnade: 'The Colonnade', terraces: 'The Terraces', chasm: 'The Chasm', expanse: 'The Expanse', catacombs: 'The Catacombs' };
-  const BIOME_PAL = { interior: [0, 1, 2, 3, 4, 5], colonnade: [1, 4, 0], terraces: [6, 6, 4], chasm: [2, 3, 0, 5], expanse: [7], catacombs: [8] };
+  const BIOME_NAMES = { interior: 'The Interior', colonnade: 'The Colonnade', terraces: 'The Terraces', chasm: 'The Chasm', expanse: 'The Expanse', catacombs: 'The Catacombs', surface: 'The Surface' };
+  const BIOME_PAL = { interior: [0, 1, 2, 3, 4, 5], colonnade: [1, 4, 0], terraces: [6, 6, 4], chasm: [2, 3, 0, 5], expanse: [7], catacombs: [8], surface: [9] };
   const DX = 16, DY = 9; // a district: 272 m across, 72 m tall
 
   function createWorld(seed, opts) {
@@ -70,7 +74,7 @@
       const key = i + ',' + j + ',' + k, m = distMemo.get(key); if (m) return m;
       const wi = i + Math.round(5 * (noise(i / 6, 0, k / 6, 401) - 0.5)), wk = k + Math.round(5 * (noise(i / 6, 0, k / 6, 402) - 0.5));
       const bi = fdiv(wi, DX), bk = fdiv(wk, DX), bj = fdiv(j, DY);
-      let type = force;
+      let type = j >= GJ ? 'surface' : force;
       if (!type) { const r = H01(bi, bj, bk, 403); type = r < 0.18 ? 'interior' : r < 0.35 ? 'colonnade' : r < 0.52 ? 'terraces' : r < 0.69 ? 'chasm' : r < 0.84 ? 'expanse' : 'catacombs'; }
       const d = { type, bi, bj, bk, li: wi - bi * DX, lj: j - bj * DY, lk: wk - bk * DX };
       if (distMemo.size > 60000) distMemo.clear();
@@ -105,6 +109,7 @@
     // the decks, the obelisks, the stair towers and the edges of the district (every one of its neighbours is expanse)
     const airMemo = new Map();
     function isAir(i, j, k) {
+      if (j >= GJ) return true; // above the lid: no part of the network
       if (deckLevel(j) || (i === 0 && k === 0)) return false;
       const key = i + ',' + j + ',' + k, m = airMemo.get(key); if (m !== undefined) return m;
       let a = isExpanse(i, j, k) && !obeliskAt(i, j, k) && !towerCol(i, k);
@@ -113,6 +118,7 @@
       airMemo.set(key, a); return a;
     }
     function voidIn(D, i, j, k) {
+      if (D.type === 'surface') return true;
       if (D.type === 'interior' || D.type === 'catacombs') return false;
       if (D.type === 'expanse') return !obeliskAt(i, j, k);
       if (D.type === 'colonnade') return D.lj !== DY - 1 && H01(i, 0, k, 405) > 0.04; // all air under a roof, a few towers
@@ -176,10 +182,11 @@
     // stair towers in the open: some columns carry a landing at every level of a void and a stair up to the next,
     // so the voids can be climbed and descended (never where a colonnade pillar or a well or drop stands)
     function towerCol(i, k) { return !shaftCol(i, k) && !obeliskCol(i, k) && H01(i, 0, k, 420) < 0.08; }
-    const voidStair = (i, j, k) => towerCol(i, k) && isVoid(i, j, k) && isVoid(i, j + 1, k) && !(pillarCol(i, k) && (districtOf(i, j, k).type === 'colonnade' || districtOf(i, j + 1, k).type === 'colonnade'));
+    const voidStair = (i, j, k) => j < GJ - 1 && towerCol(i, k) && isVoid(i, j, k) && isVoid(i, j + 1, k) && !(pillarCol(i, k) && (districtOf(i, j, k).type === 'colonnade' || districtOf(i, j + 1, k).type === 'colonnade'));
     // the opening between a cell and its neighbour in direction d (symmetric)
     function link(i, j, k, d) {
       const [dx, dy, dz] = DIRS[d], ni = i + dx, nj = j + dy, nk = k + dz;
+      if ((d === 4 && j === GJ - 1 || d === 5 && j === GJ) && portalAt(i, k)) return true; // a portal's stair down from the surface
       if (isAir(i, j, k) || isAir(ni, nj, nk)) return false;
       if (d === 4 && voidStair(i, j, k)) return true;
       if (d === 5 && voidStair(i, j - 1, k)) return true;
@@ -194,7 +201,55 @@
     const pairKey = (i, j, k, d) => d % 2 === 0 ? [i, j, k, d] : [i + DIRS[d][0], j + DIRS[d][1], k + DIRS[d][2], OPP[d]];
     const laneOf = (i, j, k, d) => { const p = pairKey(i, j, k, d); return H(p[0], p[1], p[2], 140 + p[3]) % 4; };
     function stairOf(i, j, k) { return { lane: 1 + (((j % 2) + 2) % 2), // the middle lanes, so doors in the side walls never face the side of a stair; and alternating, so a stair arrives and the next one leaves in different lanes
-       z0: 1 + H(i, j, k, 151) % 8 }; } // for the cell below the stair
+       z0: j === GJ - 1 && portalAt(i, k) ? 1 : 1 + H(i, j, k, 151) % 8 }; } // for the cell below the stair (a portal's starts at the back, so it can climb on to the surface)
+
+    // ---------- the surface ----------
+    // portals: now and then a cell of the plain has one; there is always one over the start
+    const portalMemo = new Map();
+    function portalAt(i, k) {
+      if (i === 0 && k === 0) return true;
+      const key = i + ',' + k, m = portalMemo.get(key); if (m !== undefined) return m;
+      const v = H01(i, 0, k, 500) < 0.035 && !(H01(i, 0, k, 111) < 0.07) && !(H01(i, 0, k, 112) < 0.1);
+      if (portalMemo.size > 60000) portalMemo.clear();
+      portalMemo.set(key, v); return v;
+    }
+    const portalLane = (i, k) => LANE(1 + (((GJ - 1) % 2) + 2) % 2);
+    // the plain's height (voxel units, the height you stand at), smooth; flattened to SURF + 2 round each portal
+    function terrainH(x, z) {
+      let h = SURF + 2.5 + 1.2 * (noise(x / 48, 0, z / 48, 501) - 0.5) * 2 + 0.4 * (noise(x / 13, 0, z / 13, 502) - 0.5) * 2;
+      const i = fdiv(Math.floor(x), CW), k = fdiv(Math.floor(z), CW);
+      for (let di = -1; di <= 1; di++) for (let dk = -1; dk <= 1; dk++) {
+        if (!portalAt(i + di, k + dk)) continue;
+        const [x0, x1] = portalLane(i + di, k + dk), ox = (i + di) * CW, oz = (k + dk) * CW;
+        const dx = Math.max(ox + x0 - 3 - x, 0, x - (ox + x1 + 4)), dz = Math.max(oz - z, 0, z - (oz + 13));
+        const t = Math.min(1, Math.hypot(dx, dz) / 9), w = t * t * (3 - 2 * t);
+        h = SURF + 2 + (h - SURF - 2) * w;
+      }
+      return Math.max(SURF + 1.1, h);
+    }
+    // where you stand on the plain, or null over a portal's stairwell
+    function groundAt(x, z) {
+      const i = fdiv(Math.floor(x), CW), k = fdiv(Math.floor(z), CW);
+      if (portalAt(i, k)) { const [x0, x1] = portalLane(i, k), lx = x - i * CW, lz = z - k * CW; if (lx >= x0 && lx < x1 + 1 && lz >= 1 && lz < 9) return null; }
+      return terrainH(x, z);
+    }
+    // a surface cell: a slab of rock under the plain (the structure's lid), and a portal where there is one: a trench
+    // with walls, the top of the stair climbing out of the cell below, a landing at ground level, and the doorway
+    function surfaceCell(i, j, k, g, box) {
+      if (j !== GJ) return g;
+      box(0, CW - 1, 0, 0, 0, CW - 1, M.FLOOR);
+      if (!portalAt(i, k)) return g;
+      const [x0, x1] = portalLane(i, k);
+      box(x0, x1, 0, 0, 1, 9, 0);                                   // the stairwell
+      box(x0, x1, 0, 0, 8, 8, M.BRIDGE); box(x0, x1, 1, 1, 9, 9, M.BRIDGE); // the last two steps
+      box(x0, x1, 1, 1, 10, 11, M.BRIDGE);                         // the landing at the mouth
+      box(x0 - 1, x0 - 1, 1, 1, 0, 11, M.WALL); box(x1 + 1, x1 + 1, 1, 1, 0, 11, M.WALL); box(x0, x1, 1, 1, 0, 0, M.WALL);
+      // the doorway: two piers and a lintel, two deep, with a cold light along its inner edge
+      box(x0 - 2, x0 - 1, 1, 6, 10, 11, M.PILLAR); box(x1 + 1, x1 + 2, 1, 6, 10, 11, M.PILLAR); box(x0 - 2, x1 + 2, 6, 7, 10, 11, M.PILLAR);
+      box(x0 - 1, x0 - 1, 2, 5, 10, 10, M.LIGHT); box(x1 + 1, x1 + 1, 2, 5, 10, 10, M.LIGHT); box(x0, x1, 6, 6, 10, 10, M.LIGHT);
+      return g;
+    }
+    function surfaceSpawn() { const [x0, x1] = portalLane(0, 0), x = (x0 + x1 + 1) / 2, z = CW + 7.5; return { x, y: terrainH(x, z), z, yaw: 0 }; }
     const stairUp = (i, j, k) => roomAt(i, j, k) && link(i, j, k, 4);
     const linkedUp = (i, j, k) => link(i, j, k, 4); // a stair rises from this cell, whatever the two cells are
 
@@ -232,6 +287,7 @@
       const g = new Uint8Array(CW * CH * CW), at = (x, y, z) => (y * CW + z) * CW + x;
       const put = (x, y, z, m) => { if (x >= 0 && x < CW && y >= 0 && y < CH && z >= 0 && z < CW) g[at(x, y, z)] = m; };
       const box = (x0, x1, y0, y1, z0, z1, m) => { for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) put(x, y, z, m); };
+      if (j >= GJ) return surfaceCell(i, j, k, g, box);
       const rng = (() => { let s = H(i, j, k, 200) || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; })();
       const links = [0, 1, 2, 3].map(d => link(i, j, k, d));
       const laneC = d => 2 + 4 * laneOf(i, j, k, d); // the lateral centre of the lane a doorway or walkway uses
@@ -453,9 +509,9 @@
       let yaw = 0; for (let d = 0; d < 4; d++) if (link(0, 0, 0, d)) { yaw = [Math.PI / 2, 3 * Math.PI / 2, Math.PI, 0][d]; break; }
       return { x: 8.5, y: 1, z: 8.5, yaw };
     }
-    return { seed: S, biome: force, voidStair, towerCol, isAir, obeliskAt, isExpanse, districtOf, BIOMES, BIOME_NAMES, CW, CH, M, DIRS, PALETTES, info, link, isVoid, wellCol, dropCol, shaftCol, wellHole, dropHole, stairUp, stairOf, laneOf, variantOf, wide, parentDir, genCell, cell, voxel, spawn, regionOf, lightOf, LANE };
+    return { seed: S, GJ, SURF, portalAt, terrainH, groundAt, surfaceSpawn, biome: force, voidStair, towerCol, isAir, obeliskAt, isExpanse, districtOf, BIOMES, BIOME_NAMES, CW, CH, M, DIRS, PALETTES, info, link, isVoid, wellCol, dropCol, shaftCol, wellHole, dropHole, stairUp, stairOf, laneOf, variantOf, wide, parentDir, genCell, cell, voxel, spawn, regionOf, lightOf, LANE };
   }
 
-  const api = { createWorld, CW, CH, MATERIALS: M, PALETTES, BIOMES, BIOME_NAMES };
+  const api = { createWorld, GJ, CW, CH, MATERIALS: M, PALETTES, BIOMES, BIOME_NAMES };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MegaWorld = api;
 })(typeof window !== 'undefined' ? window : globalThis);

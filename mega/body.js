@@ -36,6 +36,11 @@
     else if (p.vy < 0) { p.y = Math.floor(ny) + 1; for (let g = 0; g < 3 && hits(b, p.x, p.y, p.z); g++) p.y += 1; p.vy = 0; b.grounded = true; b.groundT = b.t; } // landed on the top of the voxel below
     else { p.y = Math.floor(ny + TALL) - TALL - 1e-3; p.vy = 0; } // bumped the head
     if (p.vy <= 0 && hits(b, p.x, p.y - 0.03, p.z)) { b.grounded = true; b.groundT = b.t; }
+    // the open plain above the structure is a smooth heightfield, not voxels: stand on it, and walk up its slopes
+    const G = b.world.groundAt;
+    if (G) { const g = G(p.x, p.z);
+      if (g !== null && p.y < g && p.y > g - 1.5) { p.y = g; if (p.vy < 0) p.vy = 0; b.grounded = true; b.groundT = b.t; }
+      else if (g !== null && p.vy <= 0 && p.y - g < 0.04 && p.y >= g) { b.grounded = true; b.groundT = b.t; } }
   }
   const api = { createBody, step, hits, EYE: 1.55, HALF, TALL, WALK, RUN };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MegaBody = api;
