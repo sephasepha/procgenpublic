@@ -173,6 +173,10 @@
     if (st.ready) {
       let n = 0; while (st.acc >= STEP_DT && n++ < 12) { st.acc -= STEP_DT; physics(STEP_DT); }
       if (st.acc > STEP_DT * 12) st.acc = 0;
+      // which portal you came down: you were on the plain and now you are under the lid, in a portal's column
+      { const up = st.p.y >= world.SURF + 0.5;
+        if (st.wasUp && !up && st.p.y < world.SURF - 1) { const i = Math.floor(Math.floor(st.p.x) / CW), k = Math.floor(Math.floor(st.p.z) / CW); if (world.portalAt(i, k)) st.entered = [i, k]; }
+        if (up || st.p.y < world.SURF - 1) st.wasUp = up; }
       if (st.grounded && st.t - st.safeT > 0.5) { st.safe = { x: st.p.x, y: st.p.y, z: st.p.z }; st.safeT = st.t; }
     }
     const td = performance.now(); draw(); st.stats.draw = st.stats.draw * 0.92 + (performance.now() - td) * 0.08;
@@ -240,6 +244,7 @@
       if (!st) return;
       if (e.code === 'KeyR' && !e.repeat) { respawn(); return; }
       if (e.code === 'KeyF' && !e.repeat) { guide(); return; }
+      if (e.code === 'KeyT' && !e.repeat) { surfaceToggle(); return; }
       if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) { e.preventDefault(); st.keys[e.code] = true; }
       if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) st.jumpAt = st.t; st.keys.Space = true; }
     });
@@ -283,6 +288,7 @@
       });
       const lift = e => { if (e.pointerId === moveId) { moveId = null; base.hidden = true; st.stick = { on: false, x: 0, y: 0, mag: 0 }; } if (e.pointerId === lookId) lookId = null; };
       ['pointerup', 'pointercancel'].forEach(t => zone.addEventListener(t, lift));
+      const sb = q('.mg-surf'); if (sb) sb.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); surfaceToggle(); });
       const gb = q('.mg-guide'); if (gb) gb.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); guide(); });
       const jump = q('.mg-jump'); jump.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); st.jumpAt = st.t; st.keys.Space = true; });
       ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => jump.addEventListener(t, () => { if (st) delete st.keys.Space; }));
@@ -364,6 +370,28 @@
     gl.disable(gl.BLEND); gl.depthMask(true); gl.enable(gl.CULL_FACE);
   }
 
+  // T: up to the plain, in front of the doorway you came down (or the nearest one), remembering where you were; and
+  // from the plain, back down to exactly that place
+  function teleport(x, y, z, yaw, pitch) { Object.assign(st.p, { x, y, z, vy: 0, yaw, pitch }); st.safe = { x, y, z }; st.wasUp = y >= world.SURF + 0.5; }
+  function surfaceToggle() {
+    if (!st || !st.ready) return;
+    const p = st.p, onPlain = p.y >= world.SURF + 0.5;
+    if (onPlain) {
+      if (!st.back) { toast('Nowhere to go back to: go down through a doorway, then T brings you up and back.'); return; }
+      const b = st.back; st.back = null; teleport(b.x, b.y, b.z, b.yaw, b.pitch); toast('Back where you were.'); return;
+    }
+    let pk = st.entered;
+    if (!pk) { // the nearest portal over where you are
+      const ci = Math.floor(Math.floor(p.x) / CW), ck = Math.floor(Math.floor(p.z) / CW);
+      for (let r = 0; r <= 40 && !pk; r++) for (let i = ci - r; i <= ci + r && !pk; i++) for (let k = ck - r; k <= ck + r && !pk; k++) if (Math.max(Math.abs(i - ci), Math.abs(k - ck)) === r && world.portalAt(i, k)) pk = [i, k];
+      if (!pk) { toast('No doorway to the surface was found near here.'); return; }
+    }
+    st.back = { x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch };
+    const m = MegaGuide.mouth(world, pk[0], pk[1]), z = m[2] + 4;
+    teleport(m[0], world.terrainH(m[0], z), z, 0, 0);
+    toast(st.entered ? 'Up at the doorway you came down. T takes you back.' : 'Up at the nearest doorway. T takes you back.');
+  }
+
   function respawn() { const s = startPoint(); Object.assign(st.p, { x: s.x, y: s.y, z: s.z, vy: 0, yaw: s.yaw, pitch: 0 }); st.safe = { x: s.x, y: s.y, z: s.z }; toast('Back at the start.'); }
 
   // ---------- start ----------
@@ -378,7 +406,7 @@
     PAL = W.PALETTES.map(palFlat);
     const s = startPoint();
     const body = MegaBody.createBody(world, s.x, s.y, s.z, s.yaw);
-    st = { body, p: body.p, keys: {}, stick: { on: false, x: 0, y: 0, mag: 0 }, cells: new Map(), ready: false, t: 0, last: 0, acc: 0, grounded: false, groundT: 0, jumpAt: 0, jumps: 0, safe: { x: s.x, y: s.y, z: s.z }, safeT: 0, frames: 0, hudT: 0, drawn: 0, stats: { frame: 16, chunk: 0, draw: 0, built: 0, chunkMax: 0, at: 0, guideMs: 0, guideFrames: 0 } };
+    st = { body, p: body.p, keys: {}, stick: { on: false, x: 0, y: 0, mag: 0 }, cells: new Map(), ready: false, t: 0, last: 0, acc: 0, grounded: false, groundT: 0, jumpAt: 0, jumps: 0, safe: { x: s.x, y: s.y, z: s.z }, safeT: 0, frames: 0, hudT: 0, drawn: 0, entered: null, back: null, wasUp: false, stats: { frame: 16, chunk: 0, draw: 0, built: 0, chunkMax: 0, at: 0, guideMs: 0, guideFrames: 0 } };
     q('.mg-load').hidden = false; q('.mg-load').textContent = 'Building the first rooms…';
     cancelAnimationFrame(raf); raf = requestAnimationFrame(frame);
   }
