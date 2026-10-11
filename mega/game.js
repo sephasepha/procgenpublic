@@ -4,8 +4,13 @@
 (function (root) {
   const W = root.MegaWorld, { CW, CH } = W;
   const EYE = 1.55, STEP_DT = 1 / 120;
-  const RH = (matchMedia("(pointer: coarse)").matches || "ontouchstart" in window) ? 5 : 6, RUP = 4, RDOWN = 6;                    // cells drawn around you: sideways, above, below
-  const FOG = [0.62, 0.64, 0.66], FOGD = (matchMedia("(pointer: coarse)").matches || "ontouchstart" in window) ? 0.009 : 0.0085;
+  const PHONE = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+  // cells drawn around you: sideways, above, below. The drawn volume is an ellipsoid, wide and tall, so you see far
+  // up and down a shaft while the sideways reach stays the same
+  const RH = PHONE ? 5 : 6, RUP = PHONE ? 5 : 7, RDOWN = PHONE ? 8 : 10;
+  // fog: thicker than before, but vertical distance counts for less (FOGV), so drops and shafts read deep
+  const FOG = [0.62, 0.64, 0.66], FOGD = PHONE ? 0.0125 : 0.012, FOGV = 0.45;
+  const reach = (di, dj, dk) => { const h = Math.hypot(di, dk) / (RH + 0.6), v = dj > 0 ? dj / (RUP + 0.5) : -dj / (RDOWN + 0.5); return h * h + v * v; };
   const TAU = Math.PI * 2;
   const hexRGB = h => { const n = parseInt(h.slice(1), 16); return [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]; };
   const fdiv = (a, b) => Math.floor(a / b);
@@ -62,7 +67,7 @@
       vec2 uv = vFace < 1.5 ? vL.zy : vFace < 3.5 ? vL.xz : vL.xy;
       vec2 fr = fract(uv); float e = min(min(fr.x, 1.0 - fr.x), min(fr.y, 1.0 - fr.y));
       float grid = 0.91 + 0.09 * smoothstep(0.0, 0.06, e);
-      float d = length(vRel) * uFogD; float fog = 1.0 - exp(-d * d);
+      float d = length(vec3(vRel.x, vRel.y * 0.45, vRel.z)) * uFogD; float fog = 1.0 - exp(-d * d);
       gl_FragColor = vec4(mix(vCol * grid, uFog, fog), 1.0);
     }`;
   function shader(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
@@ -113,7 +118,7 @@
     const p = st.p, ci = fdiv(Math.floor(p.x), CW), cj = fdiv(Math.floor(p.y + 1), CH), ck = fdiv(Math.floor(p.z), CW), t0 = performance.now();
     const want = [];
     for (let dj = -RDOWN; dj <= RUP; dj++) for (let dk = -RH; dk <= RH; dk++) for (let di = -RH; di <= RH; di++) {
-      const d = Math.hypot(di, dk) + Math.abs(dj) * 0.9; if (d > RH + 0.6) continue; want.push([ci + di, cj + dj, ck + dk, d]);
+      const r = reach(di, dj, dk); if (r > 1) continue; want.push([ci + di, cj + dj, ck + dk, Math.hypot(di, dk) + Math.abs(dj) * 0.5]);
     }
     want.sort((a, b) => a[3] - b[3]);
     let built = 0;
@@ -122,7 +127,7 @@
       st.cells.set(key, meshCell(i, j, k)); built++;
       if (performance.now() - t0 > budgetMs && st.ready) break;
     }
-    st.cells.forEach((c, key) => { if (Math.abs(c.i - ci) > RH + 1 || Math.abs(c.k - ck) > RH + 1 || c.j - cj > RUP + 1 || cj - c.j > RDOWN + 1) { dropCell(c); st.cells.delete(key); } });
+    st.cells.forEach((c, key) => { if (reach(c.i - ci, c.j - cj, c.k - ck) > 1.35) { dropCell(c); st.cells.delete(key); } });
     if (!st.ready) { const near = want.filter(w => w[3] <= 1.5).every(w => st.cells.has(w[0] + ',' + w[1] + ',' + w[2])); if (near) { st.ready = true; q('.mg-load').hidden = true; } }
     return built;
   }
@@ -173,7 +178,7 @@
   function toast(msg) { const t = q('.mg-toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 3200); }
   function hud() {
     const p = st.p, i = fdiv(Math.floor(p.x), CW), j = fdiv(Math.floor(p.y), CH), k = fdiv(Math.floor(p.z), CW), inf = world.info(i, j, k);
-    const place = inf.void ? 'The shaft' : inf.well ? 'A well' : inf.drop ? 'A drop' : ({ open: 'A hall', pillars: 'Pillar hall', tunnels: 'Conduit', warren: 'Cells', terrace: 'A terrace' })[inf.variant];
+    const place = inf.air ? 'Open air' : inf.void ? (inf.biome === 'expanse' ? 'A deck' : 'The shaft') : inf.biome === 'expanse' ? 'Inside an obelisk' : inf.well ? 'A well' : inf.drop ? 'A drop' : ({ open: 'A hall', pillars: 'Pillar hall', tunnels: 'Conduit', warren: 'Cells', terrace: 'A terrace' })[inf.variant];
     q('.mg-where').innerHTML = `<b>${W.BIOME_NAMES[inf.biome]}</b><span>${place} · ${W.PALETTES[inf.region].name} · level ${j}</span>`;
     q('.mg-pos').textContent = `cell ${i}, ${j}, ${k} · seed ${world.seed}`;
   }

@@ -32,6 +32,7 @@
     { name: 'Ash', c: ['#6b6e70', '#85888a', '#55585a', '#9a9da0', '#b0b3b5', '#404345', '#ffffff'] },
     { name: 'Verdigris', c: ['#34433f', '#44574f', '#28332f', '#587068', '#6e8a80', '#1f2825', '#eefff6'] },
     { name: 'Stone', c: ['#4d4842', '#605a52', '#3c3833', '#716a60', '#837b6f', '#2d2a26', '#fff0dc'] },
+    { name: 'Obsidian', c: ['#2c2e33', '#2a2c31', '#1e2023', '#3a3d44', '#565a62', '#18191c', '#e8f0ff'] },
   ];
   // Districts: big regions of space (about ten cells across and six levels tall) that each have an identity you
   // recognise as you walk in. They share one connection scheme, so you can always cross from one into the next.
@@ -39,10 +40,11 @@
   //   colonnade  one enormous void under a roof, held up by pillars seven metres thick, crossed by walkways
   //   terraces   a stepped stone massif: open shelves that fall away level by level, monoliths standing on them,
   //              and corridors cut into the rock behind
-  //   chasm      sheer faces: a canyon several cells wide and many levels deep, shafts and colossal voids
-  const BIOMES = ['interior', 'colonnade', 'terraces', 'chasm'];
-  const BIOME_NAMES = { interior: 'The Interior', colonnade: 'The Colonnade', terraces: 'The Terraces', chasm: 'The Chasm' };
-  const BIOME_PAL = { interior: [0, 1, 2, 3, 4, 5], colonnade: [1, 4, 0], terraces: [6, 6, 4], chasm: [2, 3, 0, 5] };
+  //   chasm      sheer faces: canyons several cells wide and many levels deep, crossing, and colossal voids
+  //   expanse    empty space: open air with decks of walkways every third level, and huge obelisks floating in it
+  const BIOMES = ['interior', 'colonnade', 'terraces', 'chasm', 'expanse'];
+  const BIOME_NAMES = { interior: 'The Interior', colonnade: 'The Colonnade', terraces: 'The Terraces', chasm: 'The Chasm', expanse: 'The Expanse' };
+  const BIOME_PAL = { interior: [0, 1, 2, 3, 4, 5], colonnade: [1, 4, 0], terraces: [6, 6, 4], chasm: [2, 3, 0, 5], expanse: [7] };
   const DX = 10, DY = 6;
 
   function createWorld(seed, opts) {
@@ -66,7 +68,7 @@
       const wi = i + Math.round(5 * (noise(i / 6, 0, k / 6, 401) - 0.5)), wk = k + Math.round(5 * (noise(i / 6, 0, k / 6, 402) - 0.5));
       const bi = fdiv(wi, DX), bk = fdiv(wk, DX), bj = fdiv(j, DY);
       let type = force;
-      if (!type) { const r = H01(bi, bj, bk, 403); type = r < 0.28 ? 'interior' : r < 0.52 ? 'colonnade' : r < 0.76 ? 'terraces' : 'chasm'; }
+      if (!type) { const r = H01(bi, bj, bk, 403); type = r < 0.22 ? 'interior' : r < 0.41 ? 'colonnade' : r < 0.6 ? 'terraces' : r < 0.8 ? 'chasm' : 'expanse'; }
       const d = { type, bi, bj, bk, li: wi - bi * DX, lj: j - bj * DY, lk: wk - bk * DX };
       if (distMemo.size > 60000) distMemo.clear();
       distMemo.set(key, d); return d;
@@ -82,8 +84,34 @@
       if (voidMemo.size > 60000) voidMemo.clear();
       voidMemo.set(key, v); return v;
     }
+    // obelisks: on a lattice seven cells apart, two or three cells across and nine or twelve levels tall, hanging in
+    // the air (they exist only where the district is an expanse); you can go inside them
+    function obeliskAt(i, j, k) {
+      const bi = fdiv(i, 7), bk = fdiv(k, 7), w = 2 + (H(bi, 0, bk, 430) & 1), d = 2 + (H(bi, 0, bk, 431) & 1);
+      const ox = bi * 7 + H(bi, 0, bk, 432) % (6 - w), oz = bk * 7 + H(bi, 0, bk, 433) % (6 - d);
+      if (i < ox || i >= ox + w || k < oz || k >= oz + d) return false;
+      const bj = fdiv(j, 15); if (H01(bi, bj, bk, 434) > 0.75) return false;
+      const h = H(bi, bj, bk, 435) & 1 ? 12 : 9, y0 = bj * 15 + 2 + (h === 9 && (H(bi, bj, bk, 436) & 1) ? 3 : 0);
+      return j >= y0 && j < y0 + h;
+    }
+    const obeliskCol = (i, k) => { const bi = fdiv(i, 7), bk = fdiv(k, 7), w = 2 + (H(bi, 0, bk, 430) & 1), d = 2 + (H(bi, 0, bk, 431) & 1);
+      const ox = bi * 7 + H(bi, 0, bk, 432) % (6 - w), oz = bk * 7 + H(bi, 0, bk, 433) % (6 - d); return i >= ox && i < ox + w && k >= oz && k < oz + d; };
+    const isExpanse = (i, j, k) => districtOf(i, j, k).type === 'expanse';
+    const deckLevel = j => ((j % 3) + 3) % 3 === 0;
+    // open air: an expanse cell that is no part of the network at all, so the expanse is truly empty. Only away from
+    // the decks, the obelisks, the stair towers and the edges of the district (every one of its neighbours is expanse)
+    const airMemo = new Map();
+    function isAir(i, j, k) {
+      if (deckLevel(j) || (i === 0 && k === 0)) return false;
+      const key = i + ',' + j + ',' + k, m = airMemo.get(key); if (m !== undefined) return m;
+      let a = isExpanse(i, j, k) && !obeliskAt(i, j, k) && !towerCol(i, k);
+      for (let d = 0; d < 6 && a; d++) if (!isExpanse(i + DIRS[d][0], j + DIRS[d][1], k + DIRS[d][2])) a = false;
+      if (airMemo.size > 60000) airMemo.clear();
+      airMemo.set(key, a); return a;
+    }
     function voidIn(D, i, j, k) {
       if (D.type === 'interior') return false;
+      if (D.type === 'expanse') return !obeliskAt(i, j, k);
       if (D.type === 'colonnade') return D.lj !== DY - 1 && H01(i, 0, k, 405) > 0.04; // all air under a roof, a few towers
       if (D.type === 'terraces') { // a stepped massif, narrowing as it rises, its centre off to one side
         const cx = 3 + H(D.bi, D.bj, D.bk, 406) % 4, cz = 3 + H(D.bi, D.bj, D.bk, 407) % 4;
@@ -103,12 +131,16 @@
         big = i >= ox && i < ox + w && k >= oz && k < oz + d && j >= oy && j < oy + hh;
       }
       const along = H(D.bi, 0, D.bk, 409) & 1, a = along ? D.lk : D.li, b = along ? D.li : D.lk;
-      const canyon = Math.abs(a - 4.5 - 3 * (noise(b / 4, j / 5, 0, 411) - 0.5)) < 1.6;
-      return canyon || n > 0.76 || shaft || big;
+      const canyon = Math.abs(a - 4.5 - 3 * (noise(b / 4, j / 5, 0, 411) - 0.5)) < 2.4;
+      // and a second canyon crossing it in some districts
+      const cross = H01(D.bi, 0, D.bk, 413) < 0.5 && Math.abs(b - 4.5 - 3 * (noise(a / 4, j / 5, 0, 414) - 0.5)) < 1.3;
+      return canyon || cross || big;
     }
-    const wellCol = (i, k) => !(i === 0 && k === 0) && H01(i, 0, k, 111) < 0.07;     // a column of wide wells (in halls)
-    const dropCol = (i, k) => !(i === 0 && k === 0) && !wellCol(i, k) && H01(i, 0, k, 112) < 0.1; // a narrow drop (in tunnels)
-    const shaftCol = (i, k) => wellCol(i, k) || dropCol(i, k);
+    // wells and drops are columns, but they stop in an expanse and the level either side of it
+    const nearExpanse = (i, j, k) => isExpanse(i, j, k) || isExpanse(i, j - 1, k) || isExpanse(i, j + 1, k);
+    const wellCol = (i, k, j) => !(i === 0 && k === 0) && H01(i, 0, k, 111) < 0.07 && (j === undefined || !nearExpanse(i, j, k)); // wide wells (in halls)
+    const dropCol = (i, k, j) => !(i === 0 && k === 0) && !(H01(i, 0, k, 111) < 0.07) && H01(i, 0, k, 112) < 0.1 && (j === undefined || !nearExpanse(i, j, k)); // narrow drops (in tunnels)
+    const shaftCol = (i, k, j) => wellCol(i, k, j) || dropCol(i, k, j);
     const wellHole = j => ((j % 4) + 4) % 4 !== 0;                                    // wells have a floor every fourth level
     const dropHole = j => ((j % 5) + 5) % 5 !== 0;                                    // drops fall four levels, then a floor
     const roomAt = (i, j, k) => !isVoid(i, j, k);
@@ -116,35 +148,42 @@
     // tree towards the origin: each cell's parent is a step that reduces one of its coordinates
     function validDir(i, j, k, d) {
       const [dx, dy, dz] = DIRS[d], ni = i + dx, nj = j + dy, nk = k + dz;
-      if (dy !== 0) return roomAt(i, j, k) && roomAt(ni, nj, nk) && !shaftCol(i, k);   // stairs join halls, never through a shaft
+      if (dy !== 0) return roomAt(i, j, k) && roomAt(ni, nj, nk) && !shaftCol(i, k, j) && !shaftCol(i, k, nj);   // stairs join halls, never through a shaft
       return true;                                                                    // doors and bridges go anywhere
     }
+    // Every step to a parent lowers (|i| + |k|, off a deck level, |j|) in that order, so the parents form a tree. In an
+    // expanse the steps that reduce a coordinate may all lead into open air; then the cell's parent is the deck level
+    // next to it (decks are every third level, so one is always adjacent), by a stair of whatever kind fits.
+    const pot = (i, j, k) => [Math.abs(i) + Math.abs(k), (i || k) && !deckLevel(j) ? 1 : 0, Math.abs(j)];
+    const lower = (a, b) => a[0] !== b[0] ? a[0] < b[0] : a[1] !== b[1] ? a[1] < b[1] : a[2] < b[2];
     const parentMemo = new Map();
     function parentDir(i, j, k) {
       if (!i && !j && !k) return -1;
       const key = i + ',' + j + ',' + k, m = parentMemo.get(key); if (m !== undefined) return m;
-      const c = [];
+      if (isAir(i, j, k)) { parentMemo.set(key, -1); return -1; }
+      const c = [], me = pot(i, j, k);
       if (i) c.push(i > 0 ? 1 : 0); if (k) c.push(k > 0 ? 3 : 2); if (j) c.push(j > 0 ? 5 : 4);
-      const ok = c.filter(d => validDir(i, j, k, d));
-      const pool = ok.length ? ok : c, wts = pool.map(d => (d >= 4 ? 0.5 : 1)), tot = wts.reduce((a, b) => a + b, 0);
+      const ok = c.filter(d => { const ni = i + DIRS[d][0], nj = j + DIRS[d][1], nk = k + DIRS[d][2]; return validDir(i, j, k, d) && !isAir(ni, nj, nk) && lower(pot(ni, nj, nk), me); });
+      const pool = ok.length ? ok : [((j % 3) + 3) % 3 === 1 ? 5 : 4], wts = pool.map(d => (d >= 4 ? 0.5 : 1)), tot = wts.reduce((a, b) => a + b, 0);
       let r = H01(i, j, k, 120) * tot, pick = pool[0]; for (let n = 0; n < pool.length; n++) { if ((r -= wts[n]) < 0) { pick = pool[n]; break; } }
       if (parentMemo.size > 60000) parentMemo.clear();
       parentMemo.set(key, pick); return pick;
     }
     // stair towers in the open: some columns carry a landing at every level of a void and a stair up to the next,
     // so the voids can be climbed and descended (never where a colonnade pillar or a well or drop stands)
-    const towerCol = (i, k) => !shaftCol(i, k) && H01(i, 0, k, 420) < 0.08;
+    function towerCol(i, k) { return !shaftCol(i, k) && !obeliskCol(i, k) && H01(i, 0, k, 420) < 0.08; }
     const voidStair = (i, j, k) => towerCol(i, k) && isVoid(i, j, k) && isVoid(i, j + 1, k) && !(pillarCol(i, k) && (districtOf(i, j, k).type === 'colonnade' || districtOf(i, j + 1, k).type === 'colonnade'));
     // the opening between a cell and its neighbour in direction d (symmetric)
     function link(i, j, k, d) {
       const [dx, dy, dz] = DIRS[d], ni = i + dx, nj = j + dy, nk = k + dz;
+      if (isAir(i, j, k) || isAir(ni, nj, nk)) return false;
       if (d === 4 && voidStair(i, j, k)) return true;
       if (d === 5 && voidStair(i, j - 1, k)) return true;
       if (parentDir(i, j, k) === d || parentDir(ni, nj, nk) === OPP[d]) return true;
       // extra links make loops; decided once per pair from its canonical (lower) side
       const c = d % 2 === 0 ? [i, j, k, d] : [ni, nj, nk, OPP[d]];
       if (!validDir(c[0], c[1], c[2], c[3])) return false;
-      const void2 = isVoid(i, j, k) || isVoid(ni, nj, nk), p = c[3] >= 4 ? 0.13 : void2 ? 0.14 : 0.24;
+      const void2 = isVoid(i, j, k) || isVoid(ni, nj, nk), p = c[3] >= 4 ? 0.13 : (isExpanse(i, j, k) || isExpanse(ni, nj, nk)) ? 0.04 : void2 ? 0.14 : 0.24;
       return H01(c[0], c[1], c[2], 130 + c[3]) < p;
     }
     // which of a room's four lanes a doorway or bridge uses, and where a staircase goes: shared by both sides
@@ -153,17 +192,19 @@
     function stairOf(i, j, k) { return { lane: 1 + (((j % 2) + 2) % 2), // the middle lanes, so doors in the side walls never face the side of a stair; and alternating, so a stair arrives and the next one leaves in different lanes
        z0: 1 + H(i, j, k, 151) % 8 }; } // for the cell below the stair
     const stairUp = (i, j, k) => roomAt(i, j, k) && link(i, j, k, 4);
+    const linkedUp = (i, j, k) => link(i, j, k, 4); // a stair rises from this cell, whatever the two cells are
 
     // the inside of a block: tunnels, a warren, or a hall; halls hold the stairs and the wells, tunnels the narrow drops
     function variantOf(i, j, k) {
       if (i === 0 && j === 0 && k === 0) return 'open';
-      if (wellCol(i, k)) return 'open';
-      if (dropCol(i, k)) return 'tunnels';
-      const D = districtOf(i, j, k), up = link(i, j, k, 4) && roomAt(i, j + 1, k), down = link(i, j, k, 5) && roomAt(i, j - 1, k);
+      if (wellCol(i, k, j)) return 'open';
+      if (dropCol(i, k, j)) return 'tunnels';
+      const D = districtOf(i, j, k), up = link(i, j, k, 4), down = link(i, j, k, 5);
       const r = H01(i, j, k, 160);
       if (up || down) return r < 0.5 ? 'open' : 'pillars';
       if (D.type === 'terraces') return isVoid(i, j + 1, k) ? 'terrace' : r < 0.5 ? 'tunnels' : r < 0.8 ? 'warren' : 'open';
       if (D.type === 'colonnade') return r < 0.6 ? 'pillars' : 'open';
+      if (D.type === 'expanse') return r < 0.45 ? 'tunnels' : r < 0.7 ? 'open' : 'warren';
       if (D.type === 'interior') return r < 0.34 ? 'tunnels' : r < 0.56 ? 'warren' : r < 0.78 ? 'open' : 'pillars';
       return r < 0.46 ? 'tunnels' : r < 0.72 ? 'warren' : r < 0.82 ? 'open' : 'pillars';
     }
@@ -178,7 +219,7 @@
     const lightOf = (i, j, k) => 1;
     function info(i, j, k) {
       const v = isVoid(i, j, k);
-      return { i, j, k, void: v, variant: v ? null : variantOf(i, j, k), region: regionOf(i, j, k), light: lightOf(i, j, k), well: !v && wellCol(i, k), drop: !v && dropCol(i, k), biome: districtOf(i, j, k).type };
+      return { i, j, k, void: v, variant: v ? null : variantOf(i, j, k), region: regionOf(i, j, k), light: lightOf(i, j, k), well: !v && wellCol(i, k, j), drop: !v && dropCol(i, k, j), air: isAir(i, j, k), biome: districtOf(i, j, k).type };
     }
 
     // ---------- the voxels of a cell ----------
@@ -191,9 +232,11 @@
       const laneC = d => 2 + 4 * laneOf(i, j, k, d); // the lateral centre of the lane a doorway or walkway uses
 
       if (isVoid(i, j, k)) {
+        const D = districtOf(i, j, k), up = link(i, j, k, 4), down = link(i, j, k, 5);
         // the faces of the structure that border this void: ribs and pipes against them, and a cornice at every level
+        // (but obelisks stay bare)
         for (let d = 0; d < 4; d++) {
-          if (isVoid(i + DIRS[d][0], j, k + DIRS[d][2])) continue;
+          if (isVoid(i + DIRS[d][0], j, k + DIRS[d][2]) || D.type === 'expanse' || isExpanse(i + DIRS[d][0], j, k + DIRS[d][2])) continue;
           const along = d < 2, near = d === 1 || d === 3; // the face is at x or z = 0 when the neighbour is on the minus side
           const cut = (a0, a1, n0, n1, y0, y1, m) => { // a box against the face: positions a (along the face), depth n from the face
             const [x0, x1] = along ? (near ? [n0, n1] : [CW - 1 - n1, CW - 1 - n0]) : [a0, a1], [z0, z1] = along ? [a0, a1] : (near ? [n0, n1] : [CW - 1 - n1, CW - 1 - n0]);
@@ -203,8 +246,7 @@
           if (H01(i, j, k, 300 + d) < 0.4) cut(0, CW - 1, 0, 0, 3, 3, M.TRIM); // and sometimes a ledge halfway
           [4, 8, 12].forEach((p, n) => { const r = H01(i, j, k, 310 + d * 3 + n); if (r < 0.34) cut(p, p, 0, 1, 1, CH - 2, M.PILLAR); else if (r < 0.62) cut(p, p, 1, 1, 1, CH - 2, M.TRIM); });
         }
-        const D = districtOf(i, j, k);
-        if (D.type === 'colonnade' && pillarCol(i, k)) {
+        if (D.type === 'colonnade' && pillarCol(i, k) && !up && !down) {
           // a great pillar through every level, a ring around it where walkways meet, and a collar under the roof
           const nl = links.filter(Boolean).length;
           if (nl) for (let d = 0; d < 4; d++) {
@@ -221,8 +263,7 @@
           return g;
         }
         // a slender column, kept out of the lanes the walkways use (lanes never cover 4 or 12)
-        if (H01(i, 0, k, 210) < 0.3) { const c = H(i, 0, k, 211) % 4, px = c & 1 ? 12 : 4, pz = c & 2 ? 12 : 4; box(px, px, 0, CH - 1, pz, pz, M.PILLAR); }
-        const up = voidStair(i, j, k), down = voidStair(i, j - 1, k);
+        if (H01(i, 0, k, 210) < 0.3 && D.type !== 'expanse') { const c = H(i, 0, k, 211) % 4, px = c & 1 ? 12 : 4, pz = c & 2 ? 12 : 4; box(px, px, 0, CH - 1, pz, pz, M.PILLAR); }
         if (links.some(Boolean) || up || down) {
           box(6, 10, 0, 0, 6, 10, M.BRIDGE); // the central platform
           for (let d = 0; d < 4; d++) {
@@ -294,7 +335,7 @@
           else { box(z0, z1, 1, 3, 7, 9, 0); if (d === 2) box(c, c + 1, 1, 3, 9, CW - 1, 0); else box(c, c + 1, 1, 3, 0, 7, 0); }
         }
         if (rng() < 0.6) put(8, 4, 8, M.LIGHT);
-        if (dropCol(i, k)) { // a narrow drop through the floor and the ceiling at the junction
+        if (dropCol(i, k, j)) { // a narrow drop through the floor and the ceiling at the junction
           if (dropHole(j)) box(7, 8, 0, 0, 7, 8, 0);
           if (dropHole(j + 1)) box(7, 8, 4, CEILY, 7, 8, 0);
         }
@@ -316,7 +357,7 @@
 
       if (hall) {
         // wells: a wide hole through the floor and the ceiling
-        if (wellCol(i, k)) {
+        if (wellCol(i, k, j)) {
           if (wellHole(j)) box(6, 10, FLOORY, FLOORY, 6, 10, 0);
           if (wellHole(j + 1)) box(6, 10, CEILY, CEILY, 6, 10, 0);
         }
@@ -326,7 +367,7 @@
           box(x0, x1, CEILY, CEILY, s.z0 + 3, s.z0 + 6, 0); // headroom starts a step early
           for (let t = 0; t <= 6; t++) box(x0, x1, 1, 1 + t, s.z0 + t, s.z0 + t, M.BRIDGE);
         }
-        if (stairUp(i, j - 1, k)) { const s = stairOf(i, j - 1, k), [x0, x1] = LANE(s.lane); box(x0, x1, FLOORY, FLOORY, s.z0 + 4, s.z0 + 6, 0); }
+        if (linkedUp(i, j - 1, k)) { const s = stairOf(i, j - 1, k), [x0, x1] = LANE(s.lane); box(x0, x1, FLOORY, FLOORY, s.z0 + 4, s.z0 + 6, 0); }
       }
 
       // doorways in the walls
@@ -340,7 +381,7 @@
         if (links[d]) {
           if (hall && wide(i, j, k, d)) { wall(1, CW - 2, 1, CEILY - 1); for (const p of [4, 8, 12]) { if (d === 0) box(CW - 1, CW - 1, 1, CEILY - 1, p, p, M.PILLAR); else if (d === 1) box(0, 0, 1, CEILY - 1, p, p, M.PILLAR); else if (d === 2) box(p, p, 1, CEILY - 1, CW - 1, CW - 1, M.PILLAR); else box(p, p, 1, CEILY - 1, 0, 0, M.PILLAR); } }
           else { const [a, b] = LANE(laneOf(i, j, k, d)); wall(a, b, 1, dh); }
-        } else if (hall && nbVoid) { // slit windows onto the void
+        } else if (hall && nbVoid && !isExpanse(i, j, k)) { // slit windows onto the void
           for (let l = 0; l < 4; l++) if (H01(i, j, k, 220 + d * 4 + l) < 0.45) { const [a, b] = LANE(l); wall(a + 1, a + 1, 2, 5); }
         }
       }
@@ -351,7 +392,7 @@
     const cache = new Map();
     function cell(i, j, k) {
       const key = i + ',' + j + ',' + k; let c = cache.get(key);
-      if (!c) { c = genCell(i, j, k); if (cache.size > 3200) { const first = cache.keys().next().value; cache.delete(first); } cache.set(key, c); }
+      if (!c) { c = genCell(i, j, k); if (cache.size > 6000) { const first = cache.keys().next().value; cache.delete(first); } cache.set(key, c); }
       else { cache.delete(key); cache.set(key, c); } // most recently used last
       return c;
     }
@@ -366,7 +407,7 @@
       let yaw = 0; for (let d = 0; d < 4; d++) if (link(0, 0, 0, d)) { yaw = [Math.PI / 2, 3 * Math.PI / 2, Math.PI, 0][d]; break; }
       return { x: 8.5, y: 1, z: 8.5, yaw };
     }
-    return { seed: S, biome: force, voidStair, towerCol, districtOf, BIOMES, BIOME_NAMES, CW, CH, M, DIRS, PALETTES, info, link, isVoid, wellCol, dropCol, shaftCol, wellHole, dropHole, stairUp, stairOf, laneOf, variantOf, wide, parentDir, genCell, cell, voxel, spawn, regionOf, lightOf, LANE };
+    return { seed: S, biome: force, voidStair, towerCol, isAir, obeliskAt, isExpanse, districtOf, BIOMES, BIOME_NAMES, CW, CH, M, DIRS, PALETTES, info, link, isVoid, wellCol, dropCol, shaftCol, wellHole, dropHole, stairUp, stairOf, laneOf, variantOf, wide, parentDir, genCell, cell, voxel, spawn, regionOf, lightOf, LANE };
   }
 
   const api = { createWorld, CW, CH, MATERIALS: M, PALETTES, BIOMES, BIOME_NAMES };

@@ -156,15 +156,16 @@ The home page (`index.html`) is a separate 3D game, a Blame!-like infinite struc
 - **The Interior**: the dense inside of the structure, with no open air. Conduits (two-wide, three-high corridors), cells (a warren of small rooms), open halls and pillar halls, wells and narrow drops.
 - **The Colonnade**: one enormous void under a roof of halls, held up by pillars seven metres thick that run through every level, crossed by walkways that meet in rings around the pillars. A few towers stand in it.
 - **The Terraces**: stepped stone massifs that narrow as they rise. Open shelves (no ceiling) fall away level by level, monoliths stand on them, and corridors are cut into the rock behind, leading back into conduits and cells.
-- **The Chasm**: sheer faces. A canyon several cells wide runs across the district through every level, with shafts, colossal voids, ribs, pipes, cornices and walkways across.
+- **The Chasm**: sheer faces. Canyons five cells wide run across the district through every level (in half the districts a second one crosses it), with colossal voids, ribs, pipes, cornices and walkways across; the canyon walls stay whole.
+- **The Expanse**: empty space. Most of it is open air that belongs to no path at all; walkway decks cross it every third level (24 m apart), stair towers rise through it, and huge obelisks hang in it, two or three cells across (34–51 m) and nine or twelve levels tall (72–96 m), with nothing under them. You can walk into them.
 
-The HUD names the district and the kind of space you are in. The pills under the top buttons (Mixed, Interior, Colonnade, Terraces, Chasm) force every district to one kind, to test each on its own; the choice goes into the address (`#seed=…&biome=terraces`).
+The HUD names the district and the kind of space you are in. The pills under the top buttons (Mixed, Interior, Colonnade, Terraces, Chasm, Expanse) force every district to one kind, to test each on its own; the choice goes into the address (`#seed=…&biome=terraces`).
 
 **Stair towers.** About one column in twelve carries a stair tower through the open voids: a landing at every level that every walkway there joins, and a flight of slabs up to the landing above, alternating sides by level, so the voids can be climbed and descended without going back indoors.
 
-**Guarantees.** Every cell connects back to the start (a tree towards the origin, plus loops), whatever the district, and the tests walk it by steps for the mixed world and for each forced kind, and walk the real body up and down stairs and across walkways.
+**Guarantees.** Every cell that is not open air connects back to the start, whatever the district: each cell's parent is a neighbour that lowers (|i| + |k|, being off a deck level, |j|), so the parents form a tree; in an expanse, when every such neighbour is open air, the parent is the deck level next to it, joined by a stair (hall to hall, landing to landing, or between the two). The tests check this, and the tests walk it by steps for the mixed world and for each forced kind, and walk the real body up and down stairs and across walkways.
 
-**Look.** Dark inked palettes per district (Stone and Ash for the terraces, Concrete and Basalt for the colonnade, Steel and Rust for the chasm), a headlamp falloff, pale haze fog. Draw distance is six cells sideways on a computer, five on a phone.
+**Look.** Dark inked palettes per district (Stone and Ash for the terraces, Concrete and Basalt for the colonnade, Steel and Rust for the chasm), a headlamp falloff, pale haze fog that counts vertical distance for less than horizontal, so shafts read deep. The drawn volume is an ellipsoid: six cells sideways, seven up and ten down on a computer (five, five and eight on a phone).
 
 Code in `mega/world.js`, `mega/body.js`, `mega/game.js`; tests in `tests/mega.js`.
 
