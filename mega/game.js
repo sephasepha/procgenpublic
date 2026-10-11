@@ -167,15 +167,21 @@
     raf = requestAnimationFrame(frame);
     const dt = Math.min(0.1, (ts - (st.last || ts)) / 1000); st.last = ts; st.acc = (st.acc || 0) + dt;
     resize();
-    chunks(st.ready ? 5 : 40);
+    const S = st.stats, tc = performance.now(), built = chunks(st.ready ? 5 : 40), cm = performance.now() - tc;
+    S.frame = S.frame * 0.92 + dt * 1000 * 0.08; S.chunk = S.chunk * 0.92 + cm * 0.08; S.built += built; if (cm > S.chunkMax) S.chunkMax = cm;
     if (st.ready) {
       let n = 0; while (st.acc >= STEP_DT && n++ < 12) { st.acc -= STEP_DT; physics(STEP_DT); }
       if (st.acc > STEP_DT * 12) st.acc = 0;
       if (st.grounded && st.t - st.safeT > 0.5) { st.safe = { x: st.p.x, y: st.p.y, z: st.p.z }; st.safeT = st.t; }
       if (st.p.y < st.safe.y - 90) { st.p.x = st.safe.x; st.p.y = st.safe.y + 0.1; st.p.z = st.safe.z; st.p.vy = 0; toast('The fall ends. You are set back where you last stood.'); }
     }
-    draw();
+    const td = performance.now(); draw(); st.stats.draw = st.stats.draw * 0.92 + (performance.now() - td) * 0.08;
     if (ts - st.hudT > 150) { st.hudT = ts; hud(); }
+    if (ts - st.stats.at > 500) { // the timing line, twice a second
+      const S = st.stats, secs = (ts - S.at) / 1000;
+      q('.mg-stats').textContent = `${S.frame.toFixed(1)} ms · ${Math.round(1000 / Math.max(1, S.frame))} fps · draw ${S.draw.toFixed(1)} ms · chunks ${S.chunk.toFixed(1)} ms (max ${S.chunkMax.toFixed(0)}, ${(S.built / secs).toFixed(0)}/s) · ${st.drawn}/${st.cells.size} cells` + (S.guideMs ? ` · route ${S.guideMs.toFixed(0)} ms` : '');
+      S.at = ts; S.built = 0; S.chunkMax = 0;
+    }
     st.frames++;
   }
   function resize() {
@@ -214,6 +220,7 @@
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, c.tibo); gl.drawElements(gl.TRIANGLES, c.tn, gl.UNSIGNED_SHORT, 0);
     });
     gl.disableVertexAttribArray(tloc.aP); gl.disableVertexAttribArray(tloc.aC);
+    drawLine(m, eye, fog, fogD);
     st.drawn = drawn;
   }
 
@@ -232,6 +239,7 @@
     window.addEventListener('keydown', e => {
       if (!st) return;
       if (e.code === 'KeyR' && !e.repeat) { respawn(); return; }
+      if (e.code === 'KeyF' && !e.repeat) { guide(); return; }
       if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) { e.preventDefault(); st.keys[e.code] = true; }
       if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) st.jumpAt = st.t; st.keys.Space = true; }
     });
@@ -275,6 +283,7 @@
       });
       const lift = e => { if (e.pointerId === moveId) { moveId = null; base.hidden = true; st.stick = { on: false, x: 0, y: 0, mag: 0 }; } if (e.pointerId === lookId) lookId = null; };
       ['pointerup', 'pointercancel'].forEach(t => zone.addEventListener(t, lift));
+      const gb = q('.mg-guide'); if (gb) gb.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); guide(); });
       const jump = q('.mg-jump'); jump.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); st.jumpAt = st.t; st.keys.Space = true; });
       ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => jump.addEventListener(t, () => { if (st) delete st.keys.Space; }));
     }
@@ -296,6 +305,53 @@
     askedFull = true; document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {})).catch(() => {});
   }
   const startPoint = () => biome ? world.spawn() : world.surfaceSpawn(); // Mixed begins on the plain; a forced kind begins inside it
+  // ---------- the guide line (F): a glowing ribbon along the floor to the nearest portal, pulsing towards it ----------
+  const LVS = `attribute vec3 aP; attribute float aT; uniform mat4 uVP; uniform vec3 uRel; varying vec3 vRel; varying float vT;
+    void main() { vRel = aP + uRel; vT = aT; gl_Position = uVP * vec4(vRel, 1.0); }`;
+  const LFS = `precision mediump float; varying vec3 vRel; varying float vT; uniform vec3 uFog; uniform float uFogD; uniform float uTime; uniform float uAlpha;
+    void main() { float pulse = pow(1.0 - fract(vT / 5.0 - uTime * 1.2), 3.0); vec3 col = vec3(1.0, 0.82, 0.45) * (0.75 + 0.6 * pulse);
+      float d = length(vec3(vRel.x, vRel.y * 0.45, vRel.z)) * uFogD; float fog = (1.0 - exp(-d * d)) * 0.7;
+      gl_FragColor = vec4(mix(col, uFog, fog), uAlpha * (0.75 + 0.25 * pulse)); }`;
+  let lprog, lloc, line = null;
+  const GUIDE_S = 6;
+  function guide() {
+    if (!st || !st.ready) return;
+    const t0 = performance.now(), r = MegaGuide.findRoute(world, st.p.x, st.p.y, st.p.z);
+    st.stats.guideMs = performance.now() - t0;
+    if (!r || r.length < 2) { toast('No way to a portal was found from here.'); return; }
+    if (!lprog) {
+      lprog = gl.createProgram(); gl.attachShader(lprog, shader(gl.VERTEX_SHADER, LVS)); gl.attachShader(lprog, shader(gl.FRAGMENT_SHADER, LFS)); gl.linkProgram(lprog);
+      lloc = { aP: gl.getAttribLocation(lprog, 'aP'), aT: gl.getAttribLocation(lprog, 'aT') }; ['uVP', 'uRel', 'uFog', 'uFogD', 'uTime', 'uAlpha'].forEach(n => { lloc[n] = gl.getUniformLocation(lprog, n); });
+    }
+    if (line) { gl.deleteBuffer(line.vbo); gl.deleteBuffer(line.ibo); }
+    // smooth the staircase of voxel centres a little, then lay a flat ribbon 0.2 m wide just above the floor
+    const o = r[0], pts = r.map((p, n) => { if (n === 0 || n === r.length - 1) return p; const a = r[n - 1], b = r[n + 1]; return [(a[0] + 2 * p[0] + b[0]) / 4, p[1], (a[2] + 2 * p[2] + b[2]) / 4]; });
+    const V = [], X = []; let along = 0, nv = 0;
+    for (let n = 0; n < pts.length - 1; n++) {
+      const a = pts[n], b = pts[n + 1], dx = b[0] - a[0], dz = b[2] - a[2], l = Math.hypot(dx, dz); if (l < 1e-3) { along += Math.abs(b[1] - a[1]); continue; }
+      const nx = -dz / l * 0.1, nz = dx / l * 0.1, ya = a[1] - o[1] + 0.06, yb = b[1] - o[1] + 0.06, la = along; along += Math.hypot(l, b[1] - a[1]);
+      V.push(a[0] - o[0] + nx, ya, a[2] - o[2] + nz, la, a[0] - o[0] - nx, ya, a[2] - o[2] - nz, la, b[0] - o[0] + nx, yb, b[2] - o[2] + nz, along, b[0] - o[0] - nx, yb, b[2] - o[2] - nz, along);
+      X.push(nv, nv + 1, nv + 2, nv + 1, nv + 3, nv + 2); nv += 4;
+    }
+    line = { o, n: X.length, t0: st.t, vbo: gl.createBuffer(), ibo: gl.createBuffer() };
+    gl.bindBuffer(gl.ARRAY_BUFFER, line.vbo); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(V), gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, line.ibo); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(X), gl.STATIC_DRAW);
+    toast(`The way to a portal: about ${Math.round(along)} m.`);
+  }
+  function drawLine(m, eye, fog, fogD) {
+    if (!line) return;
+    const age = st.t - line.t0; if (age > GUIDE_S) { gl.deleteBuffer(line.vbo); gl.deleteBuffer(line.ibo); line = null; return; }
+    const alpha = Math.min(1, age / 0.2) * Math.min(1, (GUIDE_S - age) / 1.5);
+    gl.useProgram(lprog); gl.uniformMatrix4fv(lloc.uVP, false, m); gl.uniform3fv(lloc.uFog, fog); gl.uniform1f(lloc.uFogD, fogD);
+    gl.uniform1f(lloc.uTime, age); gl.uniform1f(lloc.uAlpha, alpha); gl.uniform3f(lloc.uRel, line.o[0] - eye[0], line.o[1] - eye[1], line.o[2] - eye[2]);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.disable(gl.CULL_FACE);
+    gl.enableVertexAttribArray(lloc.aP); gl.enableVertexAttribArray(lloc.aT);
+    gl.bindBuffer(gl.ARRAY_BUFFER, line.vbo); gl.vertexAttribPointer(lloc.aP, 3, gl.FLOAT, false, 16, 0); gl.vertexAttribPointer(lloc.aT, 1, gl.FLOAT, false, 16, 12);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, line.ibo); gl.drawElements(gl.TRIANGLES, line.n, gl.UNSIGNED_SHORT, 0);
+    gl.disableVertexAttribArray(lloc.aP); gl.disableVertexAttribArray(lloc.aT);
+    gl.disable(gl.BLEND); gl.depthMask(true); gl.enable(gl.CULL_FACE);
+  }
+
   function respawn() { const s = startPoint(); Object.assign(st.p, { x: s.x, y: s.y, z: s.z, vy: 0, yaw: s.yaw, pitch: 0 }); st.safe = { x: s.x, y: s.y, z: s.z }; toast('Back at the start.'); }
 
   // ---------- start ----------
@@ -310,7 +366,7 @@
     PAL = W.PALETTES.map(palFlat);
     const s = startPoint();
     const body = MegaBody.createBody(world, s.x, s.y, s.z, s.yaw);
-    st = { body, p: body.p, keys: {}, stick: { on: false, x: 0, y: 0, mag: 0 }, cells: new Map(), ready: false, t: 0, last: 0, acc: 0, grounded: false, groundT: 0, jumpAt: 0, jumps: 0, safe: { x: s.x, y: s.y, z: s.z }, safeT: 0, frames: 0, hudT: 0, drawn: 0 };
+    st = { body, p: body.p, keys: {}, stick: { on: false, x: 0, y: 0, mag: 0 }, cells: new Map(), ready: false, t: 0, last: 0, acc: 0, grounded: false, groundT: 0, jumpAt: 0, jumps: 0, safe: { x: s.x, y: s.y, z: s.z }, safeT: 0, frames: 0, hudT: 0, drawn: 0, stats: { frame: 16, chunk: 0, draw: 0, built: 0, chunkMax: 0, at: 0, guideMs: 0 } };
     q('.mg-load').hidden = false; q('.mg-load').textContent = 'Building the first rooms…';
     cancelAnimationFrame(raf); raf = requestAnimationFrame(frame);
   }
@@ -320,7 +376,7 @@
     setup();
     let seed = seedFromHash(); biome = biomeFromHash(); if (seed === null) { seed = Math.floor(Math.random() * 1e6); history.replaceState(null, '', hashFor(seed, biome)); }
     start(seed);
-    root.Mega = { state: () => st, world: () => world, start, respawn, CW, CH };
+    root.Mega = { state: () => st, world: () => world, start, respawn, guide, line: () => line, CW, CH };
   }
   root.MegaGame = { init };
 })(window);

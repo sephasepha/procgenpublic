@@ -105,6 +105,19 @@ for (const biome of ['colonnade', 'chasm', null]) for (const seed of [1, 2, 3]) 
   if (tried) check(climbed === tried, `${biome || 'mixed'} seed ${seed}: every stair tower flight can be climbed (${climbed}/${tried})`);
 }
 
+console.log('Every stair has a metre of floor before its first step and after its last');
+for (const biome of [null, 'interior', 'catacombs', 'chasm', 'expanse']) for (const seed of [1, 2]) {
+  const w = createWorld(seed, { biome }), solid = (x, y, z) => w.voxel(x, y, z) !== 0, stand = (x, y, z) => solid(x, y - 1, z) && !solid(x, y, z) && !solid(x, y + 1, z);
+  let n = 0, bad = []; 
+  for (let i = -6; i <= 6; i++) for (let k = -6; k <= 6; k++) for (let j = -3; j <= 2; j++) {
+    if (!w.link(i, j, k, 4)) continue; n++;
+    const st = w.stairOf(i, j, k), [x0, x1] = w.LANE(st.lane);
+    const foot = [0, 1, 2].some(d => stand(i * CW + x0 + d, j * CH + 1, k * CW + st.z0 - 1)), head = [0, 1, 2].some(d => stand(i * CW + x0 + d, (j + 1) * CH + 1, k * CW + st.z0 + 7));
+    if (!foot || !head) bad.push([i, j, k].join() + (foot ? '' : ' foot') + (head ? '' : ' head'));
+  }
+  check(n > 0 && bad.length === 0, `${biome || 'mixed'} seed ${seed}: ${n - bad.length}/${n} stairs have floor at both ends ${bad.slice(0, 3).join('; ')}`);
+}
+
 console.log('Every stair that touches open space can be climbed');
 for (const biome of ['expanse', null]) for (const seed of [1, 2, 3, 4]) {
   const w = createWorld(seed, { biome }), solid = (x, y, z) => w.voxel(x, y, z) !== 0;
@@ -139,7 +152,7 @@ for (const seed of [1, 2, 3]) {
   let portals = 0, down = 0; const bad = [];
   for (let i = -12; i <= 12; i++) for (let k = -12; k <= 12; k++) {
     if (!w.portalAt(i, k)) continue; portals++;
-    const x0 = i * CW + w.LANE(1 + ((GJ - 1) % 2))[0], start = [x0 + 1, S + 2, k * CW + 11];
+    const x0 = i * CW + w.LANE(1 + ((GJ - 1) % 2))[0], start = [x0 + 1, S + 2, k * CW + w.PZ + 10];
     const q = [start], seen = new Set([start.join()]); let ok = false;
     const stand = (x, y, z) => solid(x, y - 1, z) && !solid(x, y, z) && !solid(x, y + 1, z);
     for (let h = 0; h < q.length && !ok; h++) { const [x, y, z] = q[h];

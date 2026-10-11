@@ -201,7 +201,7 @@
     const pairKey = (i, j, k, d) => d % 2 === 0 ? [i, j, k, d] : [i + DIRS[d][0], j + DIRS[d][1], k + DIRS[d][2], OPP[d]];
     const laneOf = (i, j, k, d) => { const p = pairKey(i, j, k, d); return H(p[0], p[1], p[2], 140 + p[3]) % 4; };
     function stairOf(i, j, k) { return { lane: 1 + (((j % 2) + 2) % 2), // the middle lanes, so doors in the side walls never face the side of a stair; and alternating, so a stair arrives and the next one leaves in different lanes
-       z0: j === GJ - 1 && portalAt(i, k) ? 1 : 1 + H(i, j, k, 151) % 8 }; } // for the cell below the stair (a portal's starts at the back, so it can climb on to the surface)
+       z0: j === GJ - 1 && portalAt(i, k) ? 2 : 2 + H(i, j, k, 151) % 7 }; } // for the cell below the stair: 2..8, so there is always a metre of floor before the first step and after the last (a portal's starts at the back, so it can climb on to the surface)
 
     // ---------- the surface ----------
     // portals: now and then a cell of the plain has one; there is always one over the start
@@ -213,6 +213,7 @@
       if (portalMemo.size > 60000) portalMemo.clear();
       portalMemo.set(key, v); return v;
     }
+    const PZ = 2; // where a portal's stair starts in the cell below
     const portalLane = (i, k) => LANE(1 + (((GJ - 1) % 2) + 2) % 2);
     // the plain's height (voxel units, the height you stand at), smooth; flattened to SURF + 2 round each portal
     function terrainH(x, z) {
@@ -221,7 +222,7 @@
       for (let di = -1; di <= 1; di++) for (let dk = -1; dk <= 1; dk++) {
         if (!portalAt(i + di, k + dk)) continue;
         const [x0, x1] = portalLane(i + di, k + dk), ox = (i + di) * CW, oz = (k + dk) * CW;
-        const dx = Math.max(ox + x0 - 3 - x, 0, x - (ox + x1 + 4)), dz = Math.max(oz - z, 0, z - (oz + 13));
+        const dx = Math.max(ox + x0 - 3 - x, 0, x - (ox + x1 + 4)), dz = Math.max(oz - z, 0, z - (oz + PZ + 12));
         const t = Math.min(1, Math.hypot(dx, dz) / 9), w = t * t * (3 - 2 * t);
         h = SURF + 2 + (h - SURF - 2) * w;
       }
@@ -230,7 +231,7 @@
     // where you stand on the plain, or null over a portal's stairwell
     function groundAt(x, z) {
       const i = fdiv(Math.floor(x), CW), k = fdiv(Math.floor(z), CW);
-      if (portalAt(i, k)) { const [x0, x1] = portalLane(i, k), lx = x - i * CW, lz = z - k * CW; if (lx >= x0 && lx < x1 + 1 && lz >= 1 && lz < 9) return null; }
+      if (portalAt(i, k)) { const [x0, x1] = portalLane(i, k), lx = x - i * CW, lz = z - k * CW; if (lx >= x0 && lx < x1 + 1 && lz >= 1 && lz < PZ + 8) return null; }
       return terrainH(x, z);
     }
     // a surface cell: a slab of rock under the plain (the structure's lid), and a portal where there is one: a trench
@@ -240,13 +241,14 @@
       box(0, CW - 1, 0, 0, 0, CW - 1, M.FLOOR);
       if (!portalAt(i, k)) return g;
       const [x0, x1] = portalLane(i, k);
-      box(x0, x1, 0, 0, 1, 9, 0);                                   // the stairwell
-      box(x0, x1, 0, 0, 8, 8, M.BRIDGE); box(x0, x1, 1, 1, 9, 9, M.BRIDGE); // the last two steps
-      box(x0, x1, 1, 1, 10, 11, M.BRIDGE);                         // the landing at the mouth
-      box(x0 - 1, x0 - 1, 1, 1, 0, 11, M.WALL); box(x1 + 1, x1 + 1, 1, 1, 0, 11, M.WALL); box(x0, x1, 1, 1, 0, 0, M.WALL);
+      const Z = PZ;                                                 // the stair below starts at Z
+      box(x0, x1, 0, 0, 1, Z + 8, 0);                               // the stairwell
+      box(x0, x1, 0, 0, Z + 7, Z + 7, M.BRIDGE); box(x0, x1, 1, 1, Z + 8, Z + 8, M.BRIDGE); // the last two steps
+      box(x0, x1, 1, 1, Z + 9, Z + 10, M.BRIDGE);                   // the landing at the mouth
+      box(x0 - 1, x0 - 1, 1, 1, 0, Z + 10, M.WALL); box(x1 + 1, x1 + 1, 1, 1, 0, Z + 10, M.WALL); box(x0, x1, 1, 1, 0, 0, M.WALL);
       // the doorway: two piers and a lintel, two deep, with a cold light along its inner edge
-      box(x0 - 2, x0 - 1, 1, 6, 10, 11, M.PILLAR); box(x1 + 1, x1 + 2, 1, 6, 10, 11, M.PILLAR); box(x0 - 2, x1 + 2, 6, 7, 10, 11, M.PILLAR);
-      box(x0 - 1, x0 - 1, 2, 5, 10, 10, M.LIGHT); box(x1 + 1, x1 + 1, 2, 5, 10, 10, M.LIGHT); box(x0, x1, 6, 6, 10, 10, M.LIGHT);
+      box(x0 - 2, x0 - 1, 1, 6, Z + 9, Z + 10, M.PILLAR); box(x1 + 1, x1 + 2, 1, 6, Z + 9, Z + 10, M.PILLAR); box(x0 - 2, x1 + 2, 6, 7, Z + 9, Z + 10, M.PILLAR);
+      box(x0 - 1, x0 - 1, 2, 5, Z + 9, Z + 9, M.LIGHT); box(x1 + 1, x1 + 1, 2, 5, Z + 9, Z + 9, M.LIGHT); box(x0, x1, 6, 6, Z + 9, Z + 9, M.LIGHT);
       return g;
     }
     function surfaceSpawn() { const [x0, x1] = portalLane(0, 0), x = (x0 + x1 + 1) / 2, z = CW + 7.5; return { x, y: terrainH(x, z), z, yaw: 0 }; }
@@ -509,7 +511,7 @@
       let yaw = 0; for (let d = 0; d < 4; d++) if (link(0, 0, 0, d)) { yaw = [Math.PI / 2, 3 * Math.PI / 2, Math.PI, 0][d]; break; }
       return { x: 8.5, y: 1, z: 8.5, yaw };
     }
-    return { seed: S, GJ, SURF, portalAt, terrainH, groundAt, surfaceSpawn, biome: force, voidStair, towerCol, isAir, obeliskAt, isExpanse, districtOf, BIOMES, BIOME_NAMES, CW, CH, M, DIRS, PALETTES, info, link, isVoid, wellCol, dropCol, shaftCol, wellHole, dropHole, stairUp, stairOf, laneOf, variantOf, wide, parentDir, genCell, cell, voxel, spawn, regionOf, lightOf, LANE };
+    return { seed: S, GJ, SURF, PZ, portalAt, terrainH, groundAt, surfaceSpawn, biome: force, voidStair, towerCol, isAir, obeliskAt, isExpanse, districtOf, BIOMES, BIOME_NAMES, CW, CH, M, DIRS, PALETTES, info, link, isVoid, wellCol, dropCol, shaftCol, wellHole, dropHole, stairUp, stairOf, laneOf, variantOf, wide, parentDir, genCell, cell, voxel, spawn, regionOf, lightOf, LANE };
   }
 
   const api = { createWorld, GJ, CW, CH, MATERIALS: M, PALETTES, BIOMES, BIOME_NAMES };

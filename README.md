@@ -153,6 +153,8 @@ The home page (`index.html`) is a separate 3D game, a Blame!-like infinite struc
 
 **The surface.** The structure has a lid four levels above the start. Above it lies the ground floor: a gently rolling plain of grass and dirt (a smooth heightfield with slope shading, not voxels; you walk on its height directly) in dense, slightly green fog, empty but for doorways. About one cell in thirty holds one: two stone piers and a lintel with a cold light along the inner edge, opening on a trench and a stair down into whatever lies beneath. There is always one in front of the start, and Mixed begins there on the plain; a forced kind of district begins inside the structure as before. On the plain only the level under the lid is drawn, since the lid hides the rest.
 
+**The way out (F).** Press F (or WAY on a phone) and a glowing line is laid along the floor to the nearest portal, light pulsing along it in the direction to go; it fades after six seconds. Underground the route is real (`mega/guide.js`): a breadth-first search over the cells and their links finds the nearest cell under a portal, then an A* search over the voxels you can stand on, kept to the cells along that route, finds the steps; on the plain it runs over the ground to the nearest doorway. In the corner, a dim line shows frame time, frames per second, drawing time, chunk building time (average, worst and cells built per second), cells drawn of cells held, and the last route's search time.
+
 **Districts.** Space is divided into districts sixteen cells (272 m) across and nine levels (72 m) tall, with wobbling plumb sides, and each has an identity you recognise as you walk in:
 
 - **The Interior**: the dense inside of the structure, with no open air. Conduits (two-wide, three-high corridors), cells (a warren of small rooms), open halls and pillar halls, wells and narrow drops.
@@ -166,7 +168,7 @@ The HUD names the district and the kind of space you are in. The pills under the
 
 **Scale.** The large forms (districts, canyons, colossal voids four to six cells across and nine to fourteen levels tall, obelisks, terraced massifs, the colonnade's 64 m void, halls merged into multi-cell halls) are big; the things you walk on keep human sizes (one-metre steps, two-to-four-metre doorways), so everything stays walkable.
 
-**Stairs.** Every staircase, in a hall or out in a void, is the same open flight: seven single slabs climbing one metre a step, rising through a hole in the floor above. Flights alternate sides level by level, so a stack of them zig-zags.
+**Stairs.** Every staircase, in a hall or out in a void, is the same open flight: seven single slabs climbing one metre a step, with at least a metre of floor before the first step and after the last, rising through a hole in the floor above. Flights alternate sides level by level, so a stack of them zig-zags.
 
 **Stair towers.** About one column in twelve carries a stair tower through the open voids: a landing at every level that every walkway there joins, and a flight of slabs up to the landing above, alternating sides by level, so the voids can be climbed and descended without going back indoors.
 

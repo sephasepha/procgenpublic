@@ -35,6 +35,9 @@
   .mg .mg-stick::before { content: ''; position: absolute; left: -52px; top: -52px; width: 104px; height: 104px; border-radius: 50%; border: 2px solid rgba(10,12,14,0.8); background: rgba(30,36,40,0.18); }
   .mg .mg-stick i { position: absolute; left: 0; top: 0; width: 46px; height: 46px; border-radius: 50%; background: rgba(18,20,23,0.85); transform: translate(-50%, -50%); }
   .mg .mg-jump { position: absolute; right: calc(env(safe-area-inset-right, 0px) + 28px); bottom: calc(env(safe-area-inset-bottom, 0px) + 30px); width: 84px; height: 84px; border-radius: 50%; border: 2px solid rgba(18,20,23,0.85); background: rgba(30,36,40,0.28); color: #f0f3f5; font-size: 0.85rem; letter-spacing: 0.06em; appearance: none; touch-action: none; }
+  .mg .mg-guide { position: absolute; right: calc(env(safe-area-inset-right, 0px) + 122px); bottom: calc(env(safe-area-inset-bottom, 0px) + 40px); width: 58px; height: 58px; border-radius: 50%; border: 2px solid rgba(18,20,23,0.85); background: rgba(30,36,40,0.28); color: #ffe2a8; font-size: 0.72rem; letter-spacing: 0.06em; appearance: none; touch-action: none; }
+  .mg .mg-stats { position: absolute; left: 8px; bottom: calc(env(safe-area-inset-bottom, 0px) + 4px); font: 0.62rem ui-monospace, SFMono-Regular, Menlo, monospace; opacity: 0.45; pointer-events: none; text-shadow: 0 0 3px rgba(10,12,14,0.9); white-space: nowrap; }
+  .mg.touch .mg-stats { bottom: auto; top: calc(env(safe-area-inset-top, 0px) + 78px); }
   .mg .mg-jump:active { background: rgba(240,243,245,0.55); color: #d8dde2; }
   .mg .mg-hint { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); transform: translateX(-50%); font-size: 0.72rem; opacity: 0.7; pointer-events: none; text-shadow: 0 0 4px rgba(10,12,14,0.9); white-space: nowrap; }
   .mg.touch .mg-hint { display: none; }
@@ -48,13 +51,15 @@
   <div class="mg-pos"></div>
   <div class="mg-load">Building the first rooms…</div>
   <div class="mg-toast" hidden></div>
-  <div class="mg-help"><b>Click to look around</b><span>W A S D walk · mouse looks · Space jumps · Shift runs · R back to the start · Esc frees the mouse</span></div>
-  <div class="mg-hint">W A S D · mouse · Space · Shift</div>
+  <div class="mg-help"><b>Click to look around</b><span>W A S D walk · mouse looks · Space jumps · Shift runs · F shows the way out · R back to the start · Esc frees the mouse</span></div>
+  <div class="mg-hint">W A S D · mouse · Space · Shift · F the way out</div>
+  <div class="mg-stats"></div>
   <div class="mg-biomes" aria-label="Force one kind of district"></div>
-  <div class="mg-touch"><div class="mg-stick" hidden><i></i></div><button class="mg-jump" type="button">JUMP</button></div>
+  <div class="mg-touch"><div class="mg-stick" hidden><i></i></div><button class="mg-jump" type="button">JUMP</button><button class="mg-guide" type="button" title="The way to a portal">WAY</button></div>
 </div>
 <script src="mega/world.js"></script>
 <script src="mega/body.js"></script>
+<script src="mega/guide.js"></script>
 <script src="mega/game.js"></script>
 <script>MegaGame.init(document.querySelector('.mg'));</script>
 <script src="assets/build.js"></script>
